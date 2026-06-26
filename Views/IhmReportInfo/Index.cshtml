@@ -1,0 +1,706 @@
+@model IhmReportInfoViewModel
+@{
+    Layout = null;
+    var customGroups = Model.CustomAppendices
+        .GroupBy(x => x.AppendixNo ?? 0)
+        .OrderBy(x => x.Key)
+        .ToList();
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IHM Report Workspace</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/ihm-report.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="app-shell">
+        <header class="topbar">
+            <div class="topbar-main">
+                <a class="icon-button" href="/SurveyJobs/Ihm" aria-label="Back to IHM jobs">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </a>
+                <div class="report-mark"><i class="fa-solid fa-ship"></i></div>
+                <div class="title-block">
+                    <div class="eyebrow">Inventory of Hazardous Materials</div>
+                    <h1>@(string.IsNullOrWhiteSpace(Model.VesselName) ? "IHM Report" : Model.VesselName)</h1>
+                    <div class="title-meta">
+                        <span><i class="fa-solid fa-hashtag"></i> @(Model.JobNumber ?? $"Job {Model.JobId}")</span>
+                        @if (!string.IsNullOrWhiteSpace(Model.ImoNumber))
+                        {
+                            <span><i class="fa-solid fa-fingerprint"></i> IMO @Model.ImoNumber</span>
+                        }
+                        <span class="status-chip"><i class="fa-solid fa-pen-ruler"></i> Report editor</span>
+                    </div>
+                </div>
+                <div class="topbar-actions">
+                    <button class="button ghost" type="button" data-bs-toggle="modal" data-bs-target="#reportFinderModal">
+                        <i class="fa-solid fa-copy"></i> Use previous report
+                    </button>
+                    <a class="button ghost" href="/IhmReportInfo/ViewPdf?jobId=@Model.JobId">
+                        <i class="fa-regular fa-eye"></i> Latest PDF
+                    </a>
+                </div>
+            </div>
+            <div class="progress-track"><span id="formProgress"></span></div>
+        </header>
+
+        <div class="workspace">
+            <aside class="sidebar">
+                <div class="sidebar-card overview-card">
+                    <div class="overview-ring" id="completionRing">
+                        <strong id="completionValue">0%</strong>
+                    </div>
+                    <div>
+                        <div class="small-label">Report readiness</div>
+                        <p id="completionText">Complete the core report fields</p>
+                    </div>
+                </div>
+
+                <nav class="section-nav" aria-label="Report sections">
+                    <a href="#vessel"><span>01</span><i class="fa-solid fa-ship"></i> Vessel</a>
+                    <a href="#cover"><span>02</span><i class="fa-regular fa-file-lines"></i> Cover details</a>
+                    <a href="#revisions"><span>03</span><i class="fa-solid fa-code-branch"></i> Revisions</a>
+                    <a href="#scope"><span>04</span><i class="fa-solid fa-microscope"></i> Scope</a>
+                    <a href="#materials"><span>05</span><i class="fa-solid fa-flask-vial"></i> Materials</a>
+                    <a href="#sampling"><span>06</span><i class="fa-solid fa-location-crosshairs"></i> Sampling plan</a>
+                    <a href="#ohs"><span>07</span><i class="fa-solid fa-shield-halved"></i> OHS assessment</a>
+                    <a href="#appendices"><span>08</span><i class="fa-solid fa-paperclip"></i> Appendices</a>
+                </nav>
+
+                <div class="sidebar-note">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span>Changes are saved to the API and used for the generated report.</span>
+                </div>
+            </aside>
+
+            <main class="report-canvas">
+                @if (TempData["SuccessMessage"] != null)
+                {
+                    <div class="toast-banner success"><i class="fa-solid fa-circle-check"></i> @TempData["SuccessMessage"]</div>
+                }
+                @if (TempData["ErrorMessage"] != null)
+                {
+                    <div class="toast-banner error"><i class="fa-solid fa-triangle-exclamation"></i> @TempData["ErrorMessage"]</div>
+                }
+
+                <form id="reportForm" method="post" action="@Url.Action("Save", "IhmReportInfo")">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="JobId" />
+                    <input type="hidden" asp-for="VesselId" />
+
+                    <section class="report-section" id="vessel">
+                        <button class="section-heading" type="button" aria-expanded="true">
+                            <span class="section-icon blue"><i class="fa-solid fa-ship"></i></span>
+                            <span>
+                                <span class="section-kicker">Section 01</span>
+                                <strong>Vessel Information</strong>
+                                <small>Primary vessel particulars used throughout the report.</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-up chevron"></i>
+                        </button>
+                        <div class="section-body">
+                            <div class="form-grid">
+                                <label class="field span-2"><span>Vessel name</span><input asp-for="VesselName" class="core-field" /></label>
+                                <label class="field"><span>IMO number</span><input asp-for="ImoNumber" class="core-field" /></label>
+                                <label class="field"><span>Official number</span><input asp-for="OfficialNumber" /></label>
+                                <label class="field"><span>Vessel type</span><input asp-for="VesselType" /></label>
+                                <label class="field"><span>Flag</span><input asp-for="Flag" /></label>
+                                <label class="field"><span>Port of registry</span><input asp-for="PortOfRegistry" /></label>
+                                <label class="field"><span>Class society</span><input asp-for="ClassSociety" /></label>
+                                <label class="field"><span>Call sign</span><input asp-for="CallSign" /></label>
+                                <label class="field"><span>Builder</span><input asp-for="Builder" /></label>
+                                <label class="field"><span>Date of build</span><input asp-for="DateOfBuild" type="date" /></label>
+                                <label class="field"><span>Deadweight</span><input asp-for="Deadweight" /></label>
+                                <label class="field"><span>Year built</span><input asp-for="YearBuilt" /></label>
+                                <label class="field"><span>Owner name</span><input asp-for="OwnerName" /></label>
+                                <label class="field"><span>Ship manager</span><input asp-for="ShipManager" /></label>
+                            </div>
+                            <div class="metric-grid">
+                                <label class="metric"><span>LOA</span><input asp-for="LengthOverall" inputmode="decimal" /><small>metres</small></label>
+                                <label class="metric"><span>LBP</span><input asp-for="LengthBetweenPerpendiculars" inputmode="decimal" /><small>metres</small></label>
+                                <label class="metric"><span>Breadth</span><input asp-for="Breadth" inputmode="decimal" /><small>metres</small></label>
+                                <label class="metric"><span>Depth</span><input asp-for="Depth" inputmode="decimal" /><small>metres</small></label>
+                                <label class="metric"><span>Draught</span><input asp-for="DraughtMoulded" inputmode="decimal" /><small>metres</small></label>
+                                <label class="metric"><span>GRT</span><input asp-for="GrossTonnage" inputmode="decimal" /><small>tonnage</small></label>
+                                <label class="metric"><span>NRT</span><input asp-for="NetTonnage" inputmode="decimal" /><small>tonnage</small></label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="report-section" id="cover">
+                        <button class="section-heading" type="button" aria-expanded="true">
+                            <span class="section-icon purple"><i class="fa-regular fa-file-lines"></i></span>
+                            <span>
+                                <span class="section-kicker">Section 02</span>
+                                <strong>Cover and Document Control</strong>
+                                <small>Company identity, client identity and approval chain.</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-up chevron"></i>
+                        </button>
+                        <div class="section-body">
+                            <div class="subsection-title"><span>Company details</span></div>
+                            <div class="form-grid">
+                                <label class="field company-search-field">
+                                    <span>Company name</span>
+
+                                    <input asp-for="CompanyId" type="hidden" />
+                                    <input asp-for="CompanyDisplayName" type="hidden" />
+                                    <input asp-for="CompanyName"
+                                           class="core-field"
+                                           autocomplete="off"
+                                           placeholder="Search or enter company name" />
+
+                                    <div id="companySearchResults"
+                                         class="company-search-results"
+                                         hidden></div>
+                                </label>
+                                <label class="field"><span>Company email</span><textarea asp-for="CompanyEmail" rows="2"></textarea></label>
+                                <label class="field span-2"><span>Company address</span><textarea asp-for="CompanyAddress" rows="3"></textarea></label>
+                                <label class="field"><span>Telephone</span><input asp-for="CompanyTel" /></label>
+                                <label class="field"><span>Fax</span><input asp-for="CompanyFax" /></label>
+                                <label class="field"><span>Website</span><input asp-for="CompanyWebsite" /></label>
+                                <label class="field"><span>Client name</span><input asp-for="ClientName" class="core-field" /></label>
+                            </div>
+                            <div class="asset-grid">
+                                <div class="asset-box paste-upload-zone"
+                                     data-target="CompanyLogoPath"
+                                     tabindex="0">
+                                    <div class="asset-icon"><i class="fa-regular fa-image"></i></div>
+                                    <div>
+                                        <strong>Company logo</strong>
+                                        <small id="CompanyLogoPath-label">@(Model.CompanyLogoPath ?? "Browse or click here and press Ctrl+V")</small>
+                                    </div>
+                                    <input asp-for="CompanyLogoPath" type="hidden" />
+                                    <label class="mini-button"><input class="asset-input" data-target="CompanyLogoPath" type="file" accept=".png,.jpg,.jpeg" hidden /> Upload</label>
+                                </div>
+                                <div class="asset-box paste-upload-zone"
+                                     data-target="ClientLogoPath"
+                                     tabindex="0">
+                                    <div class="asset-icon"><i class="fa-regular fa-image"></i></div>
+                                    <div>
+                                        <strong>Client logo</strong>
+                                        <small id="ClientLogoPath-label">@(Model.ClientLogoPath ?? "Browse or click here and press Ctrl+V")</small>
+                                    </div>
+                                    <input asp-for="ClientLogoPath" type="hidden" />
+                                    <label class="mini-button"><input class="asset-input" data-target="ClientLogoPath" type="file" accept=".png,.jpg,.jpeg" hidden /> Upload</label>
+                                </div>
+                            </div>
+
+                            <div class="subsection-title"><span>Document control</span></div>
+                            <div class="form-grid">
+                                <label class="field"><span>Prepared by</span><input asp-for="PreparedBy" class="core-field" /></label>
+                                <label class="field"><span>Checked by</span><input asp-for="CheckedBy" /></label>
+                                <label class="field"><span>Approved by</span><input asp-for="ApprovedBy" /></label>
+                                <label class="field"><span>UID number</span><input asp-for="Uid" /></label>
+                                <label class="field"><span>Job number</span><input asp-for="JobNumber" readonly /></label>
+                                <label class="field"><span>Document number</span><input asp-for="DocumentNo" class="core-field" /></label>
+                                <label class="field"><span>Document date</span><input asp-for="DocumentDate" type="date" /></label>
+                                <label class="field"><span>Revision number</span><input asp-for="RevisionNo" type="text" maxlength="30" />
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="report-section" id="revisions">
+                        <button class="section-heading" type="button" aria-expanded="true">
+                            <span class="section-icon teal"><i class="fa-solid fa-code-branch"></i></span>
+                            <span>
+                                <span class="section-kicker">Section 03</span>
+                                <strong>Revision History</strong>
+                                <small>Maintain the document issue and approval trail.</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-up chevron"></i>
+                        </button>
+                        <div class="section-body">
+                            <div class="table-toolbar">
+                                <p>Each row becomes an entry in the revision history table.</p>
+                                <button class="mini-button add-row" type="button" data-collection="revisions"><i class="fa-solid fa-plus"></i> Add revision</button>
+                            </div>
+                            <div class="data-table-wrap">
+                                <table class="data-table">
+                                    <thead><tr><th>UID</th><th>Rev</th><th>Date</th><th>Description</th><th>Prepared</th><th>Checked</th><th>Approved</th><th></th></tr></thead>
+                                    <tbody data-collection="revisions" data-prefix="Revisions">
+                                        @for (var i = 0; i < Model.Revisions.Count; i++)
+                                        {
+                                            <tr>
+                                                <td><input asp-for="Revisions[i].Uid" data-field="Uid" /></td>
+                                                <td><input asp-for="Revisions[i].RevisionNo" data-field="RevisionNo" class="short-input" /></td>
+                                                <td><input asp-for="Revisions[i].RevisionDate" data-field="RevisionDate" type="date" /></td>
+                                                <td><input asp-for="Revisions[i].Description" data-field="Description" /></td>
+                                                <td><input asp-for="Revisions[i].PreparedBy" data-field="PreparedBy" /></td>
+                                                <td><input asp-for="Revisions[i].CheckedBy" data-field="CheckedBy" /></td>
+                                                <td><input asp-for="Revisions[i].ApprovedBy" data-field="ApprovedBy" /></td>
+                                                <td><button class="remove-row" type="button" aria-label="Remove row"><i class="fa-regular fa-trash-can"></i></button></td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="report-section" id="scope">
+                        <button class="section-heading" type="button" aria-expanded="true">
+                            <span class="section-icon amber"><i class="fa-solid fa-microscope"></i></span>
+                            <span>
+                                <span class="section-kicker">Section 04</span>
+                                <strong>Introduction and Scope of Work</strong>
+                                <small>Survey findings and laboratory reporting references.</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-up chevron"></i>
+                        </button>
+                        <div class="section-body">
+                            <div class="form-grid">
+                                <label class="field span-2"><span>Hazardous material findings</span><textarea asp-for="HazardousMaterialNoFindings" rows="5" class="core-field"></textarea></label>
+                                <label class="field span-2"><span>Hazardous material findings</span><textarea asp-for="HazardousMaterialFindings" rows="5" class="core-field"></textarea></label>
+                                <label class="field"><span>Lab test report number</span><input asp-for="LabReportNo" /></label>
+                                <label class="field"><span>Lab reporting date</span><input asp-for="LabReportingDate" type="date" /></label>
+                                <label class="field span-2"><span>Hazmat expert</span><input asp-for="HazmatExpert" /></label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="report-section" id="materials">
+                        <button class="section-heading" type="button" aria-expanded="true">
+                            <span class="section-icon red"><i class="fa-solid fa-flask-vial"></i></span>
+                            <span>
+                                <span class="section-kicker">Section 05</span>
+                                <strong>Hazardous Materials in Structure and Equipment</strong>
+                                <small>Tables I-1, I-2 and I-3 of the IHM report.</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-up chevron"></i>
+                        </button>
+                        <div class="section-body">
+                            <div class="table-block">
+                                <div class="table-toolbar">
+                                    <div><span class="table-number">I-1</span><strong>Paints and coating systems</strong><p>Materials listed in Table A and Table B.</p></div>
+                                    <button class="mini-button add-row" type="button" data-collection="paint"><i class="fa-solid fa-plus"></i> Add row</button>
+                                </div>
+                                <div class="data-table-wrap">
+                                    <table class="data-table">
+                                        <thead><tr><th>#</th><th>Application</th><th>Paint name</th><th>Location</th><th>Materials</th><th>Mass</th><th>Unit</th><th>Remarks</th><th></th></tr></thead>
+                                        <tbody data-collection="paint" data-prefix="PaintAndCoatingSystems">
+                                            @for (var i = 0; i < Model.PaintAndCoatingSystems.Count; i++)
+                                            {
+                                                <tr>
+                                                    <td class="row-number">@(i + 1)</td>
+                                                    <td><input asp-for="PaintAndCoatingSystems[i].ApplicationOfPaint" data-field="ApplicationOfPaint" /></td>
+                                                    <td><input asp-for="PaintAndCoatingSystems[i].NameOfPaint" data-field="NameOfPaint" /></td>
+                                                    <td><input asp-for="PaintAndCoatingSystems[i].Location" data-field="Location" /></td>
+                                                    <td><input asp-for="PaintAndCoatingSystems[i].MaterialClassification" data-field="MaterialClassification" /></td>
+                                                    <td><input asp-for="PaintAndCoatingSystems[i].Mass" data-field="Mass" /></td>
+                                                    <td><input asp-for="PaintAndCoatingSystems[i].Unit" data-field="Unit" /></td>
+                                                    <td><input asp-for="PaintAndCoatingSystems[i].Remarks" data-field="Remarks" /></td>
+                                                    <td><button class="remove-row" type="button"><i class="fa-regular fa-trash-can"></i></button></td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="table-block">
+                                <div class="table-toolbar">
+                                    <div><span class="table-number">I-2</span><strong>Equipment and machinery</strong><p>Rows from completed survey checkpoints can be refined here.</p></div>
+                                    <button class="mini-button add-row" type="button" data-collection="equipment"><i class="fa-solid fa-plus"></i> Add row</button>
+                                </div>
+                                <div class="data-table-wrap">
+                                    <table class="data-table">
+                                        <thead><tr><th>#</th><th>Equipment</th><th>Location</th><th>Materials</th><th>Parts used</th><th>Unit kg</th><th>Qty</th><th>Total kg</th><th>Remarks</th><th></th></tr></thead>
+                                        <tbody data-collection="equipment" data-prefix="EquipmentAndMachinery">
+                                            @for (var i = 0; i < Model.EquipmentAndMachinery.Count; i++)
+                                            {
+                                                <tr>
+                                                    <td class="row-number">@(i + 1)<input asp-for="EquipmentAndMachinery[i].IhmCheckpointId" data-field="IhmCheckpointId" type="hidden" /><input asp-for="EquipmentAndMachinery[i].IsHidden" data-field="IsHidden" type="hidden" /><input asp-for="EquipmentAndMachinery[i].SortOrder" data-field="SortOrder" type="hidden" /></td>
+                                                    <td><input asp-for="EquipmentAndMachinery[i].EquipmentName" data-field="EquipmentName" /></td>
+                                                    <td><input asp-for="EquipmentAndMachinery[i].Location" data-field="Location" /></td>
+                                                    <td><input asp-for="EquipmentAndMachinery[i].MaterialClassification" data-field="MaterialClassification" /></td>
+                                                    <td><input asp-for="EquipmentAndMachinery[i].PartsWereUsed" data-field="PartsWereUsed" /></td>
+                                                    <td><input asp-for="EquipmentAndMachinery[i].UnitKg" data-field="UnitKg" /></td>
+                                                    <td><input asp-for="EquipmentAndMachinery[i].QuantityNo" data-field="QuantityNo" /></td>
+                                                    <td><input asp-for="EquipmentAndMachinery[i].TotalKg" data-field="TotalKg" /></td>
+                                                    <td><input asp-for="EquipmentAndMachinery[i].Remarks" data-field="Remarks" /></td>
+                                                    <td><button class="remove-row" type="button"><i class="fa-regular fa-trash-can"></i></button></td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="table-block">
+                                <div class="table-toolbar">
+                                    <div><span class="table-number">I-3</span><strong>Structure and hull</strong><p>Hazardous materials associated with vessel structure.</p></div>
+                                    <button class="mini-button add-row" type="button" data-collection="structure"><i class="fa-solid fa-plus"></i> Add row</button>
+                                </div>
+                                <div class="data-table-wrap">
+                                    <table class="data-table">
+                                        <thead><tr><th>#</th><th>Equipment / structure</th><th>Location</th><th>Materials</th><th>Parts used</th><th>Approx. quantity</th><th>Remarks</th><th></th></tr></thead>
+                                        <tbody data-collection="structure" data-prefix="StructureAndHull">
+                                            @for (var i = 0; i < Model.StructureAndHull.Count; i++)
+                                            {
+                                                <tr>
+                                                    <td class="row-number">@(i + 1)</td>
+                                                    <td><input asp-for="StructureAndHull[i].EquipmentName" data-field="EquipmentName" /></td>
+                                                    <td><input asp-for="StructureAndHull[i].Location" data-field="Location" /></td>
+                                                    <td><input asp-for="StructureAndHull[i].MaterialClassification" data-field="MaterialClassification" /></td>
+                                                    <td><input asp-for="StructureAndHull[i].PartsWereUsed" data-field="PartsWereUsed" /></td>
+                                                    <td><input asp-for="StructureAndHull[i].ApproximateQuantity" data-field="ApproximateQuantity" /></td>
+                                                    <td><input asp-for="StructureAndHull[i].Remarks" data-field="Remarks" /></td>
+                                                    <td><button class="remove-row" type="button"><i class="fa-regular fa-trash-can"></i></button></td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="subsection-title"><span>Collection of necessary information</span></div>
+                            <label class="field"><span>Enter one information point per line</span><textarea asp-for="NecessaryInformationText" rows="8"></textarea><small>Blank lines are ignored when saving.</small></label>
+                        </div>
+                    </section>
+
+                    <section class="report-section" id="sampling">
+                        <button class="section-heading" type="button" aria-expanded="true">
+                            <span class="section-icon green"><i class="fa-solid fa-location-crosshairs"></i></span>
+                            <span>
+                                <span class="section-kicker">Section 06</span>
+                                <strong>Visual / Sampling Check Plan</strong>
+                                <small>Site, methodology, laboratory and analysis approach.</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-up chevron"></i>
+                        </button>
+                        <div class="section-body">
+                            <div class="form-grid">
+                                <label class="field"><span>Ship manager</span><input value="@Model.ShipManager" readonly class="read-only-field" /></label>
+                                <label class="field span-2">
+                                    <span>Ship manager contact</span>
+                                    <textarea asp-for="ShipManagerContact"
+                                              rows="4"
+                                              placeholder="Enter each contact detail on a new line"></textarea>
+                                </label>
+                                <label class="field"><span>Site of check</span><input asp-for="SiteOfCheck" class="core-field" /></label>
+                                <label class="field"><span>Date of survey</span><input asp-for="DateOfSurvey" type="date" /></label>
+                                <label class="field span-2"><span>Sampling methodology</span><textarea asp-for="SamplingMethodology" rows="4"></textarea></label>
+                                <label class="field span-2"><span>Sampling of fragments of paints</span><textarea asp-for="SamplingOfFragmentsOfPaints" rows="3"></textarea></label>
+                                <label class="field"><span>Laboratory</span><input asp-for="Laboratory" /></label>
+                                <label class="field"><span>Chemical analysis method</span><input asp-for="ChemicalAnalysisMethod" /></label>
+                                <label class="field span-2"><span>Location of visual / sampling check</span><textarea asp-for="LocationOfVisualSamplingCheck" rows="3"></textarea></label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="report-section" id="ohs">
+                        <button class="section-heading" type="button" aria-expanded="true">
+                            <span class="section-icon navy"><i class="fa-solid fa-shield-halved"></i></span>
+                            <span>
+                                <span class="section-kicker">Section 07</span>
+                                <strong>OHS Risk Assessment</strong>
+                                <small>Project team, risk controls, responsible persons and approvals.</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-up chevron"></i>
+                        </button>
+                        <div class="section-body">
+                            <div class="form-grid">
+                                <label class="field"><span>Job detail</span><input asp-for="OhsJobDetail" /></label>
+                                <label class="field"><span>Client name</span><input asp-for="OhsClient" /></label>
+                                <label class="field"><span>Job location</span><input asp-for="OhsJobLocation" /></label>
+                                <label class="field"><span>Job number</span><input asp-for="OhsJobNo" /></label>
+                                <label class="field"><span>Project in charge</span><input asp-for="OhsProjectInCharge" /></label>
+                                <label class="field"><span>Division / branch</span><input asp-for="OhsDivisionBranch" /></label>
+                                <label class="field"><span>RA number</span><input asp-for="OhsRaNo" /></label>
+                                <label class="field"><span>Revision number</span><input asp-for="OhsRevNo" /></label>
+                                <label class="field"><span>Revision date</span><input asp-for="OhsRevisionDate" type="date" /></label>
+                            </div>
+
+                            <div class="people-grid">
+                                @foreach (var role in new[] { ("HseOfficer", "HSE Officers", 3), ("ResponsibleSupervisor", "Responsible Supervisors", 6), ("Participant", "Participants", 12) })
+                                {
+                                    var rolePeople = Model.OhsPeople.Where(x => x.RoleType == role.Item1).ToList();
+                                    <div class="people-card">
+                                        <div class="people-heading"><strong>@role.Item2</strong><button type="button" class="add-person" data-role="@role.Item1" data-max="@role.Item3"><i class="fa-solid fa-plus"></i></button></div>
+                                        <div class="people-list" data-role="@role.Item1">
+                                            @foreach (var person in rolePeople)
+                                            {
+                                                var originalIndex = Model.OhsPeople.IndexOf(person);
+                                                <div class="person-row">
+                                                    <input asp-for="OhsPeople[originalIndex].RoleType" data-field="RoleType" type="hidden" />
+                                                    <input asp-for="OhsPeople[originalIndex].SortOrder" data-field="SortOrder" type="hidden" />
+                                                    <input asp-for="OhsPeople[originalIndex].Name" data-field="Name" placeholder="Full name" />
+                                                    <button type="button" class="remove-person"><i class="fa-solid fa-xmark"></i></button>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="table-block">
+                                <div class="table-toolbar">
+                                    <div><strong>Risk assessment table</strong><p>Record initial risk, controls and residual risk.</p></div>
+                                    <button class="mini-button add-row" type="button" data-collection="risk"><i class="fa-solid fa-plus"></i> Add risk</button>
+                                </div>
+                                <div class="data-table-wrap">
+                                    <table class="data-table risk-table">
+                                        <thead><tr><th>Activity</th><th>Hazard</th><th>Risks</th><th>P</th><th>S</th><th>R</th><th>ALARP</th><th>Control measures</th><th>P</th><th>S</th><th>R</th><th>ALARP</th><th>Responsible</th><th></th></tr></thead>
+                                        <tbody data-collection="risk" data-prefix="OhsRiskAssessmentRows">
+                                            @for (var i = 0; i < Model.OhsRiskAssessmentRows.Count; i++)
+                                            {
+                                                <tr>
+                                                    <td><input asp-for="OhsRiskAssessmentRows[i].Activity" data-field="Activity" /><input asp-for="OhsRiskAssessmentRows[i].SortOrder" data-field="SortOrder" type="hidden" /></td>
+                                                    <td><input asp-for="OhsRiskAssessmentRows[i].HazardDescription" data-field="HazardDescription" /></td>
+                                                    <td><input asp-for="OhsRiskAssessmentRows[i].Risks" data-field="Risks" /></td>
+                                                    <td><input asp-for="OhsRiskAssessmentRows[i].InitialRiskP" data-field="InitialRiskP" class="risk-score" /></td>
+                                                    <td><input asp-for="OhsRiskAssessmentRows[i].InitialRiskS" data-field="InitialRiskS" class="risk-score" /></td>
+                                                    <td><input asp-for="OhsRiskAssessmentRows[i].InitialRiskR" data-field="InitialRiskR" class="risk-score" /></td>
+                                                    <td><input asp-for="OhsRiskAssessmentRows[i].InitialAlarp" data-field="InitialAlarp" /></td>
+                                                    <td><textarea asp-for="OhsRiskAssessmentRows[i].ControlMeasures" data-field="ControlMeasures" rows="2"></textarea></td>
+                                                    <td><input asp-for="OhsRiskAssessmentRows[i].ResidualRiskP" data-field="ResidualRiskP" class="risk-score" /></td>
+                                                    <td><input asp-for="OhsRiskAssessmentRows[i].ResidualRiskS" data-field="ResidualRiskS" class="risk-score" /></td>
+                                                    <td><input asp-for="OhsRiskAssessmentRows[i].ResidualRiskR" data-field="ResidualRiskR" class="risk-score" /></td>
+                                                    <td><input asp-for="OhsRiskAssessmentRows[i].ResidualAlarp" data-field="ResidualAlarp" /></td>
+                                                    <td><input asp-for="OhsRiskAssessmentRows[i].ResponsiblePerson" data-field="ResponsiblePerson" /></td>
+                                                    <td><button class="remove-row" type="button"><i class="fa-regular fa-trash-can"></i></button></td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="approval-grid">
+                                <div class="approval-card">
+                                    <span>Prepared by</span>
+                                    <input asp-for="OhsPreparedBy" placeholder="Name" />
+                                    <input asp-for="OhsPreparedDate" type="date" />
+                                    <input asp-for="OhsPreparedBySignPath" type="hidden" />
+                                    <label class="signature-upload paste-upload-zone"
+                                           data-target="OhsPreparedBySignPath"
+                                           tabindex="0"><input class="asset-input" data-target="OhsPreparedBySignPath" type="file" accept=".png,.jpg,.jpeg" hidden /><i class="fa-solid fa-signature"></i><span id="OhsPreparedBySignPath-label">@(Model.OhsPreparedBySignPath ?? "Upload signature")</span></label>
+                                </div>
+                                <div class="approval-card">
+                                    <span>Approved by</span>
+                                    <input asp-for="OhsApprovedBy" placeholder="Name" />
+                                    <input asp-for="OhsApprovedDate" type="date" />
+                                    <input asp-for="OhsApprovedBySignPath" type="hidden" />
+                                    <label class="signature-upload paste-upload-zone"
+                                           data-target="OhsApprovedBySignPath"
+                                           tabindex="0"><input class="asset-input" data-target="OhsApprovedBySignPath" type="file" accept=".png,.jpg,.jpeg" hidden /><i class="fa-solid fa-signature"></i><span id="OhsApprovedBySignPath-label">@(Model.OhsApprovedBySignPath ?? "Upload signature")</span></label>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="report-section" id="appendices">
+                        <button class="section-heading" type="button" aria-expanded="true">
+                            <span class="section-icon purple"><i class="fa-solid fa-paperclip"></i></span>
+                            <span>
+                                <span class="section-kicker">Section 08</span>
+                                <strong>Appendices</strong>
+                                <small>Sampling results, lab reports, vessel documents and certificates.</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-up chevron"></i>
+                        </button>
+                        <div class="section-body">
+                            <div class="appendix-card">
+                                <div class="appendix-heading"><span class="appendix-no">01</span><div><strong>Sampling / visual check results</strong><small>Edit the material-specific result statements.</small></div><button class="mini-button add-row" type="button" data-collection="appendixPoints"><i class="fa-solid fa-plus"></i> Add point</button></div>
+                                <div class="appendix-points" data-collection="appendixPoints" data-prefix="AppendixOneResultPoints">
+                                    @for (var i = 0; i < Model.AppendixOneResultPoints.Count; i++)
+                                    {
+                                        <div class="appendix-point">
+                                            <input asp-for="AppendixOneResultPoints[i].Title" data-field="Title" placeholder="Hazardous material" />
+                                            <textarea asp-for="AppendixOneResultPoints[i].Description" data-field="Description" rows="2" placeholder="Result statement"></textarea>
+                                            <input asp-for="AppendixOneResultPoints[i].SortOrder" data-field="SortOrder" type="hidden" />
+                                            <button class="remove-row" type="button"><i class="fa-regular fa-trash-can"></i></button>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            @await Html.PartialAsync("_IhmAttachmentPanel", new IhmAttachmentPanelViewModel
+                            {
+                                JobId = Model.JobId,
+                                                        Number = "02",
+                                                        Title = "Test results for hazardous materials",
+                                                        Subtitle = "PDF and image laboratory reports.",
+                                                        AppendixType = "AppendixTwo",
+                                                        Attachments = Model.AppendixTwoAttachments
+                                                        })
+
+                            <div class="appendix-card">
+                                <div class="appendix-heading"><span class="appendix-no">05</span><div><strong>Vessel documents</strong><small>Collection of necessary information and supporting vessel files.</small></div></div>
+                                <label class="field"><span>One information point per line</span><textarea asp-for="AppendixFiveInformationText" rows="6"></textarea></label>
+                                @await Html.PartialAsync("_IhmAttachmentList", new IhmAttachmentListViewModel { JobId = Model.JobId, Attachments = Model.AppendixFiveAttachments })
+                                <div class="upload-zone appendix-upload-form" data-action="/IhmReportInfo/UploadAppendices">
+                                    <input type="hidden" name="jobId" value="@Model.JobId" />
+                                    <input type="hidden" name="appendixType" value="AppendixFive" />
+                                    <input name="files" type="file" accept=".pdf,.png,.jpg,.jpeg" multiple />
+                                    <i class="fa-solid fa-cloud-arrow-up"></i><strong>Upload vessel documents</strong><small>PDF, PNG, JPG or JPEG</small>
+                                </div>
+                            </div>
+
+                            @await Html.PartialAsync("_IhmAttachmentPanel", new IhmAttachmentPanelViewModel
+                                                        {
+                                JobId = Model.JobId,
+                                                        Number = "07",
+                                                        Title = "Qualification and capability certificates",
+                                                        Subtitle = "Surveyor and laboratory qualification evidence.",
+                                                        AppendixType = "AppendixSeven",
+                                                        Attachments = Model.AppendixSevenAttachments
+                                                        })
+
+                            @foreach (var group in customGroups)
+                            {
+                                var title = group.FirstOrDefault()?.AppendixTitle ?? $"Appendix {group.Key}";
+                                <div class="appendix-card custom-appendix">
+                                    <div class="appendix-heading">
+                                        <span class="appendix-no">@group.Key.ToString("00")</span>
+                                        <div class="appendix-title-form" data-action="/IhmReportInfo/RenameAppendix">
+                                            <input type="hidden" name="jobId" value="@Model.JobId" />
+                                            <input type="hidden" name="appendixNo" value="@group.Key" />
+                                            <input name="appendixTitle" value="@title" aria-label="Appendix title" />
+                                            <button type="button" class="icon-button small appendix-rename"><i class="fa-solid fa-check"></i></button>
+                                        </div>
+                                    </div>
+                                    @await Html.PartialAsync("_IhmAttachmentList", new IhmAttachmentListViewModel { JobId = Model.JobId, Attachments = group.ToList() })
+                                    <div class="upload-zone compact appendix-upload-form" data-action="/IhmReportInfo/UploadAppendices">
+                                        <input type="hidden" name="jobId" value="@Model.JobId" />
+                                        <input type="hidden" name="appendixType" value="Custom" />
+                                        <input type="hidden" name="appendixName" value="@title" />
+                                        <input type="hidden" name="appendixNo" value="@group.Key" />
+                                        <input name="files" type="file" accept=".pdf,.png,.jpg,.jpeg" multiple />
+                                        <i class="fa-solid fa-plus"></i><strong>Add files</strong>
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="appendix-card add-appendix-card">
+                                <div><i class="fa-solid fa-folder-plus"></i><strong>Add another appendix</strong><small>Create a named appendix after Appendix 7.</small></div>
+                                <button id="showAppendixForm"
+                                        class="button secondary"
+                                        type="button">
+                                    <i class="fa-solid fa-plus"></i>
+                                    Add appendix
+                                </button>
+                                <div id="newAppendixForm" class="new-appendix-form appendix-upload-form" data-action="/IhmReportInfo/UploadAppendices" data-require-name="true" hidden>
+                                    <input type="hidden" name="jobId" value="@Model.JobId" />
+                                    <input type="hidden" name="appendixType" value="Custom" />
+                                    <input name="appendixName" placeholder="Appendix title" />
+                                    <label class="mini-button"><input name="files" type="file" accept=".pdf,.png,.jpg,.jpeg" multiple hidden /><i class="fa-solid fa-paperclip"></i> Choose files</label>
+                                    <button class="button primary upload-submit" type="button"><i class="fa-solid fa-plus"></i> Create appendix</button>
+                                    <button id="cancelAppendixForm"
+                                            class="button ghost"
+                                            type="button">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="bottom-actions">
+                        <div>
+                            <strong>Ready to save?</strong>
+                            <span>Your report data will be synchronized with the IHM backend.</span>
+                        </div>
+                        <button class="button secondary submit-action" type="submit">
+                            <i class="fa-regular fa-floppy-disk"></i> Save report
+                        </button>
+                        <button class="button primary submit-action"
+                                id="generatePdfButton"
+                                type="button"
+                                data-generate-url="@Url.Action("GeneratePdf", "IhmReportInfo")">
+                            <i class="fa-regular fa-file-pdf"></i> Save & generate PDF
+                        </button>
+                    </div>
+                </form>
+            </main>
+        </div>
+    </div>
+
+    <div class="modal fade" id="reportFinderModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content report-modal">
+                <div class="modal-header">
+                    <div>
+                        <span class="section-kicker">Reuse report information</span>
+                        <h2>Select vessel - job number</h2>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="template-help">
+                        Selected report information will be loaded into this form.
+                        Current vessel and job details will not change.
+                    </p>
+
+                    <div class="finder-input">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input id="reportSearch"
+                               placeholder="Search vessel or job number" />
+                    </div>
+                    <div id="reportResults" class="report-results"><div class="result-loading">Start typing to search reports.</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <template id="revisions-template">
+        <tr><td><input data-field="Uid" /></td><td><input data-field="RevisionNo" class="short-input" /></td><td><input data-field="RevisionDate" type="date" /></td><td><input data-field="Description" /></td><td><input data-field="PreparedBy" /></td><td><input data-field="CheckedBy" /></td><td><input data-field="ApprovedBy" /></td><td><button class="remove-row" type="button"><i class="fa-regular fa-trash-can"></i></button></td></tr>
+    </template>
+    <template id="paint-template">
+        <tr><td class="row-number"></td><td><input data-field="ApplicationOfPaint" /></td><td><input data-field="NameOfPaint" /></td><td><input data-field="Location" /></td><td><input data-field="MaterialClassification" /></td><td><input data-field="Mass" /></td><td><input data-field="Unit" /></td><td><input data-field="Remarks" /></td><td><button class="remove-row" type="button"><i class="fa-regular fa-trash-can"></i></button></td></tr>
+    </template>
+    <template id="equipment-template">
+        <tr><td class="row-number"><input data-field="IhmCheckpointId" type="hidden" /><input data-field="IsHidden" type="hidden" value="false" /><input data-field="SortOrder" type="hidden" /></td><td><input data-field="EquipmentName" /></td><td><input data-field="Location" /></td><td><input data-field="MaterialClassification" /></td><td><input data-field="PartsWereUsed" /></td><td><input data-field="UnitKg" /></td><td><input data-field="QuantityNo" /></td><td><input data-field="TotalKg" /></td><td><input data-field="Remarks" /></td><td><button class="remove-row" type="button"><i class="fa-regular fa-trash-can"></i></button></td></tr>
+    </template>
+    <template id="structure-template">
+        <tr><td class="row-number"></td><td><input data-field="EquipmentName" /></td><td><input data-field="Location" /></td><td><input data-field="MaterialClassification" /></td><td><input data-field="PartsWereUsed" /></td><td><input data-field="ApproximateQuantity" /></td><td><input data-field="Remarks" /></td><td><button class="remove-row" type="button"><i class="fa-regular fa-trash-can"></i></button></td></tr>
+    </template>
+    <template id="risk-template">
+        <tr><td><input data-field="Activity" /><input data-field="SortOrder" type="hidden" /></td><td><input data-field="HazardDescription" /></td><td><input data-field="Risks" /></td><td><input data-field="InitialRiskP" class="risk-score" /></td><td><input data-field="InitialRiskS" class="risk-score" /></td><td><input data-field="InitialRiskR" class="risk-score" /></td><td><input data-field="InitialAlarp" /></td><td><textarea data-field="ControlMeasures" rows="2"></textarea></td><td><input data-field="ResidualRiskP" class="risk-score" /></td><td><input data-field="ResidualRiskS" class="risk-score" /></td><td><input data-field="ResidualRiskR" class="risk-score" /></td><td><input data-field="ResidualAlarp" /></td><td><input data-field="ResponsiblePerson" /></td><td><button class="remove-row" type="button"><i class="fa-regular fa-trash-can"></i></button></td></tr>
+    </template>
+    <template id="appendixPoints-template">
+        <div class="appendix-point"><input data-field="Title" placeholder="Hazardous material" /><textarea data-field="Description" rows="2" placeholder="Result statement"></textarea><input data-field="SortOrder" type="hidden" /><button class="remove-row" type="button"><i class="fa-regular fa-trash-can"></i></button></div>
+    </template>
+
+    <script>
+        window.ihmReportConfig = {
+            jobId: @Model.JobId,
+            uploadAssetUrl: '@Url.Action("UploadAsset", "IhmReportInfo")',
+            jobOptionsUrl: '@Url.Action("JobOptions", "IhmReportInfo")',
+            companyOptionsUrl: '@Url.Action("CompanyOptions", "IhmReportInfo")',
+            templateFromJobUrl: '@Url.Action("TemplateFromJob", "IhmReportInfo")',
+            copyAppendicesUrl: '@Url.Action("CopyFromJob", "IhmReportInfo")',
+            generatePdfUrl: '@Url.Action("GeneratePdf", "IhmReportInfo")',
+            saveUrl: '@Url.Action("Save", "IhmReportInfo")',
+            currentJobId: @Model.JobId
+        };
+    </script>
+
+    <div id="pdfOverlay" class="pdf-overlay" hidden>
+        <div class="pdf-overlay-card">
+            <div class="pdf-spinner">
+                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                            stroke-dasharray="100" stroke-dashoffset="60" class="spinner-arc" />
+                </svg>
+            </div>
+            <div class="pdf-overlay-body">
+                <p class="pdf-stage-label" id="pdfStageLabel">Saving report data...</p>
+                <div class="pdf-progress-track">
+                    <div class="pdf-progress-fill" id="pdfProgressFill"></div>
+                </div>
+                <p class="pdf-pct" id="pdfPct">0%</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/ihm-report.js" asp-append-version="true"></script>
+</body>
+</html>

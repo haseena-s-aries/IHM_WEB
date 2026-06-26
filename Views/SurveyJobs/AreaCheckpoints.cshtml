@@ -1,0 +1,397 @@
+﻿@model Survery_Certification_App_Consume.Models.IhmAreaOptionDto
+@{
+    Layout = null;
+    var jobId = (int)(ViewBag.JobId ?? 0);
+
+    string Val(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>@Model.AreaName Checkpoints</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #eef4fb;
+            color: #102033;
+            font-family: "Segoe UI",Arial,sans-serif;
+        }
+
+        /* HEADER */
+
+        .appbar {
+            height: 62px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 18px;
+            background: #f5f8fd;
+            border-bottom: 1px solid #d8e3ee;
+        }
+
+        .back-btn {
+            width: 36px;
+            height: 36px;
+            display: grid;
+            place-items: center;
+            color: #102033;
+            text-decoration: none;
+            font-size: 20px;
+        }
+
+        .title {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 900;
+        }
+
+        .sub {
+            margin: 2px 0 0;
+            font-size: 13px;
+            color: #607d9a;
+        }
+
+
+        /* PAGE */
+
+        .page {
+            max-width: 1320px; /* reduced */
+
+            margin: auto;
+            padding: 18px;
+        }
+
+        .section-title {
+            margin: 0 0 18px;
+            color: #607d9a;
+            font-size: 14px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            font-weight: 900;
+        }
+
+
+        /* RESPONSIVE GRID */
+
+        .grid {
+            display: grid;
+            gap: 14px;
+            /* default maximum = 4 cards */
+            grid-template-columns: repeat(3,minmax(0,1fr));
+        }
+
+
+        /* CARD */
+
+        .cp-card {
+            background: #fff;
+            border: 1px solid #ffe0e0;
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(255,120,120,.05);
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+
+        /* TOP */
+
+        .cp-head {
+            background: #fff3f3;
+            min-height: 72px;
+            padding: 16px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .cp-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+
+        /* BADGE */
+
+        .type-badge {
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 900;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        .sample {
+            background: #ffd9dd;
+            color: #ff5d65;
+        }
+
+        .visual {
+            background: #e2f1ff;
+            color: #1e95ff;
+        }
+
+        .normal {
+            background: #edf3f8;
+            color: #607d9a;
+        }
+
+
+        /* TITLE */
+
+        .cp-title {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 900;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .edit-btn {
+            color: #607d9a;
+            font-size: 18px;
+            text-decoration: none;
+        }
+
+
+        /* BODY */
+
+        .cp-body {
+            padding: 16px 18px;
+        }
+
+        .info-row {
+            display: grid;
+            grid-template-columns: 95px 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: start;
+        }
+
+        .info-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #607d9a;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+            .info-label i {
+                width: 14px;
+                font-size: 13px;
+            }
+
+        .info-value {
+            font-size: 13px;
+            font-weight: 600;
+            overflow-wrap: anywhere;
+        }
+
+
+        /* STATUS */
+
+        .status-box {
+            margin-top: 12px;
+            border: 1px solid #ccd7e4;
+            background: #f4f7fa;
+            border-radius: 12px;
+            padding: 10px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .status-left {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .result-text {
+            color: #607d9a;
+        }
+
+
+        /* BREAKPOINTS */
+
+        @@media (max-width:1200px) {
+            .grid
+
+        {
+            grid-template-columns: repeat(3,1fr);
+        }
+
+        }
+
+        @@media (max-width:900px) {
+            .grid
+
+        {
+            grid-template-columns: repeat(2,1fr);
+        }
+
+        }
+
+        @@media (max-width:620px) {
+            .page
+
+        {
+            padding: 14px;
+        }
+
+        .grid {
+            grid-template-columns: 1fr;
+        }
+
+        
+
+        .cp-head {
+            padding: 14px;
+            min-height: 64px;
+        }
+
+        .cp-body {
+            padding: 14px;
+        }
+
+        .title {
+            font-size: 18px;
+        }
+
+        .cp-title {
+            font-size: 14px;
+        }
+
+        }
+
+        @@media (max-width:420px) {
+            .info-row
+
+        {
+            grid-template-columns: 1fr;
+            gap: 3px;
+        }
+
+        .status-box {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        }
+    </style>
+</head>
+
+<body>
+    <header class="appbar">
+        <a class="back-btn" href="/SurveyJobs/SurveyAreas?jobId=@jobId">
+            <i class="fa-solid fa-chevron-left"></i>
+        </a>
+        <div>
+            <h1 class="title">@Model.AreaName</h1>
+            <p class="sub">@(Model.Checkpoints?.Count ?? 0) checkpoints</p>
+        </div>
+    </header>
+
+    <main class="page">
+        <h2 class="section-title">Checkpoints</h2>
+
+        <div class="grid">
+            @foreach (var checkpoint in Model.Checkpoints ?? new List<Survery_Certification_App_Consume.Models.IhmCheckpointOptionDto>())
+            {
+                var isVisual = checkpoint.IsVisual;
+                var isSample = checkpoint.IsSample;
+
+                var typeClass = isVisual ? "visual" : isSample ? "sample" : "normal";
+                var typeText = isVisual ? "Visual" : isSample ? "Sample" : "Checkpoint";
+                var icon = isVisual ? "fa-eye" : isSample ? "fa-flask" : "fa-location-dot";
+
+                var code = Val(checkpoint.SampleNo ?? checkpoint.Location);
+                var surveyStatus = checkpoint.IsAudited ? "Surveyed" : "Not surveyed yet";
+                var result = Val(checkpoint.Result ?? checkpoint.CheckResult);
+
+                <a class="cp-card" href="/SurveyJobs/CheckpointDetail?jobId=@jobId&areaId=@Model.Id&checkpointId=@checkpoint.Id">
+                    <div class="cp-head">
+                        <div class="cp-left">
+                            <span class="type-badge @typeClass">
+                                <i class="fa-solid @icon"></i>
+                                @typeText
+                            </span>
+                            <h2 class="cp-title">@code</h2>
+                        </div>
+
+                        @* <a class="edit-btn"
+                           href="/SurveyJobs/EditCheckpoint?jobId=@jobId&checkpointId=@checkpoint.Id">
+                            <i class="fa-solid fa-pencil"></i>
+                        </a> *@
+                    </div>
+
+                    <div class="cp-body">
+                        <div class="info-row">
+                            <div class="info-label">
+                                <i class="fa-solid fa-location-dot"></i>
+                                Location
+                            </div>
+                            <div class="info-value">@Val(checkpoint.Location)</div>
+                        </div>
+
+                        <div class="info-row">
+                            <div class="info-label">
+                                <i class="fa-solid fa-gear"></i>
+                                Equipment
+                            </div>
+                            <div class="info-value">@Val(checkpoint.EquipmentName)</div>
+                        </div>
+
+                        <div class="info-row">
+                            <div class="info-label">
+                                <i class="fa-solid fa-shapes"></i>
+                                Component
+                            </div>
+                            <div class="info-value">@Val(checkpoint.Component)</div>
+                        </div>
+
+                        <div class="info-row">
+                            <div class="info-label">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                Hazmat
+                            </div>
+                            <div class="info-value">@Val(checkpoint.Description)</div>
+                        </div>
+
+                        <div class="status-box">
+                            <div class="status-left">
+                                <i class="fa-solid fa-user-check"></i>
+                                @surveyStatus
+                            </div>
+                            <div class="result-text">Result: @result</div>
+                        </div>
+                    </div>
+                </a>
+            }
+        </div>
+    </main>
+</body>
+</html>

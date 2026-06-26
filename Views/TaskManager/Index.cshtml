@@ -1,0 +1,190 @@
+﻿@{
+    ViewData["Title"] = "Certificate List";
+}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+<style>
+#certificateTable tbody tr:hover {
+    background-color: #f1f1f1;
+    cursor: pointer;
+}
+
+</style>
+<div class="container mt-5">
+    <div class="card shadow-lg">
+        <div class="card-header bg-primary text-white">
+            <h3 class="mb-0">📄 Certificate List</h3>
+        </div>
+
+        <div class="card-body">
+            <!-- Search Form -->
+            <form id="searchForm" class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <label for="search" class="form-label">🔍 Search</label>
+                    <input type="text" name="search" id="search" class="form-control" placeholder="Enter project or client name..." />
+                </div>
+
+                <div class="col-md-4">
+                    <label for="type" class="form-label">📁 Certificate Type</label>
+                    <select name="type" id="type" class="form-select">
+                        <option value="seafastening">Sea Fastening</option>
+                        <option value="towage">Towage</option>
+                        <option value="loadout">Loadout</option>
+                    </select>
+                </div>
+
+                <div class="col-md-4 align-self-end">
+                    <button type="submit" class="btn btn-success w-100"><i class="bi bi-search"></i> Search</button>
+                </div>
+            </form>
+
+            <!-- Error Message -->
+            <div id="errorMessage" class="alert alert-danger d-none"></div>
+
+            <!-- Certificate Table -->
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped align-middle text-center" id="certificateTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Certificate No</th>
+                            <th>Project Title</th>
+                            <th>Client Name</th>
+                         
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Dynamic content injected via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div id="pagination" class="d-flex justify-content-between align-items-center mt-4 d-none">
+                <button id="prevPage" class="btn btn-outline-primary"><i class="bi bi-chevron-left"></i> Previous</button>
+                <span id="pageInfo" class="fw-bold"></span>
+                <button id="nextPage" class="btn btn-outline-primary">Next <i class="bi bi-chevron-right"></i></button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="mt-4">
+    <a asp-action="AdminDashboard" asp-controller="Home" class="btn btn-outline-secondary">
+        ← Back to Dashboard
+    </a>
+</div>
+
+
+@section Scripts {
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            const apiBaseUrl = '@ViewBag.ApiBaseUrl';
+            let currentPage = 1;
+            let totalPages = 1;
+
+            function fetchCertificates() {
+                const search = $('#search').val();
+                const type = $('#type').val();
+                const pageSize = 10;
+
+                $.ajax({
+                    url: `${apiBaseUrl}/GetCertificates?type=${type}&search=${search}&page=${currentPage}&pageSize=${pageSize}`,
+                    method: 'GET',
+                   success: function (data) {
+        console.log("API Response:", data);
+
+        if (data && data.data.length > 0) {
+            renderTable(data.data, type);
+            totalPages = Math.ceil(data.totalCount / pageSize);
+            updatePagination();
+        } else {
+            showError('No certificates found.');
+            $('#certificateTable tbody').empty();
+            $('#pagination').hide();
+        }
+                    },
+                    error: function () {
+                        showError('Failed to load certificates.');
+                    }
+                });
+            }
+                    function renderTable(certificates, type) {
+            const tableBody = $('#certificateTable tbody');
+            tableBody.empty();
+
+            certificates.forEach(cert => {
+                const row = `<tr>
+                    <td>${cert.certificateNumber}</td>
+                    <td>${cert.projectTitle}</td>
+                    <td>${cert.clientName}</td>
+                  
+                    <td>
+                        <a href="${apiBaseUrl}/generate-pdf?type=${type}&id=${cert.id}"
+                           target="_blank"
+                           class="btn btn-sm btn-outline-primary me-1">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                    </td>
+                </tr>`;
+                tableBody.append(row);
+            });
+        }
+
+
+        function updatePagination() {
+            $('#pageInfo').text(`Page ${currentPage} of ${totalPages}`);
+            $('#prevPage').prop('disabled', currentPage === 1);
+            $('#nextPage').prop('disabled', currentPage === totalPages);
+            $('#pagination').removeClass("d-none").show();
+        }
+
+            function showError(message) {
+                $('#errorMessage').text(message).show();
+            }
+
+            $('#searchForm').on('submit', function (e) {
+                e.preventDefault();
+                currentPage = 1;
+                fetchCertificates();
+            });
+
+            $('#prevPage').on('click', function () {
+                if (currentPage > 1) {
+                    currentPage--;
+                    fetchCertificates();
+                }
+            });
+
+            $('#nextPage').on('click', function () {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    fetchCertificates();
+                }
+            });
+
+            fetchCertificates();
+        });
+                function deleteCertificate(id, type) {
+            if (confirm("Are you sure you want to archive this certificate?")) {
+                $.ajax({
+                    url: '/Home/DeleteCertificate', // Adjust if your controller is different
+                    type: 'POST',
+                    data: { id: id, type: type },
+                    success: function (result) {
+                        if (result.success) {
+                            fetchCertificates(); // Refresh the table
+                        } else {
+                            showError(result.message || "Failed to archive certificate.");
+                        }
+                    },
+                    error: function () {
+                        showError("Error communicating with the server.");
+                    }
+                });
+            }
+        }
+
+
+    </script>
+}

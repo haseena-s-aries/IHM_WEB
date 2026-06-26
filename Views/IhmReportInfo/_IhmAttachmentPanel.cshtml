@@ -1,0 +1,16 @@
+@model IhmAttachmentPanelViewModel
+<div class="appendix-card">
+    <div class="appendix-heading">
+        <span class="appendix-no">@Model.Number</span>
+        <div><strong>@Model.Title</strong><small>@Model.Subtitle</small></div>
+    </div>
+    @await Html.PartialAsync("_IhmAttachmentList", new IhmAttachmentListViewModel { JobId = Model.JobId, Attachments = Model.Attachments })
+    <div class="upload-zone appendix-upload-form" data-action="/IhmReportInfo/UploadAppendices">
+        <input type="hidden" name="jobId" value="@Model.JobId" />
+        <input type="hidden" name="appendixType" value="@Model.AppendixType" />
+        <input name="files" type="file" accept=".pdf,.png,.jpg,.jpeg" multiple />
+        <i class="fa-solid fa-cloud-arrow-up"></i>
+        <strong>Choose or drop files here</strong>
+        <small>PDF, PNG, JPG or JPEG</small>
+    </div>
+</div>

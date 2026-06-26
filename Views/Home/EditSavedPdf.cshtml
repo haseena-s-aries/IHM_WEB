@@ -1,0 +1,113 @@
+@model PdfEditorViewModel
+
+@{
+
+    Layout = null;
+
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@Model.Title - PDF Editor</title>
+    <link rel="stylesheet" href="~/css/pdf-editor.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="editor-header">
+        <a href="@Url.Action("SavedReports", "Home")">Back to reports</a>
+        <div><strong>@Model.Title</strong><span>Original PDF with editable overlays</span></div>
+        <span id="saveStatus">Ready</span>
+    </header>
+    <nav class="editor-toolbar">
+        <div class="toolbar-row">
+            <div class="toolbar-group">
+                <button id="selectTool" class="active" type="button">Select text</button>
+                <button id="editSelectedText" type="button">Edit selected</button>
+                <button id="addTextTool" type="button">Add text</button>
+                <button id="deleteField" type="button">Delete selected text</button>
+            </div>
+
+            <div class="toolbar-group toolbar-actions">
+                <span>
+
+                    Page <b id="pageNumber">1</b> /
+                    <b id="pageCount">1</b>
+                </span>
+
+                <button id="saveEdits" class="primary" type="button">Save</button>
+                <button id="generatePdf" class="success" type="button">
+
+                    Generate PDF
+                </button>
+            </div>
+        </div>
+
+        <div class="toolbar-row toolbar-options">
+            <label>
+
+                Font size
+                <input id="fontSize" type="number" min="6" max="72" value="12" />
+            </label>
+
+            <label>
+
+                Style
+                <select id="fontWeight">
+                    <option value="regular">Regular</option>
+                    <option value="bold">Bold</option>
+                    <option value="italic">Italic</option>
+                </select>
+            </label>
+
+            <label class="check-option">
+                <input id="coverOriginal" type="checkbox" checked />
+
+                Cover original text
+            </label>
+
+            <label class="check-option">
+                <input id="autoBullet" type="checkbox" />
+
+                Bullet points
+            </label>
+
+            @*  <button id="removePage" class="danger-outline" type="button">
+
+                Remove current page
+</button>  *@
+        </div>
+    </nav>
+    <main class="editor-workspace">
+        <aside>
+            <h2>Editable fields</h2>
+            <p>Click existing PDF text, then choose Edit selected or Delete selected text.</p>
+            <div id="fieldList"></div>
+        </aside>
+        <section id="pdfStage">
+            <div id="pdfPages"></div>
+        </section>
+    </main>
+    <script>
+
+        window.pdfEditorConfig = {
+
+            type: '@Model.ReportType',
+
+            id: @Model.ReportId,
+
+            pdfUrl: '@Url.Action("SavedReportFile", "Home", new { type = Model.ReportType, id = Model.ReportId })',
+
+            loadUrl: '@Url.Action("GetPdfEdits", "Home")',
+
+            saveUrl: '@Url.Action("SavePdfEdits", "Home")',
+
+            generateUrl: '@Url.Action("GenerateEditedPdf", "Home")'
+
+        };
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
+    <script src="~/js/pdf-editor.js" type="module" asp-append-version="true"></script>
+</body>
+</html>
+

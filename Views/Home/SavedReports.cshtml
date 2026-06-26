@@ -1,0 +1,86 @@
+@model List<SavedReportViewModel>
+@{
+    Layout = null;
+    string TypeLabel(string type) => type?.ToLowerInvariant() switch
+    {
+        "ihm" => "IHM Survey",
+        "seafastening" => "Sea Fastening",
+        "loadout" => "Loadout",
+        "towage" => "Towage",
+        _ => "Report"
+    };
+    string DateLabel(SavedReportViewModel report) =>
+        report.SavedAt?.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+        ?? report.SavedDate?.ToString("dd MMM yyyy")
+        ?? "Date unavailable";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Saved Reports</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/saved-reports.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="reports-topbar">
+        <a class="back-link" href="@Url.Action("AdminDashboard", "Home")"><i class="fa-solid fa-arrow-left"></i><span>Dashboard</span></a>
+        <div class="reports-brand"><span><i class="fa-regular fa-folder-open"></i></span><strong>AURAS Report Library</strong></div>
+        <div class="report-total"><strong>@Model.Count</strong><span>Saved reports</span></div>
+    </header>
+
+    <main class="reports-page">
+        <section class="reports-hero">
+            <div><span class="eyebrow">Document centre</span><h1>Saved reports</h1><p>Find vessel reports, open the PDF, or download a copy for your records.</p></div>
+            <div class="hero-stat"><i class="fa-solid fa-file-shield"></i><span><strong>@Model.Count</strong> documents available</span></div>
+        </section>
+
+        @if (ViewBag.LoadError != null)
+        {
+            <div class="load-error"><i class="fa-solid fa-triangle-exclamation"></i>@ViewBag.LoadError</div>
+        }
+
+        <section class="report-toolbar">
+            <label class="report-search"><i class="fa-solid fa-magnifying-glass"></i><input id="reportSearch" type="search" placeholder="Search vessel, title or reference..." autocomplete="off" /></label>
+            <div class="type-filters">
+                <button class="active" type="button" data-type="">All</button>
+                <button type="button" data-type="ihm">IHM</button>
+                <button type="button" data-type="towage">Towage</button>
+                <button type="button" data-type="seafastening">Sea Fastening</button>
+                <button type="button" data-type="loadout">Loadout</button>
+            </div>
+        </section>
+
+        <section class="report-grid">
+            @foreach (var report in Model)
+            {
+                var typeLabel = TypeLabel(report.ReportType);
+                var vessel = string.IsNullOrWhiteSpace(report.VesselName) ? "Vessel not specified" : report.VesselName;
+                var title = string.IsNullOrWhiteSpace(report.Title) ? $"{typeLabel} Report" : report.Title;
+                var searchText = $"{vessel} {title} {report.Reference} {typeLabel}".ToLowerInvariant();
+                var editUrl = Url.Action("EditSavedPdf", "Home",
+                    new { type = report.ReportType, id = report.Id, title });
+                <article class="report-card" data-type="@report.ReportType.ToLowerInvariant()" data-search="@searchText">
+                    <div class="report-card-head"><span class="pdf-icon"><i class="fa-regular fa-file-pdf"></i></span><span class="type-badge">@typeLabel</span><span class="report-date">@DateLabel(report)</span></div>
+                    <div class="report-card-body">
+                        <span class="vessel-label"><i class="fa-solid fa-ship"></i> Vessel</span>
+                        <h2>@vessel</h2><p>@title</p>
+                        <span class="reference">@(string.IsNullOrWhiteSpace(report.Reference) ? "No reference number" : report.Reference)</span>
+                    </div>
+                    <div class="report-actions">
+                        <a class="edit-report" href="@editUrl"><i class="fa-regular fa-pen-to-square"></i>Edit</a>
+                        <a class="view-report" target="_blank" rel="noopener" href="@Url.Action("SavedReportFile", "Home", new { type = report.ReportType, id = report.Id })"><i class="fa-regular fa-eye"></i>View PDF</a>
+                        <a class="download-report" href="@Url.Action("SavedReportFile", "Home", new { type = report.ReportType, id = report.Id, download = true })"><i class="fa-solid fa-download"></i>Download</a>
+                    </div>
+                </article>
+            }
+        </section>
+
+        <div class="reports-empty @(Model.Any() ? "" : "show")" id="reportsEmpty">
+            <span><i class="fa-regular fa-folder-open"></i></span><h2>No reports found</h2><p>Saved reports will appear here after a report is generated.</p>
+        </div>
+    </main>
+    <script src="~/js/saved-reports.js" asp-append-version="true"></script>
+</body>
+</html>

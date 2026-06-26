@@ -1,0 +1,571 @@
+﻿@model SurveyJobsPageViewModel
+@{
+    Layout = null;
+    var isIhm = Model.SurveyType == "IHM Survey";
+    var backUrl = Model.IsAdmin ? "/Home/AdminDashboard" : "/Home/Index";
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>@Model.SurveyType Jobs</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+        body { margin:0; background:#f4f6fa; color:#1a2333; font-family:"Segoe UI",Arial,sans-serif; }
+        .header { padding:24px; background:linear-gradient(135deg,#0b1d33,#132b4a,#1e3a5f); color:white; border-radius:0 0 20px 20px; box-shadow:0 4px 12px #0003; }
+        .header-row { display:flex; align-items:center; gap:14px; }
+        .header-icon,.back-btn,.refresh-btn { width:44px; height:44px; border-radius:10px; background:#ffffff1a; color:white; border:0; display:flex; align-items:center; justify-content:center; text-decoration:none; }
+        .title { font-size:20px; font-weight:800; margin:0; }
+        .sub { color:#ffffff88; font-size:12px; margin:2px 0 0; }
+        .count-pill { padding:8px 14px; border-radius:20px; background:#ffffff1a; border:1px solid #ffffff25; font-size:12px; font-weight:700; }
+        .new-btn { background:#1976d2; color:white; border:0; border-radius:10px; padding:10px 16px; font-weight:800; }
+        .search-box { margin-top:16px; background:#ffffff1a; border:1px solid #ffffff18; border-radius:12px; display:flex; align-items:center; padding:0 14px; }
+        .search-box input { flex:1; background:transparent; border:0; outline:0; color:white; padding:14px 8px; }
+        .search-box input::placeholder { color:#ffffff66; }
+    
+        .content { padding:16px; }
+        .job-card { background:white; border:1px solid #e0e4ec; border-radius:14px; padding:18px; margin-bottom:12px; box-shadow:0 3px 10px #0000000a; }
+        .job-head { display:flex; align-items:center; gap:12px; }
+        .job-icon { width:46px; height:46px; border-radius:12px; background:linear-gradient(135deg,#0b1d33,#1e3a5f); color:white; display:flex; align-items:center; justify-content:center; }
+        .job-title { font-size:16px; font-weight:800; margin:0; }
+        .client { color:#607080; font-size:12px; margin:2px 0 0; }
+        .status { padding:5px 10px; border-radius:20px; font-size:11px; font-weight:800; background:#1976d21a; color:#1976d2; }
+        .line { border-top:1px solid #e0e4ec; margin:14px 0 12px; }
+        .info-row { display:flex; gap:8px; align-items:center; color:#607080; font-size:13px; margin-bottom:6px; }
+        .info-row strong { width:58px; color:#607080; }
+        .info-row span { color:#1a2333; font-weight:600; }
+        .assigned { margin:12px 0; padding:9px 10px; border-radius:8px; background:#43a04714; color:#43a047; font-size:12px; font-weight:700; }
+        .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+        .action-btn { border:0; border-radius:8px; padding:8px 12px; font-size:12px; font-weight:800; text-decoration:none; display:inline-flex; align-items:center; gap:5px; }
+        .blue { background:#1976d214; color:#1976d2; }
+        .teal { background:#00897b14; color:#00897b; }
+        .green { background:#43a04714; color:#43a047; }
+        .purple { background:#512da814; color:#512da8; }
+        .amber { background:#ffa72618; color:#d98200; }
+        .red { background:#ef535014; color:#d93636; }
+        .empty { text-align:center; padding:70px 20px; color:#607080; }
+        .modal-content { border-radius:16px; border:0; }
+        .modal-header { background:linear-gradient(135deg,#0b1d33,#132b4a,#1e3a5f); color:white; border-radius:16px 16px 0 0; }
+        .form-control,.form-select { border-radius:8px; padding:12px; }
+    </style>
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-row">
+            <a class="back-btn" href="@backUrl"><i class="fa-solid fa-chevron-left"></i></a>
+            <div class="header-icon"><i class="fa-solid @(isIhm ? "fa-clipboard-list" : "fa-helmet-safety")"></i></div>
+
+            <div class="flex-grow-1">
+                <h1 class="title">@Model.SurveyType Jobs</h1>
+                <p class="sub">Survey Job Management</p>
+            </div>
+
+            <span class="count-pill"><i class="fa-regular fa-briefcase"></i> @Model.Jobs.Count Jobs</span>
+            <a class="refresh-btn" href="@Url.Action(isIhm ? "Ihm" : "Ex", "SurveyJobs")"><i class="fa-solid fa-rotate-right"></i></a>
+
+            @if (Model.IsAdmin)
+            {
+                <button class="new-btn" data-bs-toggle="modal" data-bs-target="#createJobModal">
+                    <i class="fa-solid fa-plus"></i> New Job
+                </button>
+            }
+        </div>
+
+        <div class="search-box">
+            <i class="fa-solid fa-search"></i>
+            <input id="jobSearch" placeholder="Search by job number, client, vessel, status..." />
+        </div>
+    </header>
+
+    <main class="content">
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <div class="empty">
+                <i class="fa-solid fa-triangle-exclamation fa-3x text-danger"></i>
+                <p class="mt-3">@Model.ErrorMessage</p>
+            </div>
+        }
+        else if (!Model.Jobs.Any())
+        {
+            <div class="empty">
+                <i class="fa-regular fa-clipboard fa-3x"></i>
+                <p class="mt-3">No @Model.SurveyType jobs found.</p>
+            </div>
+        }
+        else
+        {
+            foreach (var job in Model.Jobs)
+            {
+                <article class="job-card" data-search="@($"{job.JobNumber} {job.ClientName} {job.VesselName} {job.SiteName} {job.Status}".ToLower())">
+                    <div class="job-head">
+                        <div class="job-icon"><i class="fa-solid @(isIhm ? "fa-clipboard-list" : "fa-helmet-safety")"></i></div>
+
+                        <div class="flex-grow-1">
+                            <h2 class="job-title">@job.JobNumber</h2>
+                            @if (!string.IsNullOrWhiteSpace(job.ClientName))
+                            {
+                                <p class="client">@job.ClientName</p>
+                            }
+                        </div>
+
+                        <span class="status">@job.Status</span>
+                    </div>
+
+                    <div class="line"></div>
+
+                    @if (!string.IsNullOrWhiteSpace(job.VesselName))
+                    {
+                        <div class="info-row"><i class="fa-solid fa-ship"></i><strong>Vessel</strong><span>@job.VesselName</span></div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(job.ImoNumber))
+                    {
+                        <div class="info-row"><i class="fa-solid fa-tag"></i><strong>IMO</strong><span>@job.ImoNumber</span></div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(job.SiteName))
+                    {
+                        <div class="info-row"><i class="fa-solid fa-location-dot"></i><strong>Site</strong><span>@job.SiteName</span></div>
+                    }
+
+                    @{
+                        var primarySurveyorName = job.Assignments?
+                        .FirstOrDefault(x => job.PrimarySurveyorUserId.HasValue &&
+                        x.SurveyorUserId == job.PrimarySurveyorUserId.Value)
+                        ?.SurveyorName;
+
+                        var secondarySurveyorName = job.Assignments?
+                        .FirstOrDefault(x => job.SecondarySurveyorUserId.HasValue &&
+                        x.SurveyorUserId == job.SecondarySurveyorUserId.Value)
+                        ?.SurveyorName;
+
+                        if (string.IsNullOrWhiteSpace(primarySurveyorName) && job.PrimarySurveyorUserId.HasValue)
+                        {
+                            primarySurveyorName = Model.Surveyors
+                            .FirstOrDefault(x => x.Id == job.PrimarySurveyorUserId.Value)
+                            ?.FullName;
+                        }
+
+                        if (string.IsNullOrWhiteSpace(secondarySurveyorName) && job.SecondarySurveyorUserId.HasValue)
+                        {
+                            secondarySurveyorName = Model.Surveyors
+                            .FirstOrDefault(x => x.Id == job.SecondarySurveyorUserId.Value)
+                            ?.FullName;
+                        }
+
+                        var hasAssignedSurveyor = !string.IsNullOrWhiteSpace(primarySurveyorName) ||
+                        !string.IsNullOrWhiteSpace(secondarySurveyorName) ||
+                        !string.IsNullOrWhiteSpace(job.AssignedSurveyorName);
+                    }
+
+                    @if (hasAssignedSurveyor)
+                    {
+                        <div class="assigned">
+                            <i class="fa-regular fa-user"></i>
+
+                            @if (!string.IsNullOrWhiteSpace(primarySurveyorName))
+                            {
+                                <div>Primary: @primarySurveyorName</div>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(secondarySurveyorName))
+                            {
+                                <div>Secondary: @secondarySurveyorName</div>
+                            }
+
+                            @if (string.IsNullOrWhiteSpace(primarySurveyorName) &&
+                                            string.IsNullOrWhiteSpace(secondarySurveyorName) &&
+                                            !string.IsNullOrWhiteSpace(job.AssignedSurveyorName))
+                            {
+                                <div>@job.AssignedSurveyorName</div>
+                            }
+
+                            @if (job.AssignedAt.HasValue)
+                            {
+                                <span>Assigned: @job.AssignedAt.Value.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</span>
+                            }
+                        </div>
+                    }
+
+                    <div class="actions">
+                        @if (Model.IsAdmin)
+                        {
+                            <a class="action-btn blue" href="/SurveyJobs/ProjectInfo?jobId=@job.Id">
+                                <i class="fa-solid fa-up-right-from-square"></i> Open
+                            </a>
+                        }
+                        else
+                        {
+                            <a class="action-btn blue" href="/SurveyJobs/Work?jobId=@job.Id&surveyType=@Uri.EscapeDataString(Model.SurveyType)">
+                                <i class="fa-solid fa-up-right-from-square"></i> Open
+                            </a>
+                        }
+
+                        @if (Model.IsAdmin)
+                        {
+                            <button class="action-btn teal" data-bs-toggle="modal" data-bs-target="#assignModal-@job.Id">
+                                <i class="fa-solid @(hasAssignedSurveyor ? "fa-repeat" : "fa-user-plus")"></i>
+                                @(hasAssignedSurveyor ? "Reassign Surveyor" : "Assign Surveyor")
+                            </button>
+
+                              <form method="post" action="/SurveyJobs/Delete" class="d-inline" onsubmit="return confirm('Delete job @job.JobNumber? This cannot be undone.');">
+                                <input type="hidden" name="jobId" value="@job.Id" />
+                                <input type="hidden" name="surveyType" value="@Model.SurveyType" />
+                                <button type="submit" class="action-btn red">
+                                    <i class="fa-regular fa-trash-can"></i> Delete
+                                </button>
+                            </form>
+
+
+                        }
+
+                        @if (Model.IsAdmin && isIhm)
+                        {
+                            var hasExcelData = Model.AreasByJob.ContainsKey(job.Id) &&
+                            Model.AreasByJob[job.Id] != null &&
+                            Model.AreasByJob[job.Id].Any();
+
+                            <form method="post" enctype="multipart/form-data" action="/SurveyJobs/UploadIhmExcel" class="d-inline">
+    <input type="hidden" name="jobId" value="@job.Id" />
+    <input type="file" name="file" accept=".xlsx,.xls" hidden onchange="this.form.submit()" id="excel-@job.Id" />
+    <label class="action-btn green" for="excel-@job.Id">
+        <i class="fa-regular fa-file-excel"></i>
+        @(hasExcelData ? "Reupload Excel" : "Upload Excel")
+    </label>
+</form>
+
+                            <a class="action-btn purple" href="/IhmReportInfo/Index?jobId=@job.Id">
+                                <i class="fa-regular fa-file-pdf"></i> IHM Report
+</a>
+
+                            <button class="action-btn amber" type="button" data-bs-toggle="modal" data-bs-target="#layoutModal-@job.Id">
+                                <i class="fa-regular fa-map"></i> Upload Layouts
+                            </button>
+                        }
+                    </div>
+                </article>
+
+                <div class="modal fade" id="assignModal-@job.Id" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <form class="modal-content" method="post" action="/SurveyJobs/AssignSurveyors">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Reassign Surveyors - @job.JobNumber</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+
+                            <div class="modal-body">
+                                <input type="hidden" name="jobId" value="@job.Id" />
+                                <input type="hidden" name="surveyType" value="@Model.SurveyType" />
+
+                                <label class="form-label">Primary Surveyor</label>
+                                <select class="form-select mb-3" name="primarySurveyorUserId">
+                                    <option value="">Not Assign</option>
+                                    @foreach (var s in Model.Surveyors)
+                                    {
+                                        <option value="@s.Id" selected="@(job.PrimarySurveyorUserId == s.Id ? "selected" : null)">@s.DisplayName</option>
+                                    }
+                                </select>
+
+                                <label class="form-label">Secondary Surveyor</label>
+                                <select class="form-select" name="secondarySurveyorUserId">
+                                    <option value="">Not Assign</option>
+                                    @foreach (var s in Model.Surveyors)
+                                    {
+                                        <option value="@s.Id" selected="@(job.SecondarySurveyorUserId == s.Id ? "selected" : null)">@s.DisplayName</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                @if (Model.IsAdmin && isIhm)
+                {
+                    var areas = Model.AreasByJob.GetValueOrDefault(job.Id) ?? new();
+                    var attachments = Model.LayoutAttachmentsByJob.GetValueOrDefault(job.Id) ?? new();
+                    attachments.TryGetValue("common", out var commonAttachment);
+                    <div class="modal fade" id="layoutModal-@job.Id" tabindex="-1">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <form class="modal-content area-layout-form" method="post" enctype="multipart/form-data" action="/SurveyJobs/UploadIhmAreaLayout">
+                                <div class="modal-header">
+                                    <div>
+                                        <h5 class="modal-title"><i class="fa-regular fa-map me-2"></i>Upload Layout Images</h5>
+                                        <small class="text-white-50">@job.JobNumber · @(job.VesselName ?? "Vessel")</small>
+                                    </div>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <input type="hidden" name="jobId" value="@job.Id" />
+                                    <label class="form-label fw-bold">Layout visibility *</label>
+                                    <select class="form-select area-layout-select" name="layoutTarget" required>
+                                        <option value="common" selected
+                                                data-file-name="@commonAttachment?.OriginalFileName"
+                                                data-file-path="@commonAttachment?.FilePath">
+                                            Common Layout - fallback for every location
+                                        </option>
+                                        @foreach (var area in areas)
+                                        {
+                                            attachments.TryGetValue(area.Id.ToString(), out var areaAttachment);
+                                            <option value="@area.Id"
+                                                    data-locations="@area.LocationSummary"
+                                                    data-file-name="@areaAttachment?.OriginalFileName"
+                                                    data-file-path="@areaAttachment?.FilePath">
+                                                @area.AreaName
+                                            </option>
+                                        }
+                                        <option value="new">+ Create another area</option>
+                                    </select>
+                                    <div class="form-text area-location-hint">
+                                        Common is shown only where no specific area layout is uploaded.
+                                    </div>
+
+                                    <div class="new-area-fields mt-3" hidden>
+                                        <label class="form-label fw-bold">New area name *</label>
+                                        <input class="form-control" name="newAreaName" placeholder="Example: Engine Room - Lower Platform" />
+                                    </div>
+
+                                    <div class="mt-3">
+                                        <label class="form-label fw-bold">Layout image *</label>
+                                        <input class="form-control layout-file-input" type="file" name="files" accept=".jpg,.jpeg,.png,.webp" required />
+                                        <div class="form-text">Uploading a new image replaces the current attachment for this selection.</div>
+                                    </div>
+
+                                    <div class="current-layout-attachment mt-3 p-3 border rounded">
+                                        <div class="small text-uppercase fw-bold text-secondary mb-1">Current attachment</div>
+                                        <div class="attachment-empty text-muted small">No Common Layout uploaded.</div>
+                                        <div class="attachment-details d-none align-items-center gap-2">
+                                            <i class="fa-regular fa-image text-primary"></i>
+                                            <a class="attachment-link text-truncate" target="_blank"></a>
+                                            <span class="badge bg-success">Saved</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-cloud-arrow-up me-1"></i>Upload Images</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                }
+
+            }
+        }
+    </main>
+
+    <div class="modal fade" id="createJobModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <form class="modal-content" method="post" action="/SurveyJobs/Create">
+                <div class="modal-header">
+                    <h5 class="modal-title">New @Model.SurveyType Job</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <input type="hidden" name="SurveyType" value="@Model.SurveyType" />
+
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Job Number *</label>
+                            <input class="form-control" name="JobNumber" required />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Project Name</label>
+                            <input class="form-control" name="ProjectName" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Audit Port *</label>
+                            <input class="form-control" name="AuditPort" required />
+                        </div>
+
+                        <div class="col-md-12">
+                            <label class="form-label">Audit Address</label>
+                            <input class="form-control" name="AuditAddress" />
+                        </div>
+
+                        <div class="col-md-12">
+                            <label class="form-label">Select Vessel *</label>
+                            <select class="form-select" name="VesselId" id="VesselId" required>
+                                <option value="">Select vessel</option>
+                                @foreach (var vessel in Model.Vessels)
+                                {
+                                    <option value="@vessel.Id" data-client-name="@vessel.ClientName">
+                                        @vessel.VesselName @(string.IsNullOrWhiteSpace(vessel.ImoNumber) ? "" : $" - IMO {vessel.ImoNumber}")
+                                    </option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-md-12">
+                            <label class="form-label">Client Name</label>
+                            <input class="form-control" name="ClientName" id="ClientName" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Start Date *</label>
+                            <input class="form-control" type="date" name="StartDate" required />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">End Date *</label>
+                            <input class="form-control" type="date" name="EndDate" required />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Primary Surveyor</label>
+                            <select class="form-select" name="PrimarySurveyorUserId">
+                                <option value="">Not Assign</option>
+                                @foreach (var s in Model.Surveyors)
+                                {
+                                    <option value="@s.Id">@s.DisplayName</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Secondary Surveyor</label>
+                            <select class="form-select" name="SecondarySurveyorUserId">
+                                <option value="">Not Assign</option>
+                                @foreach (var s in Model.Surveyors)
+                                {
+                                    <option value="@s.Id">@s.DisplayName</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Job</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+                document.addEventListener("DOMContentLoaded", function () {
+            const vesselSelect = document.getElementById("VesselId");
+            const clientNameInput = document.getElementById("ClientName");
+
+            if (!vesselSelect || !clientNameInput) return;
+
+            vesselSelect.addEventListener("change", function () {
+                const selectedOption = vesselSelect.options[vesselSelect.selectedIndex];
+                const clientName = selectedOption.getAttribute("data-client-name") || "";
+
+                clientNameInput.value = clientName;
+            });
+        });
+        document.getElementById("jobSearch").addEventListener("input", function () {
+            const q = this.value.toLowerCase();
+            document.querySelectorAll(".job-card").forEach(card => {
+                card.style.display = card.dataset.search.includes(q) ? "" : "none";
+            });
+        });
+
+        document.querySelectorAll(".area-layout-select").forEach(select => {
+            select.addEventListener("change", function () {
+                const form = this.closest(".area-layout-form");
+                const newFields = form.querySelector(".new-area-fields");
+                const newName = newFields.querySelector("input");
+                const hint = form.querySelector(".area-location-hint");
+                const option = this.options[this.selectedIndex];
+                const isNew = this.value === "new";
+
+                newFields.hidden = !isNew;
+                newName.required = isNew;
+
+                if (this.value === "common") {
+                    hint.textContent = "Common is shown only where no specific area layout is uploaded.";
+                } else if (isNew) {
+                    hint.textContent = "The images will be mapped only to the new area.";
+                } else {
+                    hint.textContent = option.dataset.locations
+                        ? `Checkpoint locations: ${option.dataset.locations}`
+                        : "These images will appear only inside this survey area.";
+                }
+
+                updateAttachment(form, option);
+            });
+
+            const form = select.closest(".area-layout-form");
+            updateAttachment(form, select.options[select.selectedIndex]);
+            form.querySelector(".layout-file-input").addEventListener("change", function () {
+                if (!this.files.length) {
+                    updateAttachment(form, select.options[select.selectedIndex]);
+                    return;
+                }
+                const details = form.querySelector(".attachment-details");
+                const empty = form.querySelector(".attachment-empty");
+                const link = form.querySelector(".attachment-link");
+                empty.classList.add("d-none");
+                details.classList.remove("d-none");
+                details.classList.add("d-flex");
+                link.removeAttribute("href");
+                link.textContent = `${this.files[0].name} (pending upload)`;
+                details.querySelector(".badge").textContent = "Pending";
+                details.querySelector(".badge").className = "badge bg-warning text-dark";
+            });
+        });
+
+        function updateAttachment(form, option) {
+            const details = form.querySelector(".attachment-details");
+            const empty = form.querySelector(".attachment-empty");
+            const link = form.querySelector(".attachment-link");
+            const badge = details.querySelector(".badge");
+            const fileName = option.dataset.fileName;
+            const filePath = option.dataset.filePath;
+
+            if (fileName && filePath) {
+                empty.classList.add("d-none");
+                details.classList.remove("d-none");
+                details.classList.add("d-flex");
+                link.href = filePath;
+                link.textContent = fileName;
+                badge.textContent = "Saved";
+                badge.className = "badge bg-success";
+            } else {
+                details.classList.add("d-none");
+                details.classList.remove("d-flex");
+                empty.classList.remove("d-none");
+                empty.textContent = option.value === "common"
+                    ? "No Common Layout uploaded."
+                    : "No specific attachment uploaded. Flutter will use Common Layout.";
+            }
+        }
+
+    </script>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <script>
+        window.addEventListener("DOMContentLoaded", function () {
+            alert("@TempData["SuccessMessage"]");
+        });
+    </script>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <script>
+        window.addEventListener("DOMContentLoaded", function () {
+            alert("@TempData["ErrorMessage"]");
+        });
+    </script>
+}
+</body>
+</html>

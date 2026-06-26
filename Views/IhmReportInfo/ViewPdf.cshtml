@@ -1,0 +1,27 @@
+﻿@{
+    Layout = null;
+    var pdfUrl = ViewBag.PdfUrl as string;
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>IHM Report</title>
+    <style>
+        body {
+            margin: 0;
+            background: #071522;
+        }
+
+        iframe {
+            width: 100vw;
+            height: 100vh;
+            border: 0;
+        }
+    </style>
+</head>
+<body>
+    <iframe src="@pdfUrl"></iframe>
+</body>
+</html>

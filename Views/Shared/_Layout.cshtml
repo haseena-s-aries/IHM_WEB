@@ -1,0 +1,195 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>@ViewData["Title"] - Survery_Certification_App_Consume</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    @* <link href="~/css/loader.css" rel="stylesheet" /> *@
+
+    @* <link rel="stylesheet" href="~/Survery_Certification_App_Consume.styles.css" asp-append-version="true" /> *@
+    @* <link id="themeStylesheet" rel="stylesheet" href="~/css/light-theme.css" /> *@
+    <style>
+        /* #loader-wrapper {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background: white;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        } */
+
+      /*   #loader {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        } */
+
+        @@keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+
+</head>
+<body>
+   
+    @* <!-- Loader -->
+    <div id="loader-wrapper">
+        <div id="loader"></div>
+    </div> *@
+    <div class="container-fluid p-0">
+        <main role="main" class="p-0">
+            @RenderBody()
+        </main>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        //       window.addEventListener('load', function () {
+        //     document.getElementById('loader-wrapper').style.display = 'none';
+        // });
+
+
+               function test() {
+            var tabsNewAnim = $('#navbarSupportedContent');
+
+            if (tabsNewAnim.length === 0) {
+                return;
+            }
+
+            var activeItemNewAnim = tabsNewAnim.find('.active');
+
+            if (activeItemNewAnim.length === 0) {
+                return;
+            }
+
+            var itemPosNewAnimTop = activeItemNewAnim.position();
+
+            if (!itemPosNewAnimTop) {
+                return;
+            }
+
+            var activeWidthNewAnimHeight = activeItemNewAnim.innerHeight();
+            var activeWidthNewAnimWidth = activeItemNewAnim.innerWidth();
+
+            $(".hori-selector").css({
+                "top": itemPosNewAnimTop.top + "px",
+                "left": itemPosNewAnimTop.left + "px",
+                "height": activeWidthNewAnimHeight + "px",
+                "width": activeWidthNewAnimWidth + "px"
+            });
+
+            $("#navbarSupportedContent").on("click", "li", function () {
+                $('#navbarSupportedContent ul li').removeClass("active");
+                $(this).addClass('active');
+
+                var itemPos = $(this).position();
+
+                if (!itemPos) {
+                    return;
+                }
+
+                $(".hori-selector").css({
+                    "top": itemPos.top + "px",
+                    "left": itemPos.left + "px",
+                    "height": $(this).innerHeight() + "px",
+                    "width": $(this).innerWidth() + "px"
+                });
+            });
+        }
+        $(document).ready(function(){
+            setTimeout(function(){ test(); });
+        });
+        $(window).on('resize', function(){
+            setTimeout(function(){ test(); }, 500);
+        });
+        $(".navbar-toggler").click(function(){
+            $(".navbar-collapse").slideToggle(300);
+            setTimeout(function(){ test(); });
+        });
+
+
+
+        // --------------add active class-on another-page move----------
+        jQuery(document).ready(function($){
+            // Get current path and find target link
+            var path = window.location.pathname.split("/").pop();
+
+            // Account for home page with empty path
+            if ( path == '' ) {
+                path = 'index.html';
+            }
+
+            var target = $('#navbarSupportedContent ul li a[href="'+path+'"]');
+            // Add active class to target link
+            target.parent().addClass('active');
+        });
+
+
+
+
+      
+        // $(document).ready(function () {
+        //     Check localStorage for theme preference
+        //     let currentTheme = localStorage.getItem("theme") || "light";
+        //     applyTheme(currentTheme);
+
+        //     Toggle theme on button click
+        //     $("#themeToggle").click(function () {
+        //         let newTheme = (currentTheme === "light") ? "dark" : "light";
+        //         applyTheme(newTheme);
+        //     });
+
+        //     function applyTheme(theme) {
+        //         currentTheme = theme;
+        //         localStorage.setItem("theme", theme);
+
+        //         if (theme === "dark") {
+        //             $("#themeStylesheet").attr("href", "/css/Dark-theme.css");
+        //             $("#themeToggle").text("🌙 Dark Mode");
+        //         } else {
+        //             $("#themeStylesheet").attr("href", "/css/Light-theme.css");
+        //             $("#themeToggle").text("🌞 Light Mode");
+        //         }
+        //     }
+        //     });
+            // if (window.history.replaceState) {
+            //     window.history.replaceState(null, null, window.location.href);
+            // }
+                    window.addEventListener("pageshow", function (event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+    </script>
+<!-- jQuery -->
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+
+<!-- Bootstrap -->
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Validation -->
+<script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+<script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+
+<!-- Your site JS -->
+<script src="~/js/site.js" asp-append-version="true"></script>
+
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

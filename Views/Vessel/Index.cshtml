@@ -1,0 +1,367 @@
+@model VesselMasterViewModel
+@{
+    Layout = null;
+
+    string Val(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+    string NumVal(decimal? value) => value.HasValue ? (value.Value % 1 == 0 ? value.Value.ToString("0") : value.Value.ToString("0.##")) : "-";
+    string DateVal(DateTime? value) => value.HasValue ? value.Value.ToString("yyyy-MM-dd") : "-";
+    string StatusClass(string? status) => (status ?? "").ToLowerInvariant() switch
+    {
+        "active" => "status-active",
+        "inactive" => "status-inactive",
+        "pending" => "status-pending",
+        _ => "status-default"
+    };
+    string VesselIcon(string? type)
+    {
+        var t = (type ?? "").ToLowerInvariant();
+        if (t.Contains("tanker")) return "fa-gas-pump";
+        if (t.Contains("cargo")) return "fa-boxes-stacked";
+        if (t.Contains("passenger")) return "fa-users";
+        if (t.Contains("tug")) return "fa-arrows-left-right";
+        return "fa-ship";
+    }
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Vessel Master</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        :root {
+            --navy: #0b1d33;
+            --deep-blue: #132b4a;
+            --slate: #1e3a5f;
+            --ocean: #1976d2;
+            --surface: #f4f6fa;
+            --card: #ffffff;
+            --divider: #e0e4ec;
+            --text: #1a2333;
+            --muted: #607080;
+            --soft: #90a0b0;
+            --success: #43a047;
+            --amber: #ffa726;
+            --red: #ef5350;
+            --teal: #4db6ac;
+        }
+
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--surface); color: var(--text); font-family: "Segoe UI", Arial, sans-serif; }
+        .header { padding: 24px; background: linear-gradient(135deg, var(--navy), var(--deep-blue), var(--slate)); color: #fff; border-radius: 0 0 20px 20px; box-shadow: 0 4px 12px #0003; }
+        .header-row { display: flex; align-items: center; gap: 14px; }
+        .header-icon, .header-btn, .back-btn { width: 44px; height: 44px; border-radius: 12px; background: #ffffff1a; color: #ffffffb8; border: 0; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+        .header-icon { color: #fff; }
+        .title { margin: 0; font-size: 22px; line-height: 1.1; font-weight: 900; }
+        .sub { margin: 3px 0 0; color: #ffffff8a; font-size: 13px; }
+        .count-pill { padding: 8px 16px; border-radius: 20px; background: #ffffff1a; border: 1px solid #ffffff26; color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; }
+        .count-pill i { color: var(--teal); }
+        .add-btn { min-height: 44px; border: 0; border-radius: 10px; background: var(--ocean); color: white; padding: 10px 16px; font-weight: 800; }
+        .search-box { margin-top: 16px; background: #ffffff1a; border: 1px solid #ffffff1a; border-radius: 12px; display: flex; align-items: center; padding: 0 14px; }
+        .search-box input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: white; padding: 14px 8px; font-size: 14px; }
+        .search-box input::placeholder { color: #ffffff66; }
+        .content { padding: 20px; }
+        .vessel-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+        .vessel-card { min-height: 380px; border: 1px solid #e0e4ec99; border-radius: 14px; background: var(--card); box-shadow: 0 3px 10px #0000000a; padding: 18px; display: flex; flex-direction: column; }
+        .card-head { display: flex; align-items: center; gap: 12px; }
+        .vessel-icon { width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, var(--navy), var(--slate)); color: #fff; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+        .vessel-name { margin: 0; font-size: 16px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .vessel-type { margin: 2px 0 0; color: var(--soft); font-size: 12px; }
+        .status-chip { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+        .status-active { color: var(--success); background: #43a0471f; }
+        .status-inactive { color: var(--soft); background: #90a0b01f; }
+        .status-pending { color: #c27a00; background: #ffa72624; }
+        .status-default { color: var(--ocean); background: #1976d21f; }
+        .line { border-top: 1px solid #e0e4ec80; margin: 14px 0; }
+        .info-list { flex: 1; }
+        .info-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--soft); font-size: 13px; }
+        .info-row strong { width: 64px; color: var(--soft); font-size: 12px; font-weight: 700; }
+        .info-row span { min-width: 0; color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .metrics { display: flex; align-items: center; justify-content: space-around; gap: 8px; padding: 10px; border-radius: 8px; background: var(--surface); margin-top: 10px; }
+        .metric { text-align: center; min-width: 0; }
+        .metric strong { display: block; font-size: 13px; color: var(--text); }
+        .metric span { display: block; margin-top: 2px; font-size: 10px; color: var(--soft); }
+        .metric-line { width: 1px; height: 22px; background: var(--divider); }
+        .card-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+        .action-btn { border: 0; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+        .blue { background: #1976d214; color: #1976d2; }
+        .red { background: #ef535014; color: #d93636; }
+        .empty { text-align: center; padding: 70px 20px; color: var(--muted); }
+        .modal-content { border: 0; border-radius: 16px; overflow: hidden; }
+        .modal-header { background: var(--navy); color: #fff; }
+        .modal-title { font-weight: 800; }
+        .form-control { min-height: 46px; border-radius: 8px; }
+        .section-label { margin: 4px 0 10px; color: var(--ocean); font-size: 11px; font-weight: 900; letter-spacing: 1.4px; }
+        .detail-section { margin-bottom: 20px; }
+        .detail-box { background: var(--surface); border-radius: 10px; padding: 14px; }
+        .detail-row { display: grid; grid-template-columns: 160px 1fr; gap: 12px; padding-bottom: 8px; font-size: 14px; }
+        .detail-row:last-child { padding-bottom: 0; }
+        .detail-row strong { color: var(--muted); font-size: 13px; font-weight: 600; }
+        .detail-row span { color: var(--text); font-weight: 700; }
+
+        @@media (max-width: 960px) {
+            .vessel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .header-row { flex-wrap: wrap; }
+        }
+
+        @@media (max-width: 620px) {
+            .header { padding: 18px 14px; }
+            .content { padding: 14px; }
+            .vessel-grid { grid-template-columns: 1fr; }
+            .count-pill { order: 5; }
+            .detail-row { grid-template-columns: 1fr; gap: 2px; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-row">
+            <a class="back-btn" href="/Home/AdminDashboard"><i class="fa-solid fa-chevron-left"></i></a>
+            <div class="header-icon"><i class="fa-solid fa-sailboat"></i></div>
+
+            <div class="flex-grow-1">
+                <h1 class="title">Vessel Master</h1>
+                <p class="sub">Fleet Registry &amp; Management</p>
+            </div>
+
+            @if (string.IsNullOrWhiteSpace(Model.ErrorMessage))
+            {
+                <span class="count-pill"><i class="fa-solid fa-ship me-1"></i> @Model.Vessels.Count Vessel@(Model.Vessels.Count == 1 ? "" : "s")</span>
+            }
+
+            <a class="header-btn" href="/Vessel/Index" title="Refresh"><i class="fa-solid fa-rotate-right"></i></a>
+            <button class="add-btn" data-bs-toggle="modal" data-bs-target="#createVesselModal">
+                <i class="fa-solid fa-plus me-1"></i> Add Vessel
+            </button>
+        </div>
+
+        <div class="search-box">
+            <i class="fa-solid fa-search"></i>
+            <input id="vesselSearch" placeholder="Search by name, IMO, flag, type, call sign..." />
+        </div>
+    </header>
+
+    <main class="content">
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <div class="empty">
+                <i class="fa-solid fa-triangle-exclamation fa-3x text-danger"></i>
+                <p class="mt-3">@Model.ErrorMessage</p>
+            </div>
+        }
+        else if (!Model.Vessels.Any())
+        {
+            <div class="empty">
+                <i class="fa-regular fa-compass fa-3x"></i>
+                <p class="mt-3">No vessels registered yet</p>
+                <p>Tap "Add Vessel" to register your first vessel.</p>
+            </div>
+        }
+        else
+        {
+            <section class="vessel-grid">
+                @foreach (var vessel in Model.Vessels)
+                {
+                    <article class="vessel-card" data-search="@($"{vessel.VesselName} {vessel.ImoNumber} {vessel.Flag} {vessel.VesselType} {vessel.CallSign}".ToLowerInvariant())">
+                        <div class="card-head">
+                            <span class="vessel-icon"><i class="fa-solid @VesselIcon(vessel.VesselType)"></i></span>
+                            <div class="min-w-0 flex-grow-1">
+                                <h2 class="vessel-name">@vessel.VesselName</h2>
+                                @if (!string.IsNullOrWhiteSpace(vessel.VesselType))
+                                {
+                                    <p class="vessel-type">@vessel.VesselType</p>
+                                }
+                            </div>
+                            <span class="status-chip @StatusClass(vessel.Status)">@vessel.Status</span>
+                        </div>
+
+                        <div class="line"></div>
+
+                        <div class="info-list">
+                            <div class="info-row"><i class="fa-solid fa-tag"></i><strong>IMO</strong><span>@Val(vessel.ImoNumber)</span></div>
+                            <div class="info-row"><i class="fa-regular fa-flag"></i><strong>Flag</strong><span>@Val(vessel.Flag)</span></div>
+                            <div class="info-row"><i class="fa-regular fa-circle-check"></i><strong>Class</strong><span>@Val(vessel.ClassSociety)</span></div>
+                            <div class="info-row"><i class="fa-solid fa-radio"></i><strong>Call Sign</strong><span>@Val(vessel.CallSign)</span></div>
+                            @if (!string.IsNullOrWhiteSpace(vessel.OwnerName))
+                            {
+                                <div class="info-row"><i class="fa-regular fa-building"></i><strong>Owner</strong><span>@Val(vessel.OwnerName)</span></div>
+                            }
+                        </div>
+
+                        <div class="metrics">
+                            <div class="metric"><strong>@NumVal(vessel.LengthOverall)</strong><span>LOA</span></div>
+                            <span class="metric-line"></span>
+                            <div class="metric"><strong>@NumVal(vessel.GrossTonnage)</strong><span>GRT</span></div>
+                            <span class="metric-line"></span>
+                            <div class="metric"><strong>@NumVal(vessel.NetTonnage)</strong><span>NRT</span></div>
+                        </div>
+
+                        <div class="card-actions">
+                            <button class="action-btn blue" data-bs-toggle="modal" data-bs-target="#vesselDetail-@vessel.Id">
+                                <i class="fa-solid fa-circle-info"></i> Details
+                            </button>
+                            @if (!string.Equals(vessel.Status, "Inactive", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <form method="post" action="/Vessel/Deactivate" onsubmit="return confirm('Deactivate vessel @vessel.VesselName?');">
+                                    <input type="hidden" name="id" value="@vessel.Id" />
+                                    <button type="submit" class="action-btn red">
+                                        <i class="fa-regular fa-circle-xmark"></i> Deactivate
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </article>
+
+                    <div class="modal fade" id="vesselDetail-@vessel.Id" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">@vessel.VesselName</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body p-4">
+                                    <div class="d-flex align-items-center gap-3 mb-4">
+                                        <span class="vessel-icon"><i class="fa-solid @VesselIcon(vessel.VesselType)"></i></span>
+                                        <div class="flex-grow-1">
+                                            <h3 class="m-0 fs-5 fw-bold">@vessel.VesselName</h3>
+                                            <div class="text-muted">@Val(vessel.VesselType)</div>
+                                        </div>
+                                        <span class="status-chip @StatusClass(vessel.Status)">@vessel.Status</span>
+                                    </div>
+
+                                    <div class="detail-section">
+                                        <div class="section-label">IDENTIFICATION</div>
+                                        <div class="detail-box">
+                                            <div class="detail-row"><strong>IMO Number</strong><span>@Val(vessel.ImoNumber)</span></div>
+                                            <div class="detail-row"><strong>Call Sign</strong><span>@Val(vessel.CallSign)</span></div>
+                                            <div class="detail-row"><strong>Official Number</strong><span>@Val(vessel.OfficialNumber)</span></div>
+                                            <div class="detail-row"><strong>Classification Society</strong><span>@Val(vessel.ClassSociety)</span></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="detail-section">
+                                        <div class="section-label">BUILD &amp; REGISTRATION</div>
+                                        <div class="detail-box">
+                                            <div class="detail-row"><strong>Builder</strong><span>@Val(vessel.Builder)</span></div>
+                                            <div class="detail-row"><strong>Date of Build</strong><span>@DateVal(vessel.DateOfBuild)</span></div>
+                                            <div class="detail-row"><strong>Port of Registry</strong><span>@Val(vessel.PortOfRegistry)</span></div>
+                                            <div class="detail-row"><strong>Flag</strong><span>@Val(vessel.Flag)</span></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="detail-section">
+                                        <div class="section-label">DIMENSIONS &amp; TONNAGE</div>
+                                        <div class="detail-box">
+                                            <div class="detail-row"><strong>L.O.A</strong><span>@NumVal(vessel.LengthOverall)</span></div>
+                                            <div class="detail-row"><strong>L.B.P</strong><span>@NumVal(vessel.LengthBetweenPerpendiculars)</span></div>
+                                            <div class="detail-row"><strong>Breadth (MLD)</strong><span>@NumVal(vessel.Breadth)</span></div>
+                                            <div class="detail-row"><strong>Depth (MLD)</strong><span>@NumVal(vessel.Depth)</span></div>
+                                            <div class="detail-row"><strong>Draught (MLD)</strong><span>@NumVal(vessel.DraughtMoulded)</span></div>
+                                            <div class="detail-row"><strong>GRT</strong><span>@NumVal(vessel.GrossTonnage)</span></div>
+                                            <div class="detail-row"><strong>NRT</strong><span>@NumVal(vessel.NetTonnage)</span></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="detail-section">
+                                        <div class="section-label">STAKEHOLDERS</div>
+                                        <div class="detail-box">
+                                            <div class="detail-row"><strong>Owner</strong><span>@Val(vessel.OwnerName)</span></div>
+                                            <div class="detail-row"><strong>Manager</strong><span>@Val(vessel.ManagerName)</span></div>
+                                            <div class="detail-row"><strong>Client</strong><span>@Val(vessel.ClientName)</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </section>
+        }
+    </main>
+
+    <div class="modal fade" id="createVesselModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <form class="modal-content" method="post" action="/Vessel/Create">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa-regular fa-circle-plus me-2"></i>Register New Vessel</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="section-label">IDENTIFICATION</div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-8"><input class="form-control" name="VesselName" placeholder="Vessel Name *" required /></div>
+                        <div class="col-md-4"><input class="form-control" name="VesselType" placeholder="Type" /></div>
+                        <div class="col-md-6"><input class="form-control" name="ImoNumber" placeholder="IMO Number" /></div>
+                        <div class="col-md-6"><input class="form-control" name="CallSign" placeholder="Call Sign" /></div>
+                        <div class="col-md-6"><input class="form-control" name="OfficialNumber" placeholder="Official Number" /></div>
+                        <div class="col-md-6"><input class="form-control" name="ClassSociety" placeholder="Classification Society" /></div>
+                    </div>
+
+                    <div class="section-label">BUILD &amp; REGISTRATION</div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6"><input class="form-control" name="Builder" placeholder="Builder" /></div>
+                        <div class="col-md-6"><input class="form-control" type="date" name="DateOfBuild" /></div>
+                        <div class="col-md-6"><input class="form-control" name="PortOfRegistry" placeholder="Port of Registry" /></div>
+                        <div class="col-md-6"><input class="form-control" name="Flag" placeholder="Flag" /></div>
+                    </div>
+
+                    <div class="section-label">DIMENSIONS &amp; TONNAGE</div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4"><input class="form-control" type="number" step="0.01" name="LengthOverall" placeholder="L.O.A" /></div>
+                        <div class="col-md-4"><input class="form-control" type="number" step="0.01" name="LengthBetweenPerpendiculars" placeholder="L.B.P" /></div>
+                        <div class="col-md-4"><input class="form-control" type="number" step="0.01" name="Breadth" placeholder="Breadth (MLD)" /></div>
+                        <div class="col-md-4"><input class="form-control" type="number" step="0.01" name="Depth" placeholder="Depth (MLD)" /></div>
+                        <div class="col-md-4"><input class="form-control" type="number" step="0.01" name="DraughtMoulded" placeholder="Draught (MLD)" /></div>
+                        <div class="col-md-4"><input class="form-control" type="number" step="0.01" name="GrossTonnage" placeholder="GRT" /></div>
+                        <div class="col-md-4"><input class="form-control" type="number" step="0.01" name="NetTonnage" placeholder="NRT" /></div>
+                        <div class="col-md-4"><input class="form-control" type="number" step="0.01" name="Deadweight" placeholder="Deadweight" /></div>
+                        <div class="col-md-4"><input class="form-control" type="number" name="YearBuilt" placeholder="Year Built" /></div>
+                    </div>
+
+                    <div class="section-label">STAKEHOLDERS</div>
+                    <div class="row g-3">
+                        <div class="col-md-4"><input class="form-control" name="OwnerName" placeholder="Owner" /></div>
+                        <div class="col-md-4"><input class="form-control" name="ManagerName" placeholder="Manager" /></div>
+                        <div class="col-md-4"><input class="form-control" name="ClientName" placeholder="Client" /></div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-outline-secondary fw-bold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-bold"><i class="fa-solid fa-check me-1"></i> Save Vessel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById("vesselSearch").addEventListener("input", function () {
+            const q = this.value.toLowerCase();
+            document.querySelectorAll(".vessel-card").forEach(card => {
+                card.style.display = card.dataset.search.includes(q) ? "" : "none";
+            });
+        });
+    </script>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <script>
+            window.addEventListener("DOMContentLoaded", function () {
+                alert("@TempData["SuccessMessage"]");
+            });
+        </script>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <script>
+            window.addEventListener("DOMContentLoaded", function () {
+                alert("@TempData["ErrorMessage"]");
+            });
+        </script>
+    }
+</body>
+</html>

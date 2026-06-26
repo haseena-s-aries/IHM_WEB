@@ -1,0 +1,189 @@
+﻿@model Survery_Certification_App_Consume.Models.VesselDto
+@{
+    Layout = null;
+    var jobId = (int)(ViewBag.JobId ?? 0);
+
+    string Val(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+    string Num(decimal? value) => value.HasValue ? value.Value.ToString("0.##") : "-";
+    string DateVal(DateTime? value) => value.HasValue ? value.Value.ToLocalTime().ToString("dd/MM/yyyy") : "-";
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Vessel Info</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        body {
+            margin: 0;
+            background: #eef4fb;
+            color: #102033;
+            font-family: "Segoe UI",Arial,sans-serif;
+        }
+
+        .appbar {
+            height: 56px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 16px;
+            background: #fff;
+            border-bottom: 1px solid #d7e3f1;
+        }
+
+        .back-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: #eef4fb;
+            color: #102033;
+            display: grid;
+            place-items: center;
+            text-decoration: none;
+        }
+
+        .title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .page {
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        .hero {
+            background: #fff;
+            border: 1px solid #d7e6f3;
+            border-radius: 14px;
+            padding: 18px;
+            margin-bottom: 14px;
+        }
+
+            .hero h2 {
+                margin: 0;
+                font-size: 22px;
+                font-weight: 900;
+            }
+
+        .muted {
+            color: #607d9a;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2,1fr);
+            gap: 12px;
+        }
+
+        .cardx {
+            background: #fff;
+            border: 1px solid #d7e6f3;
+            border-radius: 14px;
+            padding: 16px;
+        }
+
+            .cardx h3 {
+                font-size: 13px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                color: #607d9a;
+                margin: 0 0 12px;
+                font-weight: 900;
+            }
+
+        .rowx {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 10px;
+            padding: 7px 0;
+            border-bottom: 1px solid #edf2f7;
+        }
+
+            .rowx:last-child {
+                border-bottom: 0;
+            }
+
+        .label {
+            color: #607d9a;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .value {
+            font-size: 13px;
+            font-weight: 800;
+            overflow-wrap: anywhere;
+        }
+
+        @@media(max-width:700px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .rowx {
+                grid-template-columns: 1fr;
+                gap: 2px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="appbar">
+        <a class="back-btn" href="/SurveyJobs/Work?jobId=@jobId&surveyType=IHM%20Survey">
+            <i class="fa-solid fa-chevron-left"></i>
+        </a>
+        <h1 class="title">Vessel Info</h1>
+    </header>
+
+    <main class="page">
+        <section class="hero">
+            <h2>@Val(Model.VesselName)</h2>
+            <div class="muted">IMO @Val(Model.ImoNumber) · @Val(Model.Flag) · @Val(Model.ClassSociety)</div>
+        </section>
+
+        <div class="grid">
+            <section class="cardx">
+                <h3>Identity</h3>
+                <div class="rowx"><div class="label">Vessel Type</div><div class="value">@Val(Model.VesselType)</div></div>
+                <div class="rowx"><div class="label">Official No</div><div class="value">@Val(Model.OfficialNumber)</div></div>
+                <div class="rowx"><div class="label">Call Sign</div><div class="value">@Val(Model.CallSign)</div></div>
+                <div class="rowx"><div class="label">Port Registry</div><div class="value">@Val(Model.PortOfRegistry)</div></div>
+                <div class="rowx"><div class="label">Status</div><div class="value">@Val(Model.Status)</div></div>
+            </section>
+
+            <section class="cardx">
+                <h3>Build</h3>
+                <div class="rowx"><div class="label">Builder</div><div class="value">@Val(Model.Builder)</div></div>
+                <div class="rowx"><div class="label">Year Built</div><div class="value">@(Model.YearBuilt?.ToString() ?? "-")</div></div>
+                <div class="rowx"><div class="label">Date of Build</div><div class="value">@DateVal(Model.DateOfBuild)</div></div>
+            </section>
+
+            <section class="cardx">
+                <h3>Dimensions</h3>
+                <div class="rowx"><div class="label">LOA</div><div class="value">@Num(Model.LengthOverall)</div></div>
+                <div class="rowx"><div class="label">LBP</div><div class="value">@Num(Model.LengthBetweenPerpendiculars)</div></div>
+                <div class="rowx"><div class="label">Breadth</div><div class="value">@Num(Model.Breadth)</div></div>
+                <div class="rowx"><div class="label">Depth</div><div class="value">@Num(Model.Depth)</div></div>
+                <div class="rowx"><div class="label">Draught</div><div class="value">@Num(Model.DraughtMoulded)</div></div>
+            </section>
+
+            <section class="cardx">
+                <h3>Tonnage & Parties</h3>
+                <div class="rowx"><div class="label">GRT</div><div class="value">@Num(Model.GrossTonnage)</div></div>
+                <div class="rowx"><div class="label">NRT</div><div class="value">@Num(Model.NetTonnage)</div></div>
+                <div class="rowx"><div class="label">Owner</div><div class="value">@Val(Model.OwnerName)</div></div>
+                <div class="rowx"><div class="label">Manager</div><div class="value">@Val(Model.ManagerName)</div></div>
+                <div class="rowx"><div class="label">Client</div><div class="value">@Val(Model.ClientName)</div></div>
+            </section>
+        </div>
+    </main>
+</body>
+</html>

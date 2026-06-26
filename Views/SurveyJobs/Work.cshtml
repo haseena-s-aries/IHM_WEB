@@ -1,0 +1,640 @@
+﻿@model Survery_Certification_App_Consume.Models.SurveyJobDto
+
+@{
+    Layout = null;
+
+    var surveyType = ViewBag.SurveyType?.ToString() ?? "IHM Survey";
+    var isIhm = surveyType == "IHM Survey";
+    var listUrl = isIhm ? "/SurveyJobs/Ihm" : "/SurveyJobs/Ex";
+
+    var totalVisuals = (int)(ViewBag.TotalVisuals ?? 0);
+    var totalSamples = (int)(ViewBag.TotalSamples ?? 0);
+    var audited = (int)(ViewBag.Audited ?? 0);
+    var areaCount = (int)(ViewBag.AreaCount ?? 0);
+    var vessel = ViewBag.Vessel as Survery_Certification_App_Consume.Models.VesselDto;
+
+    var total = (int)(ViewBag.Total ?? 0);
+    var pending = Math.Max(total - audited, 0);
+    var percent = total > 0 ? (audited * 100 / total) : 0;
+
+    string Val(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+    string DateVal(DateTime? value) => value.HasValue ? value.Value.ToLocalTime().ToString("dd/MM/yyyy") : "-";
+    }
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>@Model.JobNumber</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: #eef4fb;
+            color: #102033;
+            font-family: "Segoe UI", Arial, sans-serif;
+            overflow-x: hidden;
+        }
+
+        .page-header {
+            height: 42px;
+            background: #f8fbff;
+            border-bottom: 1px solid #d7e3f1;
+            display: flex;
+            align-items: center;
+            padding: 0 14px;
+            gap: 12px;
+        }
+
+        .back-btn {
+            color: #102033;
+            text-decoration: none;
+            font-size: 16px;
+        }
+
+        .header-title {
+            font-size: 11px;
+            font-weight: 800;
+            color: #607d9a;
+            margin: 0;
+            line-height: 1.1;
+        }
+
+        .header-sub {
+            font-size: 10px;
+            color: #6d849c;
+            margin: 0;
+            line-height: 1.1;
+        }
+
+        .content {
+            width: 100%;
+            padding: 14px;
+            box-sizing: border-box;
+        }
+
+        .section-title {
+            margin: 18px 0 10px;
+            color: #607d9a;
+            font-size: 11px;
+            letter-spacing: 1.5px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .nav-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .nav-card {
+            height: 75px;
+            background: #fff;
+            border: 1px solid #d7e6f3;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            text-align: center;
+            text-decoration: none;
+            color: #102033;
+            font-size: 11px;
+            font-weight: 800;
+            box-shadow: 0 5px 14px rgba(33, 68, 104, .05);
+        }
+
+            .nav-card:hover {
+                color: #102033;
+                transform: translateY(-1px);
+            }
+
+        .nav-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        .blue-soft {
+            border-color: #cfe5ff;
+        }
+
+        .orange-soft {
+            border-color: #ffe7cf;
+        }
+
+        .green-soft {
+            border-color: #d4f1e6;
+        }
+
+        .blue-icon {
+            background: #e1f0ff;
+            color: #1687ff;
+        }
+
+        .orange-icon {
+            background: #fff0df;
+            color: #ff9238;
+        }
+
+        .green-icon {
+            background: #e1f8ee;
+            color: #20b889;
+        }
+
+        .audit-card,
+        .validation-card,
+        .sync-card {
+            background: #fff;
+            border: 1px solid #d7e6f3;
+            border-radius: 14px;
+            padding: 22px;
+            box-shadow: 0 5px 14px rgba(33, 68, 104, .05);
+        }
+
+        .audit-row {
+            min-height: 112px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            align-items: center;
+            text-align: center;
+        }
+
+        .audit-box {
+            border-right: 1px solid #d7e3f1;
+        }
+
+            .audit-box:last-child {
+                border-right: 0;
+            }
+
+        .big-number {
+            font-size: 25px;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .blue-text {
+            color: #1687ff;
+        }
+
+        .green-text {
+            color: #20b889;
+        }
+
+        .orange-text {
+            color: #ff9238;
+        }
+
+        .red-text {
+            color: #ff4058;
+        }
+
+        .audit-label {
+            font-size: 12px;
+            font-weight: 800;
+            margin-top: 6px;
+        }
+
+        .audit-sub {
+            font-size: 10px;
+            color: #607d9a;
+        }
+
+        .circle-progress {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 5px solid #d5e1ee;
+            margin: 0 auto 8px;
+            display: grid;
+            place-items: center;
+            font-size: 10px;
+            font-weight: 900;
+            color: #20b889;
+        }
+
+        .progress-line {
+            height: 6px;
+            background: #d7e3f1;
+            border-radius: 20px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: @percent %;
+            background: #20b889;
+            border-radius: 20px;
+        }
+
+        .audit-footer {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            margin-top: 10px;
+            color: #607d9a;
+            font-weight: 700;
+        }
+
+        .breakdown-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .break-card {
+            background: #fff;
+            border: 1px solid #d7e6f3;
+            border-radius: 14px;
+            padding: 18px;
+            min-height: 92px;
+            box-shadow: 0 5px 14px rgba(33, 68, 104, .05);
+        }
+
+        .small-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 9px;
+            display: grid;
+            place-items: center;
+            margin-bottom: 12px;
+            font-size: 12px;
+        }
+
+        .break-number {
+            font-size: 26px;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .break-label {
+            margin-top: 8px;
+            font-size: 11px;
+            color: #607d9a;
+            font-weight: 700;
+        }
+
+        .validation-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .validation-counts {
+            display: flex;
+            align-items: center;
+            gap: 28px;
+        }
+
+        .divider {
+            width: 1px;
+            height: 42px;
+            background: #d7e3f1;
+        }
+
+        .validate-btn,
+        .sync-btn {
+            border: 0;
+            border-radius: 10px;
+            background: #45bf91;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 8px 16px;
+        }
+
+        .info-strip {
+            margin-top: 16px;
+            border-radius: 8px;
+            background: #eef4fb;
+            color: #607d9a;
+            font-size: 10px;
+            padding: 9px 12px;
+            font-weight: 700;
+        }
+
+        .sync-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sync-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .sync-title {
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .sync-sub {
+            font-size: 10px;
+            color: #607d9a;
+            margin-top: 3px;
+            font-weight: 700;
+        }
+
+            .modal-content {
+                border: 0;
+                border-radius: 16px;
+            }
+
+            .modal-header {
+                background: #f8fbff;
+                border-bottom: 1px solid #d7e3f1;
+            }
+
+            .detail-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+
+                .detail-grid div {
+                    background: #eef4fb;
+                    border: 1px solid #d7e3f1;
+                    border-radius: 12px;
+                    padding: 12px;
+                }
+
+                .detail-grid span {
+                    display: block;
+                    color: #607d9a;
+                    font-size: 11px;
+                    font-weight: 800;
+                    margin-bottom: 5px;
+                }
+
+                .detail-grid strong {
+                    color: #102033;
+                    font-size: 13px;
+                    overflow-wrap: anywhere;
+                }
+
+        @@media(max-width: 768px) {
+            .content {
+                padding: 12px;
+            }
+
+            .nav-grid,
+            .audit-row,
+            .breakdown-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .audit-box {
+                border-right: 0;
+                border-bottom: 1px solid #d7e3f1;
+                padding: 18px 0;
+            }
+
+                .audit-box:last-child {
+                    border-bottom: 0;
+                }
+
+            .validation-top,
+            .sync-card {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+                .detail-grid {
+                    grid-template-columns: 1fr;
+                }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="page-header">
+        <a class="back-btn" href="@listUrl">
+            <i class="fa-solid fa-chevron-left"></i>
+        </a>
+
+        <div>
+            <p class="header-title">@Model.JobNumber | @(Model.VesselName ?? "Test Vessel")</p>
+            <p class="header-sub">@surveyType</p>
+        </div>
+    </header>
+
+    <main class="content">
+
+        <div class="section-title">Navigation</div>
+
+        <div class="nav-grid">
+            <a class="nav-card blue-soft" href="/SurveyJobs/VesselInfo?jobId=@Model.Id">
+                <div>
+                    <div class="nav-icon blue-icon">
+                        <i class="fa-solid fa-ship"></i>
+                    </div>
+                    <div>Vessel Info</div>
+                </div>
+            </a>
+
+            <a class="nav-card orange-soft" href="/SurveyJobs/ProjectInfo?jobId=@Model.Id">
+                <div>
+                    <div class="nav-icon orange-icon">
+                        <i class="fa-solid fa-briefcase"></i>
+                    </div>
+                    <div>Project Info</div>
+                </div>
+            </a>
+
+            <a class="nav-card green-soft" href="/SurveyJobs/SurveyAreas?jobId=@Model.Id">
+                <div>
+                    <div class="nav-icon green-icon">
+                        <i class="fa-solid fa-map"></i>
+                    </div>
+                        <div>Survey Areas (@areaCount)</div>
+                </div>
+            </a>
+        </div>
+
+        <div class="section-title">Audit Summary</div>
+
+        <div class="audit-card">
+            <div class="audit-row">
+                <div class="audit-box">
+                    <div class="big-number blue-text">@total</div>
+                    <div class="audit-label">Total</div>
+                    <div class="audit-sub">All checkpoints</div>
+                </div>
+
+                <div class="audit-box">
+                    <div class="circle-progress">@percent%</div>
+                    <div class="big-number green-text">@audited</div>
+                    <div class="audit-label">Audited</div>
+                    <div class="audit-sub">Completed</div>
+                </div>
+
+                <div class="audit-box">
+                    <div class="big-number orange-text">@pending</div>
+                    <div class="audit-label">Pending</div>
+                    <div class="audit-sub">Remaining</div>
+                </div>
+            </div>
+
+            <div class="progress-line">
+                <div class="progress-fill"></div>
+            </div>
+
+            <div class="audit-footer">
+                <span>@audited audited</span>
+                <span class="orange-text">@pending remaining</span>
+            </div>
+        </div>
+
+        <div class="section-title">Checkpoint Breakdown</div>
+
+        <div class="breakdown-grid">
+            <div class="break-card">
+                <div class="small-icon blue-icon">
+                    <i class="fa-solid fa-eye"></i>
+                </div>
+                <div class="break-number blue-text">@totalVisuals</div>
+                <div class="break-label">Visuals</div>
+            </div>
+
+            <div class="break-card">
+                <div class="small-icon orange-icon">
+                    <i class="fa-solid fa-flask"></i>
+                </div>
+                <div class="break-number orange-text">@totalSamples</div>
+                <div class="break-label">Samples</div>
+            </div>
+        </div>
+
+        <div class="section-title">Data Validation</div>
+
+        <div class="validation-card">
+            <div class="validation-top">
+                <div class="validation-counts">
+                    <div>
+                        <div class="big-number green-text">@audited</div>
+                        <div class="audit-sub">Captured</div>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div>
+                        <div class="big-number red-text">@pending</div>
+                        <div class="audit-sub">Missing</div>
+                    </div>
+                </div>
+
+                <button class="validate-btn">
+                    <i class="fa-solid fa-circle-check"></i>
+                    Validate
+                </button>
+            </div>
+
+            <div class="info-strip">
+                <i class="fa-solid fa-circle-info"></i>
+                @pending of @total checkpoints still require audit data.
+            </div>
+        </div>
+
+        <div class="section-title">Upload Status</div>
+
+        <div class="sync-card">
+            <div class="sync-left">
+                <div class="small-icon green-icon">
+                    <i class="fa-solid fa-cloud-check"></i>
+                </div>
+
+                <div>
+                    <div class="sync-title">All Synced</div>
+                    <div class="sync-sub">
+                        Queued changes: 0 · Checkpoints: 0 · Images: 0
+                    </div>
+                </div>
+            </div>
+
+            <button class="sync-btn">Synced</button>
+        </div>
+
+    </main>
+        <div class="modal fade" id="vesselInfoModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Vessel Information</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="detail-grid">
+                            <div><span>Vessel Name</span><strong>@Val(vessel?.VesselName ?? Model.VesselName)</strong></div>
+                            <div><span>IMO Number</span><strong>@Val(vessel?.ImoNumber ?? Model.ImoNumber)</strong></div>
+                            <div><span>Official Number</span><strong>@Val(vessel?.OfficialNumber)</strong></div>
+                            <div><span>Vessel Type</span><strong>@Val(vessel?.VesselType)</strong></div>
+                            <div><span>Flag</span><strong>@Val(vessel?.Flag)</strong></div>
+                            <div><span>Port Of Registry</span><strong>@Val(vessel?.PortOfRegistry)</strong></div>
+                            <div><span>Class Society</span><strong>@Val(vessel?.ClassSociety)</strong></div>
+                            <div><span>Gross Tonnage</span><strong>@(vessel?.GrossTonnage?.ToString() ?? "-")</strong></div>
+                            <div><span>Net Tonnage</span><strong>@(vessel?.NetTonnage?.ToString() ?? "-")</strong></div>
+                            <div><span>Deadweight</span><strong>@(vessel?.Deadweight?.ToString() ?? "-")</strong></div>
+                            <div><span>Length Overall</span><strong>@(vessel?.LengthOverall?.ToString() ?? "-")</strong></div>
+                            <div><span>Breadth</span><strong>@(vessel?.Breadth?.ToString() ?? "-")</strong></div>
+                            <div><span>Depth</span><strong>@(vessel?.Depth?.ToString() ?? "-")</strong></div>
+                            <div><span>Year Built</span><strong>@(vessel?.YearBuilt?.ToString() ?? "-")</strong></div>
+                            <div><span>Owner Name</span><strong>@Val(vessel?.OwnerName)</strong></div>
+                            <div><span>Manager Name</span><strong>@Val(vessel?.ManagerName)</strong></div>
+                            <div><span>Call Sign</span><strong>@Val(vessel?.CallSign)</strong></div>
+                            <div><span>Builder</span><strong>@Val(vessel?.Builder)</strong></div>
+                            <div><span>Date Of Build</span><strong>@DateVal(vessel?.DateOfBuild)</strong></div>
+                            <div><span>LBP</span><strong>@(vessel?.LengthBetweenPerpendiculars?.ToString() ?? "-")</strong></div>
+                            <div><span>Draught Moulded</span><strong>@(vessel?.DraughtMoulded?.ToString() ?? "-")</strong></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="projectInfoModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Project Information</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="detail-grid">
+                            <div><span>Job Number</span><strong>@Val(Model.JobNumber)</strong></div>
+                            <div><span>Survey Type</span><strong>@surveyType</strong></div>
+                            <div><span>Client Name</span><strong>@Val(Model.ClientName)</strong></div>
+                            <div><span>Project Name</span><strong>@Val(Model.ProjectName)</strong></div>
+                            <div><span>Vessel Name</span><strong>@Val(Model.VesselName)</strong></div>
+                            <div><span>IMO Number</span><strong>@Val(Model.ImoNumber)</strong></div>
+                            <div><span>Site Name</span><strong>@Val(Model.SiteName)</strong></div>
+                            <div><span>Audit Port</span><strong>@Val(Model.AuditPort)</strong></div>
+                            <div><span>Audit Address</span><strong>@Val(Model.AuditAddress)</strong></div>
+                            <div><span>Start Date</span><strong>@DateVal(Model.StartDate)</strong></div>
+                            <div><span>End Date</span><strong>@DateVal(Model.EndDate)</strong></div>
+                            <div><span>Status</span><strong>@Val(Model.Status)</strong></div>
+                            <div><span>Assigned Surveyor</span><strong>@Val(Model.AssignedSurveyorName)</strong></div>
+                            <div><span>Assigned At</span><strong>@DateVal(Model.AssignedAt)</strong></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

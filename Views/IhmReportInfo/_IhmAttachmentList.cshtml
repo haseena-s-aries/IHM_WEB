@@ -1,0 +1,23 @@
+@model IhmAttachmentListViewModel
+@if (Model.Attachments.Any())
+{
+    <div class="attachment-list">
+        @foreach (var file in Model.Attachments)
+        {
+            var isPdf = file.OriginalFileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+            <div class="attachment-item">
+                <span class="file-icon @(isPdf ? "pdf" : "image")"><i class="fa-regular @(isPdf ? "fa-file-pdf" : "fa-file-image")"></i></span>
+                <div><strong>@file.OriginalFileName</strong><small>@(file.ContentType ?? "Attachment")</small></div>
+                <a class="icon-button small" href="/IhmReportInfo/AttachmentFile?jobId=@Model.JobId&attachmentId=@file.Id" title="Download"><i class="fa-solid fa-download"></i></a>
+                <button class="icon-button small danger attachment-delete"
+                        type="button"
+                        data-job-id="@Model.JobId"
+                        data-attachment-id="@file.Id"
+                        data-action="/IhmReportInfo/DeleteAttachment"
+                        title="Delete">
+                    <i class="fa-regular fa-trash-can"></i>
+                </button>
+            </div>
+        }
+    </div>
+}

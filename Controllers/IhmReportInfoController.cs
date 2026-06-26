@@ -1,0 +1,622 @@
+using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
+using Survery_Certification_App_Consume.Models;
+using System.Net.Http.Headers;
+using System.Text;
+
+namespace Survery_Certification_App_Consume.Controllers
+{
+    public class IhmReportInfoController : Controller
+    {
+        private readonly IHttpClientFactory _clientFactory;
+        private readonly ILogger<IhmReportInfoController> _logger;
+
+        public IhmReportInfoController(
+            IHttpClientFactory clientFactory,
+            ILogger<IhmReportInfoController> logger)
+        {
+            _clientFactory = clientFactory;
+            _logger = logger;
+        }
+
+        public async Task<IActionResult> Index(int jobId)
+        {
+            var model = await LoadModel(jobId);
+            if (model == null)
+            {
+                TempData["ErrorMessage"] = "Unable to load the IHM report. Confirm that the API is running and the survey job exists.";
+                return RedirectToAction("Ihm", "SurveyJobs");
+            }
+
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Save(IhmReportInfoViewModel model)
+        {
+            var error = await SaveAll(model);
+
+            var isAjax = string.Equals(
+                Request.Headers["X-Requested-With"],
+                "XMLHttpRequest",
+                StringComparison.OrdinalIgnoreCase
+            );
+
+            if (error != null)
+            {
+                if (isAjax)
+                    return BadRequest(error);
+
+                TempData["Error"] = error;
+            }
+            else
+            {
+                if (isAjax)
+                    return Ok(new { message = "Report saved successfully." });
+
+                TempData["Success"] = "Report saved successfully.";
+            }
+
+            return RedirectToAction("Index", new { jobId = model.JobId });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> GeneratePdf(IhmReportInfoViewModel model)
+        {
+            if (model.JobId <= 0)
+            {
+                TempData["ErrorMessage"] = "A valid survey job is required to generate the PDF.";
+                return RedirectToAction("Ihm", "SurveyJobs");
+            }
+
+            try
+            {
+                _logger.LogInformation("Starting IHM PDF workflow for job {JobId}.", model.JobId);
+                NormalizeCollections(model);
+
+                _logger.LogInformation(
+                    "Saving report before PDF generation. JobId: {JobId}, Company: {Company}, Client: {Client}, OHS people: {OhsPeople}, Risk rows: {RiskRows}",
+                    model.JobId,
+                    model.CompanyName,
+                    model.ClientName,
+                    model.OhsPeople?.Count ?? 0,
+                    model.OhsRiskAssessmentRows?.Count ?? 0
+                );
+                var error = await SaveAll(model);
+                if (error != null)
+                {
+                    _logger.LogWarning(
+                        "IHM PDF generation for job {JobId} stopped because saving failed: {Error}",
+                        model.JobId,
+                        error);
+                    TempData["ErrorMessage"] = error;
+                    return RedirectToAction(nameof(Index), new { jobId = model.JobId });
+                }
+
+                var client = CreateApiClient();
+
+                // Step 1: Generate GA marker map.
+                var markerMapPath =
+                    $"ihm-survey/jobs/{model.JobId}/generate-ga-marker-map";
+
+                _logger.LogInformation(
+                    "Generating GA marker map for job {JobId}.",
+                    model.JobId
+                );
+
+                using var markerRequest = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    markerMapPath
+                )
+                {
+                    Content = new StringContent(
+                        "{}",
+                        Encoding.UTF8,
+                        "application/json"
+                    )
+                };
+
+                using var markerResponse =
+                    await client.SendAsync(markerRequest);
+
+                if (!markerResponse.IsSuccessStatusCode)
+                {
+                    var markerError = await ReadError(
+                        markerResponse,
+                        "GA marker map generation failed."
+                    );
+
+                    if (markerError.Contains(
+                        "Full GA layout is not uploaded",
+                        StringComparison.OrdinalIgnoreCase))
+                    {
+                        _logger.LogInformation(
+                            "GA layout is not uploaded for job {JobId}. Skipping marker map generation.",
+                            model.JobId
+                        );
+                    }
+                    else
+                    {
+                        _logger.LogError(
+                            "GA marker map generation failed for job {JobId}: {Error}",
+                            model.JobId,
+                            markerError
+                        );
+
+                        TempData["ErrorMessage"] = markerError;
+
+                        return RedirectToAction(
+                            nameof(Index),
+                            new { jobId = model.JobId }
+                        );
+                    }
+                }
+
+                // Step 2: Generate PDF only after marker map succeeds.
+                var path =
+                    $"ihm-survey/jobs/{model.JobId}/generate-report";
+                var requestUri = new Uri(client.BaseAddress!, path);
+                _logger.LogInformation("POST {RequestUri}", requestUri);
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, path)
+                {
+                    Content = new StringContent("{}", Encoding.UTF8, "application/json")
+                };
+                using var response = await client.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var apiError = await ReadError(response, "PDF generation failed.");
+                    _logger.LogError(
+                        "IHM PDF API failed for job {JobId}. Status: {StatusCode}. Response: {Response}",
+                        model.JobId,
+                        (int)response.StatusCode,
+                        apiError);
+                    TempData["ErrorMessage"] = apiError;
+                    return RedirectToAction(nameof(Index), new { jobId = model.JobId });
+                }
+
+                _logger.LogInformation("IHM PDF generated successfully for job {JobId}.", model.JobId);
+                return RedirectToAction(nameof(ViewPdf), new { jobId = model.JobId });
+            }
+            catch (TaskCanceledException ex)
+            {
+                _logger.LogError(ex, "IHM PDF API timed out for job {JobId}.", model.JobId);
+                TempData["ErrorMessage"] = "The PDF API timed out. Confirm the API and Python generator are running.";
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "Unable to call the IHM PDF API for job {JobId}.", model.JobId);
+                TempData["ErrorMessage"] = $"Unable to connect to the PDF API: {ex.Message}";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected IHM PDF error for job {JobId}.", model.JobId);
+                TempData["ErrorMessage"] = $"PDF generation failed: {ex.GetBaseException().Message}";
+            }
+
+            return RedirectToAction(nameof(Index), new { jobId = model.JobId });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> CompanyOptions(string? search)
+        {
+            var path =
+                $"ihm-report-info/companies?search={Uri.EscapeDataString(search ?? "")}";
+
+            var response = await CreateApiClient().GetAsync(path);
+
+            if (!response.IsSuccessStatusCode)
+                return StatusCode(
+                    (int)response.StatusCode,
+                    await response.Content.ReadAsStringAsync());
+
+            return Content(
+                await response.Content.ReadAsStringAsync(),
+                "application/json");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> TemplateFromJob(int sourceJobId)
+        {
+            var model = await LoadModel(sourceJobId);
+
+            if (model == null)
+                return NotFound("Unable to load the selected report.");
+
+            return Json(model);
+        }
+
+        public IActionResult ViewPdf(int jobId)
+        {
+            ViewBag.JobId = jobId;
+            ViewBag.PdfUrl = Url.Action(nameof(PdfFile), new { jobId });
+            return View();
+        }
+
+        public async Task<IActionResult> PdfFile(int jobId)
+        {
+            var response = await CreateApiClient().GetAsync($"ihm-survey/jobs/{jobId}/report-pdf");
+            if (!response.IsSuccessStatusCode)
+                return NotFound("PDF report not found.");
+
+            return File(await response.Content.ReadAsByteArrayAsync(), "application/pdf");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> JobOptions(string? search)
+        {
+            var path = $"ihm-report-info/jobs/options?search={Uri.EscapeDataString(search ?? string.Empty)}";
+            var response = await CreateApiClient().GetAsync(path);
+            if (!response.IsSuccessStatusCode)
+                return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
+
+            return Content(await response.Content.ReadAsStringAsync(), "application/json");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CopyFromJob(int jobId, int sourceJobId)
+        {
+            var response = await CreateApiClient()
+                .PostAsync($"ihm-report-info/jobs/{jobId}/copy-appendices-from/{sourceJobId}", null);
+
+            if (!response.IsSuccessStatusCode)
+                TempData["ErrorMessage"] = await ReadError(response, "Unable to copy appendices.");
+            else
+                TempData["SuccessMessage"] = "Appendices copied from the selected report.";
+
+            return RedirectToAction(nameof(Index), new { jobId });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UploadAsset(int jobId, string targetField, IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("Please choose an image.");
+
+            using var content = new MultipartFormDataContent();
+            await using var stream = file.OpenReadStream();
+            using var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType ?? "application/octet-stream");
+            content.Add(fileContent, "file", file.FileName);
+
+            var response = await CreateApiClient()
+                .PostAsync($"ihm-report-info/jobs/{jobId}/assets/upload", content);
+
+            if (!response.IsSuccessStatusCode)
+                return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
+
+            var result = JsonConvert.DeserializeObject<UploadResult>(await response.Content.ReadAsStringAsync());
+            return Json(new { filePath = result?.FilePath, targetField });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [RequestSizeLimit(100_000_000)]
+        public async Task<IActionResult> UploadAppendices(
+            int jobId,
+            string appendixType,
+            string? appendixName,
+            int? appendixNo,
+            List<IFormFile> files)
+        {
+            if (files.Count == 0)
+                return BadRequest("Please choose at least one file.");
+
+            using var content = new MultipartFormDataContent();
+            content.Add(new StringContent(appendixType), "appendixType");
+            if (!string.IsNullOrWhiteSpace(appendixName))
+                content.Add(new StringContent(appendixName), "appendixName");
+            if (appendixNo.HasValue)
+                content.Add(new StringContent(appendixNo.Value.ToString()), "appendixNo");
+
+            var streams = new List<Stream>();
+            try
+            {
+                foreach (var file in files)
+                {
+                    var stream = file.OpenReadStream();
+                    streams.Add(stream);
+                    var fileContent = new StreamContent(stream);
+                    fileContent.Headers.ContentType =
+                        new MediaTypeHeaderValue(file.ContentType ?? "application/octet-stream");
+                    content.Add(fileContent, "files", file.FileName);
+                }
+
+                var response = await CreateApiClient()
+                    .PostAsync($"ihm-report-info/jobs/{jobId}/appendix-attachments/upload", content);
+
+                if (!response.IsSuccessStatusCode)
+                    return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
+
+                return Json(new { success = true });
+            }
+            finally
+            {
+                foreach (var stream in streams)
+                    await stream.DisposeAsync();
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteAttachment(int jobId, int attachmentId)
+        {
+            var response = await CreateApiClient()
+                .DeleteAsync($"ihm-report-info/jobs/{jobId}/appendix-attachments/{attachmentId}");
+
+            if (!response.IsSuccessStatusCode)
+                TempData["ErrorMessage"] = await ReadError(response, "Unable to delete attachment.");
+
+            return RedirectToAction(nameof(Index), new { jobId });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RenameAppendix(
+            int jobId,
+            int appendixNo,
+            string appendixTitle)
+        {
+            var payload = JsonConvert.SerializeObject(new { appendixTitle });
+            var response = await CreateApiClient().PutAsync(
+                $"ihm-report-info/jobs/{jobId}/custom-appendices/{appendixNo}",
+                new StringContent(payload, Encoding.UTF8, "application/json"));
+
+            if (!response.IsSuccessStatusCode)
+                TempData["ErrorMessage"] = await ReadError(response, "Unable to rename appendix.");
+
+            return RedirectToAction(nameof(Index), new { jobId });
+        }
+
+        public async Task<IActionResult> AttachmentFile(int jobId, int attachmentId)
+        {
+            var model = await LoadModel(jobId);
+            var attachment = model?.AppendixTwoAttachments
+                .Concat(model.AppendixFiveAttachments)
+                .Concat(model.AppendixSevenAttachments)
+                .Concat(model.CustomAppendices)
+                .FirstOrDefault(x => x.Id == attachmentId);
+
+            if (attachment == null)
+                return NotFound();
+
+            var client = CreateApiClient();
+            var apiRoot = new Uri(client.BaseAddress!, "/");
+            var response = await client.GetAsync(new Uri(apiRoot, attachment.FilePath.TrimStart('/')));
+            if (!response.IsSuccessStatusCode)
+                return NotFound();
+
+            return File(
+                await response.Content.ReadAsByteArrayAsync(),
+                attachment.ContentType ?? "application/octet-stream",
+                attachment.OriginalFileName);
+        }
+
+        private async Task<string?> SaveAll(IhmReportInfoViewModel model)
+        {
+            NormalizeCollections(model);
+            var client = CreateApiClient();
+
+            if (model.VesselId.HasValue)
+            {
+                var vesselResponse = await client.PutAsync(
+                    $"vessels/{model.VesselId.Value}",
+                    JsonContent(model.ToVesselRequest()));
+
+                if (!vesselResponse.IsSuccessStatusCode)
+                    return await ReadError(vesselResponse, "Unable to save vessel information.");
+            }
+
+            var reportResponse = await client.PostAsync(
+                $"ihm-report-info/jobs/{model.JobId}",
+                JsonContent(model.ToApiRequest()));
+
+            return reportResponse.IsSuccessStatusCode
+                ? null
+                : await ReadError(reportResponse, "Unable to save report information.");
+        }
+
+        private async Task<IhmReportInfoViewModel?> LoadModel(int jobId)
+        {
+            try
+            {
+                var response = await CreateApiClient().GetAsync($"ihm-report-info/jobs/{jobId}");
+                if (!response.IsSuccessStatusCode)
+                    return null;
+
+                var data = JsonConvert.DeserializeObject<IhmReportApiResponse>(
+                    await response.Content.ReadAsStringAsync());
+                if (data == null)
+                    return null;
+
+                var report = data.ReportInfo ?? new IhmReportInfoData();
+                var vessel = data.Vessel ?? new IhmVesselViewModel();
+                var job = data.Job ?? new IhmJobViewModel();
+
+                var model = new IhmReportInfoViewModel
+                {
+                    JobId = jobId,
+                    VesselId = vessel.Id > 0 ? vessel.Id : null,
+                    VesselName = vessel.VesselName,
+                    ImoNumber = vessel.ImoNumber,
+                    OfficialNumber = vessel.OfficialNumber,
+                    VesselType = vessel.VesselType,
+                    Flag = vessel.Flag,
+                    PortOfRegistry = vessel.PortOfRegistry,
+                    ClassSociety = vessel.ClassSociety,
+                    CallSign = vessel.CallSign,
+                    Builder = vessel.Builder,
+                    DateOfBuild = vessel.DateOfBuild,
+                    LengthOverall = vessel.LengthOverall,
+                    LengthBetweenPerpendiculars = vessel.LengthBetweenPerpendiculars,
+                    Breadth = vessel.Breadth,
+                    Depth = vessel.Depth,
+                    DraughtMoulded = vessel.DraughtMoulded,
+                    GrossTonnage = vessel.GrossTonnage,
+                    NetTonnage = vessel.NetTonnage,
+                    Deadweight = vessel.Deadweight,
+                    YearBuilt = vessel.YearBuilt,
+                    OwnerName = vessel.OwnerName,
+                    ShipManager = vessel.ManagerName,
+                    JobNumber = job.JobNumber,
+                    ProjectName = job.ProjectName,
+                    SiteOfCheck = job.AuditPort,
+                    DateOfSurvey = job.StartDate,
+                    CompanyName = report.CompanyName,
+                    CompanyAddress = report.CompanyAddress,
+                    CompanyTel = report.CompanyTel,
+                    CompanyFax = report.CompanyFax,
+                    CompanyWebsite = report.CompanyWebsite,
+                    CompanyEmail = report.CompanyEmail,
+                    CompanyLogoPath = report.CompanyLogoPath,
+                    ClientName = report.ClientName ?? job.ClientName,
+                    ClientLogoPath = report.ClientLogoPath,
+                    PreparedBy = report.PreparedBy,
+                    CheckedBy = report.CheckedBy,
+                    ApprovedBy = report.ApprovedBy,
+                    Uid = report.Uid,
+                    DocumentNo = report.DocumentNo,
+                    DocumentDate = report.DocumentDate,
+                    RevisionNo = report.RevisionNo,
+                    HazardousMaterialNoFindings = report.HazardousMaterialNoFindings,
+                    HazardousMaterialFindings = report.HazardousMaterialFindings,
+                    LabReportNo = report.LabReportNo,
+                    LabReportingDate = report.LabReportingDate,
+                    HazmatExpert = report.HazmatExpert,
+                    ShipManagerContact = report.ShipManagerContact,
+                    SamplingMethodology = report.SamplingMethodology ??
+                        "Wet the sampling location prior to cutting and allow it to harden after cutting to prevent scatter.\nAppropriate safety procedures are followed during onboard survey.",
+                    SamplingOfFragmentsOfPaints = report.SamplingOfFragmentsOfPaints ??
+                        "Paint suspected to contain Lead & Lead Compounds is collected and analyzed from deck areas.",
+                    Laboratory = report.Laboratory ?? "CHEM VI LABORATORY SDN BHD.",
+                    ChemicalAnalysisMethod = report.ChemicalAnalysisMethod ?? "Refer Appendix 2",
+                    LocationOfVisualSamplingCheck = report.LocationOfVisualSamplingCheck ??
+                        "Refer to lists for visual / sampling check",
+                    OhsJobDetail = report.OhsJobDetail ?? job.ProjectName,
+                    OhsClient = report.OhsClient ?? job.ClientName,
+                    OhsJobLocation = report.OhsJobLocation ?? job.SiteName,
+                    OhsJobNo = report.OhsJobNo ?? job.JobNumber,
+                    OhsProjectInCharge = report.OhsProjectInCharge ?? report.HazmatExpert,
+                    OhsDivisionBranch = report.OhsDivisionBranch,
+                    OhsRaNo = report.OhsRaNo,
+                    OhsRevNo = report.OhsRevNo ?? report.RevisionNo,
+                    OhsRevisionDate = report.OhsRevisionDate,
+                    OhsPreparedBy = report.OhsPreparedBy ?? report.PreparedBy,
+                    OhsPreparedBySignPath = report.OhsPreparedBySignPath,
+                    OhsPreparedDate = report.OhsPreparedDate,
+                    OhsApprovedBy = report.OhsApprovedBy ?? report.ApprovedBy,
+                    OhsApprovedBySignPath = report.OhsApprovedBySignPath,
+                    OhsApprovedDate = report.OhsApprovedDate,
+                    NecessaryInformationText = string.Join(Environment.NewLine,
+                        data.NecessaryInformationPoints.Select(x => x.Description).Where(x => !string.IsNullOrWhiteSpace(x))),
+                    AppendixFiveInformationText = string.Join(Environment.NewLine,
+                        data.AppendixFiveInformationPoints.Select(x => x.Description).Where(x => !string.IsNullOrWhiteSpace(x))),
+                    Revisions = data.Revisions,
+                    PaintAndCoatingSystems = data.PaintAndCoatingSystems,
+                    EquipmentAndMachinery = data.EquipmentAndMachinery,
+                    StructureAndHull = data.StructureAndHull,
+                    OhsPeople = data.OhsPeople,
+                    OhsRiskAssessmentRows = data.OhsRiskAssessmentRows,
+                    AppendixOneResultPoints = data.AppendixOneResultPoints,
+                    AppendixTwoAttachments = data.AppendixTwoAttachments,
+                    AppendixFiveAttachments = data.AppendixFiveAttachments,
+                    AppendixSevenAttachments = data.AppendixSevenAttachments,
+                    CustomAppendices = data.CustomAppendices
+                };
+
+                EnsureStarterRows(model);
+                return model;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+
+
+        private static void EnsureStarterRows(IhmReportInfoViewModel model)
+        {
+            if (model.Revisions.Count == 0)
+            {
+                model.Revisions.Add(new IhmReportRevisionViewModel
+                {
+                    Uid = model.Uid,
+                    RevisionNo = model.RevisionNo,
+                    RevisionDate = model.DocumentDate,
+                    PreparedBy = model.PreparedBy,
+                    CheckedBy = model.CheckedBy,
+                    ApprovedBy = model.ApprovedBy
+                });
+            }
+
+            if (model.PaintAndCoatingSystems.Count == 0)
+                model.PaintAndCoatingSystems.Add(new IhmPaintCoatingViewModel());
+            if (model.EquipmentAndMachinery.Count == 0)
+                model.EquipmentAndMachinery.Add(new IhmEquipmentMachineryViewModel { SortOrder = 1 });
+            if (model.StructureAndHull.Count == 0)
+                model.StructureAndHull.Add(new IhmStructureHullViewModel());
+            if (model.OhsRiskAssessmentRows.Count == 0)
+                model.OhsRiskAssessmentRows.Add(new IhmOhsRiskViewModel { SortOrder = 1 });
+
+            AddPersonIfMissing(model.OhsPeople, "HseOfficer");
+            AddPersonIfMissing(model.OhsPeople, "ResponsibleSupervisor");
+            AddPersonIfMissing(model.OhsPeople, "Participant");
+        }
+
+        private static void AddPersonIfMissing(List<IhmOhsPersonViewModel> people, string role)
+        {
+            if (people.All(x => !string.Equals(x.RoleType, role, StringComparison.OrdinalIgnoreCase)))
+                people.Add(new IhmOhsPersonViewModel { RoleType = role, SortOrder = 1 });
+        }
+
+        private static void NormalizeCollections(IhmReportInfoViewModel model)
+        {
+            model.Revisions ??= new();
+            model.PaintAndCoatingSystems ??= new();
+            model.EquipmentAndMachinery ??= new();
+            model.StructureAndHull ??= new();
+            model.OhsPeople ??= new();
+            model.OhsRiskAssessmentRows ??= new();
+            model.AppendixOneResultPoints ??= new();
+            model.OhsPeople.RemoveAll(x => string.IsNullOrWhiteSpace(x.Name));
+            for (var i = 0; i < model.EquipmentAndMachinery.Count; i++)
+                model.EquipmentAndMachinery[i].SortOrder = i + 1;
+            for (var i = 0; i < model.OhsRiskAssessmentRows.Count; i++)
+                model.OhsRiskAssessmentRows[i].SortOrder = i + 1;
+            for (var i = 0; i < model.OhsPeople.Count; i++)
+                model.OhsPeople[i].SortOrder = i + 1;
+            for (var i = 0; i < model.AppendixOneResultPoints.Count; i++)
+                model.AppendixOneResultPoints[i].SortOrder = i + 1;
+        }
+
+        private HttpClient CreateApiClient()
+        {
+            var client = _clientFactory.CreateClient("ApiClient");
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (!string.IsNullOrWhiteSpace(jwt))
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+
+            return client;
+        }
+
+        private static StringContent JsonContent(object value) =>
+            new(JsonConvert.SerializeObject(value), Encoding.UTF8, "application/json");
+
+        private static async Task<string> ReadError(HttpResponseMessage response, string fallback)
+        {
+            var message = await response.Content.ReadAsStringAsync();
+            return string.IsNullOrWhiteSpace(message) ? fallback : message.Trim('"');
+        }
+
+        private sealed class UploadResult
+        {
+            public string? FilePath { get; set; }
+        }
+    }
+}

@@ -1,0 +1,357 @@
+﻿ @model Survery_Certification_App_Consume.Models.CreateUserDto
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Certification App</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://kit.fontawesome.com/a076d05399.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .hero {
+            background: linear-gradient(rgba(0, 0, 50, 0.7), rgba(0, 0, 50, 0.7)), url('https://source.unsplash.com/1600x900/?ship,sea') no-repeat center center/cover;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding: 50px;
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            color: #ffcc00;
+        }
+
+        .section-title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #007bff;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .btn-custom {
+            background-color: #ff5733;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            border-radius: 5px;
+        }
+
+            .btn-custom:hover {
+                background-color: #ff2e00;
+            }
+
+        .footer {
+            background: #222;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <header class="hero d-flex justify-content-center align-items-center">
+        <div>
+            <h1 class="fw-bold">AURAS</h1>
+            <p class="lead">ARIES UNIFIED REPORTING APPLICATION FOR SURVEYS</p>
+            <a asp-controller="Auth" asp-action="Login" class="btn btn-custom btn-lg">Explore Features</a>
+        </div>
+    </header>
+    <section id="register-section" class="container py-5">
+        <h2 class="section-title">Register Here</h2>
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <form id="registerForm">
+                    <div class="mb-3">
+                        <label class="form-label" asp-for="FullName">Name</label>
+                        <input type="text" class="form-control" id="FullName" name="FullName" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" asp-for="Email">Email</label>
+                        <input type="email" class="form-control" id="Email" name="Email" required oninput="this.value = this.value.toLowerCase()">
+                    </div>
+
+                    <!-- OTP Section -->
+                    <div class="mb-3">
+                        <button type="button" id="sendOtpBtn" class="btn btn-info w-100">Send OTP</button>
+                    </div>
+
+                    <div class="mb-3 otp-section" style="display: none;">
+                        <label class="form-label">Enter OTP</label>
+                        <input type="password" class="form-control" id="OtpCode" name="OtpCode" required>
+                        <button type="button" id="verifyOtpBtn" class="btn btn-success w-100 mt-2">Verify OTP</button>
+                        <button type="button" id="resendOtpBtn" class="btn btn-warning w-100 mt-2" style="display: none;">Resend OTP</button>
+                    </div>
+
+                    <!-- Password Section (Initially hidden) -->
+                    <div id="password-section" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label" asp-for="Password">Create Password</label>
+                            <input type="password" class="form-control" id="Password" name="Password" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" asp-for="ConfirmPassword">Confirm Password</label>
+                            <input type="password" class="form-control" id="ConfirmPassword" name="ConfirmPassword" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" asp-for="Role">Select Role</label>
+                        <select class="form-control" id="Role" name="Role" required>
+                            <option value="">-- Select Role --</option>
+                            <option value="User">User</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Manager">Manager</option>
+                            <option value="Surveyor">Surveyor</option>
+                        </select>
+                    </div>
+
+                    <button type="button" id="registerBtn" class="btn btn-primary w-100" disabled>Register</button>
+                </form>
+            </div>
+        </div>
+    </section>
+    <!-- Success Popup Modal -->
+    <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="successModalLabel">Success</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Registration successful! You can now log in.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="redirectToLogin()">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+
+
+
+                        document.addEventListener("DOMContentLoaded", function () {
+            let sendOtpBtn = document.getElementById("sendOtpBtn");
+            let resendOtpBtn = document.getElementById("resendOtpBtn");
+            let verifyOtpBtn = document.getElementById("verifyOtpBtn");
+            let registerBtn = document.getElementById("registerBtn");
+            let emailInput = document.getElementById("Email");
+            let otpInput = document.getElementById("OtpCode");
+            let otpSection = document.querySelector(".otp-section");
+            let passwordSection = document.getElementById("password-section");
+
+            passwordSection.style.display = "none"; // Initially hide password fields
+            resendOtpBtn.style.display = "none";
+            registerBtn.disabled = true;
+
+                                        async function sendOtp(isResend = false) {
+            let email = emailInput.value.trim().toLowerCase();
+            let fullName = document.getElementById("FullName").value.trim();
+
+            if (!fullName) {
+                alert("Please enter your name.");
+                return;
+            }
+
+            if (!email) {
+                alert("Please enter your email.");
+                return;
+            }
+
+            let button = isResend ? resendOtpBtn : sendOtpBtn;
+            button.disabled = true;
+            button.textContent = isResend ? "Resending..." : "Sending...";
+
+            try {
+                let response = await fetch("/Home/SendOtp", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ Email: email })
+                });
+
+                let data = await response.json();
+
+                if (response.ok) {
+                    alert("OTP sent successfully!");
+                    otpSection.style.display = "block";
+
+                    // Disable Send OTP permanently only on success
+                    sendOtpBtn.disabled = true;
+
+                    // Show and cooldown Resend OTP
+                    resendOtpBtn.style.display = "inline-block";
+                    resendOtpBtn.disabled = true;
+                    startResendCooldown();
+                } else {
+                    // Keep Send OTP enabled if it fails
+                    sendOtpBtn.disabled = false;
+
+                    // Show only email validation error
+                    if (data.errors && data.errors.Email) {
+                        let emailError = data.errors.Email[0];
+                        if (emailError.toLowerCase().includes("already registered")) {
+                            alert("This email is already registered. Please use a different email or log in.");
+                        } else {
+                            alert(emailError);
+                        }
+                    } else {
+                        alert(" Email already registered.");
+                    }
+                }
+            } catch (error) {
+                alert("Failed to send OTP.");
+                sendOtpBtn.disabled = false; // Ensure button stays enabled on catch
+            } finally {
+                // Reset button text
+                button.textContent = isResend ? "Resend OTP" : "Send OTP";
+
+                // If it was a resend attempt and failed, re-enable resend button
+                if (isResend && !response?.ok) {
+                    resendOtpBtn.disabled = false;
+                }
+            }
+        }
+
+
+            function startResendCooldown() {
+                let countdown = 30;
+                resendOtpBtn.textContent = `Resend OTP (${countdown}s)`;
+
+                let timer = setInterval(() => {
+                    countdown--;
+                    resendOtpBtn.textContent = `Resend OTP (${countdown}s)`;
+
+                    if (countdown <= 0) {
+                        clearInterval(timer);
+                        resendOtpBtn.textContent = "Resend OTP";
+                        resendOtpBtn.disabled = false;
+                    }
+                }, 1000);
+            }
+
+            async function verifyOtp() {
+                let email = emailInput.value.trim().toLowerCase();
+                let otp = otpInput.value.trim();
+
+                if (!email || !otp) {
+                    alert("Please enter  OTP.");
+                    return;
+                }
+
+                try {
+                    let response = await fetch("/Home/VerifyOtp", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ Email: email, Otp: otp })
+                    });
+
+                    let result = await response.json();
+                    if (response.ok) {
+                        alert("OTP verified successfully!");
+                        passwordSection.style.display = "block"; // Show password section
+                        registerBtn.disabled = false;            // Enable register button
+                        verifyOtpBtn.disabled = true;            // Prevent re-verification
+                        otpInput.readOnly = true;                // Lock OTP input
+                    } else {
+                        alert(result.message);
+                    }
+                } catch (error) {
+                    alert(error.message);
+                }
+            }
+
+                  async function registerUser() {
+            let fullName = document.getElementById("FullName").value.trim();
+            let email = emailInput.value.toLowerCase();
+            let password = document.getElementById("Password").value;
+            let confirmPassword = document.getElementById("ConfirmPassword").value;
+            let role = document.getElementById("Role").value;
+
+            if (!fullName || !email || !password || !confirmPassword || !role) {
+                alert("Please fill all the required fields.");
+                return;
+            }
+           if (password.length < 6) {
+            alert("Password must be at least 6 characters long.");
+            return;
+        }
+            if (password !== confirmPassword) {
+                alert("Password and Confirm Password do not match.");
+                return;
+            }
+
+            let userData = {
+                fullName,
+                email,
+                password,
+                confirmPassword,
+                role
+            };
+
+            try {
+                let response = await fetch("/Home/Register", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(userData)
+                });
+
+                let result = await response.json();
+                if (response.ok) {
+                    alert(result.message);
+                    window.location.href = result.redirectUrl;
+                } else {
+                    let msg = result.message || "Registration failed.";
+                    alert(msg);
+                }
+            } catch (error) {
+                alert("Server error: " + error.message);
+            }
+        }
+
+
+            // Bind events
+            sendOtpBtn.addEventListener("click", () => sendOtp(false));
+            resendOtpBtn.addEventListener("click", () => sendOtp(true));
+            verifyOtpBtn.addEventListener("click", verifyOtp);
+            registerBtn.addEventListener("click", registerUser);
+        });
+
+                document.addEventListener("DOMContentLoaded", function () {
+            const passwordInput = document.getElementById("Password");
+
+            passwordInput.addEventListener("input", function () {
+                const password = passwordInput.value;
+                const hasLetters = /[a-zA-Z]/.test(password);
+                const hasNumbers = /[0-9]/.test(password);
+
+                // If only numbers and length is more than 0
+                if (password.length > 0 && !hasLetters && hasNumbers) {
+                    alert("Password must contain both letters and numbers.");
+                }
+            });
+        });
+    </script>
+
+
+    <!-- Footer -->
+    <footer class="footer">
+        
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

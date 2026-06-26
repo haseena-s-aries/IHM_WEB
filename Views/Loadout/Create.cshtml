@@ -1,0 +1,877 @@
+﻿@model Loaodut
+<style>
+    .card.form-step {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        color: #212529;
+        box-shadow: 0 0 12px rgba(0, 0, 0, 0.05);
+        border-radius: 12px;
+    }
+
+    .card-header {
+        background-color: #007bff !important;
+        color: white;
+        font-weight: bold;
+        font-size: 1.2rem;
+        border-top-left-radius: 12px;
+        border-top-right-radius: 12px;
+    }
+
+    .form-label {
+        font-weight: 500;
+        color: #495057;
+    }
+
+    .form-control, .form-select {
+        background-color: #ffffff;
+        border: 1px solid #ced4da;
+        border-radius: 8px;
+        padding: 0.45rem 0.9rem;
+        transition: border-color 0.2s ease-in-out;
+    }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+        }
+
+    .form-check-input {
+        cursor: pointer;
+    }
+
+        .form-check-input:checked {
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+
+    .form-check-label {
+        margin-left: 0.25rem;
+        color: #343a40;
+    }
+
+    .btn-secondary, .btn-primary {
+        padding: 0.5rem 1.25rem;
+        border-radius: 8px;
+    }
+
+    .btn-secondary {
+        background-color: #6c757d;
+        border: none;
+    }
+
+    .btn-primary {
+        background-color: #007bff;
+        border: none;
+    }
+
+    .btn:hover {
+        opacity: 0.9;
+    }
+
+    .text-danger {
+        font-size: 0.85rem;
+    }
+
+    .form-step .row > div {
+        margin-bottom: 1rem;
+    }
+
+    #manualCertificateTitle {
+        border: 1px dashed #adb5bd;
+    }
+
+    /* Optional: Style for previewing header image (if needed)
+        #headerPreview {
+            max-height: 50px;
+            display: block;
+            margin-top: 10px;
+        } */
+</style>
+
+
+
+
+<form asp-action="GeneratePDF" method="post" class="row g-3">
+    <input type="hidden" name="IncludeCargoDetails" value="true" />
+
+    <input type="hidden" asp-for="PdfFilePath"
+           value="@($"Loadout_{DateTime.UtcNow:yyyyMMdd_HHmmss}.pdf")" />
+ 
+    <!-- STEP 1 -->
+    <div class="card mb-4 form-step" id="step1">
+        <div class="card-header bg-primary text-white">
+            1.1.1 – General Information
+        </div>
+        <div class="card-body">
+            <div class="row g-4">
+                <!-- Header Selection -->
+                <div class="col-md-6">
+                    <label class="form-label">SELECT HEADER IMAGE OF CERTIFICATE</label>
+                    <select asp-for="HeaderImagePath" class="form-select" id="headerImageDropdown">
+                        <option value="/images/SaudiArablogo.jpg" data-img="/images/SaudiArablogo.jpg">ARIES MARINE SERVICES CO.LTD</option>
+                        <option value="/images/QatarLogo.jpg" data-img="/images/QatarLogo.jpg">ARIES MARINE CO.WLL.</option>
+                        <option value="/images/Baharin.W.L.L.png" data-img="/images/Baharin.W.L.L.png">ARIES BAHRAIN MARINE W.L.L</option>
+                        <option value="/images/MARINE.LLC.png">ARIES MARINE LLC</option>
+                        <option value="/images/OILFIELDSERVICELOGO.png">ARIES  OIL FIELD SERVICES LLC</option>
+                        <option value="/images/blank.png">No Header</option>
+                    </select>
+                </div>
+
+                <!-- Certificate & Job Number -->
+                <div class="col-md-6">
+                    <label asp-for="CertificateNumber" class="form-label">CERTIFICATE NUMBER</label>
+                    <input asp-for="CertificateNumber" class="form-control" oninput="this.value = this.value.toUpperCase();" required />
+                    <span asp-validation-for="CertificateNumber" class="text-danger"></span>
+                </div>
+
+
+
+
+                <div class="col-md-6">
+                    <label asp-for="JobNumber" class="form-label">JOB NUMBER</label>
+                    <input asp-for="JobNumber" class="form-control" oninput="this.value = this.value.toUpperCase();" required />
+                    <span asp-validation-for="JobNumber" class="text-danger"></span>
+                </div>
+
+                <!-- Certificate Title -->
+                <div class="col-md-6">
+                    <label asp-for="CertificateTitle" class="form-label">CERTIFICATE TYPE</label>
+                    <select id="projectTitleDropdown" class="form-select" onchange="toggleManualInput(this)" required>
+                        <option value="">-- Select Certificate Title --</option>
+                        <option value="ARIES MARINE SERVICES CO. LTD">ARIES MARINE SERVICES CO. LTD</option>
+                        <option value="ARIES MARINE CO. WLL">ARIES MARINE CO. WLL</option>
+                        <option value="ARIES BAHRAIN MARINE W.L.L">BAHRAIN Marine W.L.L</option>
+                        <option value="ARIES MARINE L.L.C">ARIES MARINE L.L.C</option>
+                        <option value="ARIES OIL FIELD SERVICES L.L.C">ARIES OIL FIELD SERVICES L.L.C</option>
+                        <option value="manual">Other (Enter Manually)</option>
+                    </select>
+                    <input type="text" id="manualCertificateTitle" class="form-control mt-2" placeholder="Enter Certificate Title" maxlength="50" style="display:none;" oninput="this.value = this.value.toUpperCase(); updateHiddenField(this);" />
+                    <input asp-for="CertificateTitle" id="CertificateTitle" type="hidden" />
+                    <span asp-validation-for="CertificateTitle" class="text-danger"></span>
+                </div>
+
+                <!-- Project, Client -->
+                <div class="col-md-6">
+                    <label asp-for="ProjectTitle" class="form-label">PROJECT NAME</label>
+                    <input asp-for="ProjectTitle" class="form-control" oninput="this.value = this.value.toUpperCase();" required />
+                    <span asp-validation-for="ProjectTitle" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="Client" class="form-label">CLIENT</label>
+                    <input asp-for="Client" class="form-control" oninput="this.value = this.value.toUpperCase();" required />
+                    <span asp-validation-for="Client" class="text-danger"></span>
+                </div>
+
+                <!-- Vessel & Cargo -->
+                <div class="col-md-6">
+                    <label asp-for="BargeVessel" class="form-label">ONTO BARGE/VESSEL</label>
+                    <input asp-for="BargeVessel" class="form-control" oninput="this.value = this.value.toUpperCase();" required />
+                    <span asp-validation-for="BargeVessel" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="Cargo" class="form-label">CARGO</label>
+                    <input asp-for="Cargo" class="form-control" oninput="this.value = this.value.toUpperCase();" required />
+                    <span asp-validation-for="Cargo" class="text-danger"></span>
+                </div>
+
+                <!-- Location -->
+                <div class="col-md-6">
+                    <label asp-for="Location" class="form-label">AT LOCATION</label>
+                    <input asp-for="Location" class="form-control" oninput="this.value = this.value.toUpperCase();" required />
+                    <span asp-validation-for="Location" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="OperationType" class="form-label">OPERATION TYPE</label>
+                    <select asp-for="OperationType" class="form-control" required>
+                        <option value="">-- Select Operation Type --</option>
+                        <option value="LOAD-IN">LOAD-IN</option>
+                        <option value="LOAD-OUT">LOAD-OUT</option>
+                      
+                    </select>
+                    <span asp-validation-for="OperationType" class="text-danger"></span>
+                </div>
+
+
+                <!-- Mode of Operation -->
+                <div class="col-md-6">
+                    <label class="form-label">MODE OF OPERATION</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" asp-for="Modeofoperation" value="ROLL ON" required />
+                        <label class="form-check-label">ROLL ON</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" asp-for="Modeofoperation" value="ROLL OFF" required />
+                        <label class="form-check-label">ROLL OFF</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" asp-for="Modeofoperation" value="LIFTED ON"  required/>
+                        <label class="form-check-label">LIFTED ON</label>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" asp-for="Modeofoperation" value="LIFTED OFF"  required/>
+                        <label class="form-check-label">LIFTED OFF</label>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" asp-for="Modeofoperation" value="FLOAT ON"required/>
+                        <label class="form-check-label">FLOAT ON</label>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" asp-for="Modeofoperation" value="FLOAT OFF" required/>
+                        <label class="form-check-label">FLOAT OFF</label>
+                    </div>
+                    <span asp-validation-for="Modeofoperation" class="text-danger"></span>
+                </div>
+
+                <!-- Issued By -->
+                <div class="col-md-6">
+                    <label asp-for="IssuedBy" class="form-label">ISSUED BY</label>
+                    <input asp-for="IssuedBy" class="form-control" oninput="this.value = this.value.toUpperCase();" required />
+                    <span asp-validation-for="IssuedBy" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check mb-2">
+                        <input asp-for="NoDateCheckbox" class="form-check-input" type="checkbox" id="noDateCheckbox" />
+                        <label class="form-check-label" for="noDateCheckbox">NA</label>
+                    </div>
+
+                    <label asp-for="IssuedDate" class="form-label" id="issuedDateLabel">ISSUED DATE</label>
+                    <input asp-for="IssuedDate" class="form-control" type="date" id="issuedDateInput" />
+                </div>
+
+
+                <!-- Navigation Buttons -->
+                <div class="col-12 text-end mt-4">
+                    <button type="button" class="btn btn-secondary" onclick="goBack()">Back</button>
+                    <button type="button" class="btn btn-primary" onclick="nextStep(2)">Next</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 3 (example for cargo details) -->
+    <div class="card mb-4 form-step d-none" id="step2">
+        <div class="card-header bg-primary text-white">
+            1.1.2 – Cargo Details
+        </div>
+        <div class="card-body">
+            <!-- Cargo NA Checkbox -->
+            <div class="form-check mb-2">
+                <input type="hidden" name="IsCargoDetailsNA" value="false" />
+                <input class="form-check-input" type="checkbox" id="hideCargoCheckbox"
+                       name="IsCargoDetailsNA" value="true"
+                       onchange="toggleCargoCheckbox()" @(Model.IsCargoDetailsNA ? "checked" : "") />
+                <label class="form-check-label" for="hideCargoCheckbox">
+                    Mark Cargo Details as N/A
+                </label>
+            </div>
+
+            <!-- Cargo Details Table Section -->
+            <div id="cargo-details-section" class="container mt-4" style="display: @(Model.IsCargoDetailsNA ? "none" : "block");">
+                <div class="text-end mb-3">
+                    <button type="button" class="btn btn-primary" onclick="addCargoRow()">ADD CARGO DETAIL</button>
+                </div>
+
+                <table class="table table-bordered" id="cargoTable">
+                    <thead class="table-secondary text-center">
+                        <tr>
+                            <th>Sr.</th>
+                            <th>Location</th>
+                            <th>Cargo</th>
+                            <th>ID Markings</th>
+                            <th>Weight</th>
+                            <th>Dimensions</th>
+                            <th>Remarks</th>
+                            <th style="width: 5%;">🗑️</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < Model.CargoDetails.Count; i++)
+                        {
+                            <tr>
+                                <td class="text-center">@(@i + 1)</td> <!-- Sr No. -->
+
+                                <td>
+                                    <input type="text" name="CargoDetails[@i].Location"
+                                           class="form-control"
+                                           value="@(Model.CargoDetails[i].Location ?? "")" />
+                                </td>
+
+                                <td>
+                                    <input type="text" name="CargoDetails[@i].Cargos"
+                                           class="form-control"
+                                           value="@(Model.CargoDetails[i].Cargos ?? "")" />
+                                </td>
+
+                                <td>
+                                    <input type="text" name="CargoDetails[@i].IDMarkings"
+                                           class="form-control"
+                                           value="@(Model.CargoDetails[i].IDMarkings ?? "")" />
+                                </td>
+
+                                <td>
+                                    <input type="text" name="CargoDetails[@i].Weight"
+                                           class="form-control"
+                                           value="@(Model.CargoDetails[i].Weight ?? "")" />
+                                </td>
+
+                                <td>
+                                    <input type="text" name="CargoDetails[@i].Dimensions"
+                                           class="form-control"
+                                           value="@(Model.CargoDetails[i].Dimensions ?? "")" />
+                                </td>
+
+                                <td>
+                                    <input type="text" name="CargoDetails[@i].Remarks"
+                                           class="form-control"
+                                           placeholder="Optional"
+                                           value="@(Model.CargoDetails[i].Remarks ?? "")" />
+                                </td>
+                            </tr>
+
+                        }
+                    </tbody>
+
+                </table>
+            </div>
+
+            <!-- Navigation -->
+            <div class="text-end mt-3">
+                <button type="button" class="btn btn-secondary" onclick="nextStep(1)">Back</button>
+                <button type="button" class="btn btn-primary" onclick="nextStep(3)">Next</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- STEP 5 (Surveyor Signature) -->
+    <div class="card mb-4 form-step d-none" id="step3">
+        <div class="card-header bg-primary text-white">
+            1.1.3 – Surveyor Signature
+        </div>
+        <div class="card-body">
+
+            <!-- NA Checkbox -->
+            <div class="form-check mb-3">
+                <input type="checkbox" class="form-check-input" id="signatureNA" />
+                <label class="form-check-label" for="signatureNA">Surveyor Signature Not Applicable</label>
+            </div>
+
+            <!-- Signature Upload Section -->
+            <div class="mb-3" id="signatureSection">
+                <label for="signatureUpload" class="form-label">Signature Upload</label>
+                <input type="file" id="signatureUpload" class="form-control" accept=".jpg,.jpeg,.png" />
+                <button type="button" onclick="uploadSignature()" class="btn btn-sm btn-primary mt-1"> Upload Surveyor Signature</button>
+                <input name="SignaturePath" class="form-control mt-2" readonly />
+            </div>
+
+            <div class="text-end mt-3">
+                <button type="button" class="btn btn-secondary" onclick="nextStep(2)">Back</button>
+                <button type="button" class="btn btn-primary" onclick="nextStep(4)">Next</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- STEP 4 (Approver Signature block) -->
+    <div class="card mb-4 form-step d-none" id="step4">
+        <div class="card-header bg-primary text-white">
+            1.1.4 – Approver Signature block
+        </div>
+        <div class="card-body">
+
+            <!-- NA Checkbox -->
+            <div class="form-check mb-3">
+                <input type="checkbox" class="form-check-input" id="clientSignatureNA" />
+                <label class="form-check-label" for="clientSignatureNA">Approver Signature Not Applicable</label>
+            </div>
+
+            <!-- Client Signature Upload Section -->
+            <div class="col-md-6" id="clientSignatureSection">
+                <label for="signatureClientUpload" class="form-label">Upload Approver Signature</label>
+                <input type="file" id="signatureClientUpload" class="form-control" accept=".jpg,.jpeg,.png" />
+                <button type="button" onclick="uploadClientSignature()" class="btn btn-sm btn-secondary mt-2">Upload Approver Signature</button>
+                <input name="SignatureClient" class="form-control mt-2" readonly />
+            </div>
+
+            <div class="text-end mt-3">
+                <button type="button" class="btn btn-secondary" onclick="nextStep(3)">Back</button>
+                <button type="button" class="btn btn-primary" onclick="nextStep(5)">Next</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- STEP 6 (stamp) -->
+    <div class="card mb-4 form-step d-none" id="step5">
+        <div class="card-header bg-primary text-white">
+            1.1.5 - Stamp
+        </div>
+        <div class="card-body">
+
+            <!-- NA Checkbox -->
+            <div class="form-check mb-3">
+                <input type="checkbox" class="form-check-input" id="stampNA" />
+                <label class="form-check-label" for="stampNA">Stamp Not Applicable</label>
+            </div>
+
+            <!-- Stamp Upload Section -->
+            <div class="mb-3" id="stampSection">
+                <input type="file" id="stampFile" name="stampFile" accept=".jpg,.jpeg,.png" />
+
+                <input type="hidden" name="StampPath" id="StampPath" />
+
+                <button type="button" onclick="uploadStamp()">Upload Stamp</button>
+
+                <img id="stampPreview" style="display:none; width:100px;" />
+            </div>
+
+            <div class="text-end mt-3">
+                <button type="button" class="btn btn-secondary" onclick="nextStep(4)">Back</button>
+              
+
+                <button type="submit" name="preview" value="true" formtarget="_blank" class="btn btn-outline-primary">
+                    Preview
+                </button>
+
+                <button type="submit" class="btn btn-primary">Generate PDF</button>
+                <div class="mt-4">
+                    <a asp-action="Dashboard" asp-controller="Home" class="btn btn-outline-secondary">
+                        ← Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+   
+    <input type="hidden" name="currentstep" id="currentstep" value="1" />
+
+
+    @*  <div class="col-12">
+
+    </div> *@
+    <partial name="_ValidationScriptsPartial" />
+
+</form>
+@{
+    var apiBaseUrl = ViewBag.ApiBaseUrl;  // Get the ApiBaseUrl from the controller
+}
+
+@section Scripts {
+    <script>
+
+         
+                  $(document).ready(function () {
+                    var currentStep = parseInt($("#CurrentStep").val()) || 1;
+
+                    if (currentStep > 1) {
+                        $(".step-section").hide();
+                        $("#step" + currentStep).show();
+                        $(".step-link").removeClass("active");
+                        $(".step-link[data-step='" + currentStep + "']").addClass("active");
+                    }
+                });
+        // =================================================================================
+                      function toggleManualInput(select) {
+            const manualInput = document.getElementById("manualCertificateTitle");
+            const hiddenInput = document.getElementById("CertificateTitle");
+
+            if (select.value === "manual") {
+                manualInput.style.display = "block";
+                manualInput.required = true;
+                hiddenInput.value = manualInput.value.toUpperCase();
+            } else {
+                manualInput.style.display = "none";
+                manualInput.required = false;
+                manualInput.value = '';
+                hiddenInput.value = select.value.toUpperCase();
+            }
+        }
+        function updateHiddenField(input) {
+               const hiddenField = document.getElementById("CertificateTitle");
+               const value = input.value.toUpperCase();
+               if (value.length <= 50) {
+                   hiddenField.value = value;
+               } else {
+                   input.value = value.slice(0, 40); // Trim excess
+                   hiddenField.value = input.value;
+               }
+           }
+
+
+        // =================================================================================
+         function goBack() {
+            const referrer = document.referrer;
+            if (referrer) {
+                // Redirect to previous page and clear history
+                window.location.replace(referrer);
+            } else {
+                // If no referrer, redirect to a default page
+                window.location.replace('/default-page');
+            }
+        }
+
+        // =================================================================================
+                        function nextStep(stepNumber) {
+            const currentStep = document.querySelector('.form-step:not(.d-none)');
+            const currentStepNumber = parseInt(currentStep.id.replace("step", ""));
+            const isGoingBack = stepNumber < currentStepNumber;
+
+            // Skip validation if going back
+            if (!isGoingBack) {
+                const requiredFields = currentStep.querySelectorAll('input[required], select[required], textarea[required]');
+                let isValid = true;
+                let firstInvalidField = null;
+
+                // Validate required fields
+                requiredFields.forEach(field => {
+                    if (!field.value.trim()) {
+                        isValid = false;
+                        field.classList.add('is-invalid');
+                        if (!firstInvalidField) {
+                            firstInvalidField = field;
+                        }
+                    } else {
+                        field.classList.remove('is-invalid');
+                    }
+                });
+
+                      // ✅ Custom check for Mode of Operation radio group
+           if (currentStep.querySelector('[name="Modeofoperation"]')) {
+               const radios = currentStep.querySelectorAll('input[name="Modeofoperation"]');
+               const oneChecked = Array.from(radios).some(radio => radio.checked);
+               if (!oneChecked) {
+                   isValid = false;
+                   alert("Please select a Mode of Operation before proceeding.");
+                   return;
+               }
+           }
+               
+                  if (currentStep.id === "step2") {
+            const isCargoNA = document.getElementById("hideCargoCheckbox").checked;
+            const cargoRows = document.querySelectorAll("#cargoTable tbody tr");
+
+            if (!isCargoNA) {
+                for (let row of cargoRows) {
+                    const inputs = row.querySelectorAll("input[type='text']");
+                    const allFilled = Array.from(inputs).every(input => {
+                        const name = input.getAttribute('name') || '';
+                        if (name.includes("Remarks")) return true; // Skip Remarks field
+                        return input.value.trim() !== "";
+                    });
+
+                 
+                }
+            }
+        }
+
+
+            if (!isValid) {
+                alert("Please fill all required fields before proceeding.");
+                if (firstInvalidField) {
+                    firstInvalidField.focus();
+                }
+                return;
+            }
+        }
+
+            // Show the next step
+            document.querySelectorAll('.form-step').forEach(div => div.classList.add('d-none'));
+            const target = document.getElementById('step' + stepNumber);
+            if (target) target.classList.remove('d-none');
+        }
+
+        // =================================================================================
+             const MAX_CARGO_ROWS = 15;
+
+           function addCargoRow() {
+               const tableBody = document.querySelector("#cargoTable tbody");
+               if (!tableBody) return;
+
+               const currentRows = tableBody.querySelectorAll("tr").length;
+
+               if (currentRows >= MAX_CARGO_ROWS) {
+                   alert("You can only add up to 15 cargo rows.");
+                   return;
+               }
+
+               const newRow = document.createElement("tr");
+               newRow.innerHTML = `
+                   <td class="text-center"></td>
+                   <td><input type="text" class="form-control" /></td>
+                   <td><input type="text" class="form-control" /></td>
+                   <td><input type="text" class="form-control" /></td>
+                   <td><input type="text" class="form-control" /></td>
+                   <td><input type="text" class="form-control" /></td>
+                   <td><input type="text" class="form-control" placeholder="Optional" /></td> <!-- Remarks input -->
+                   <td class="text-center align-middle">
+                       <button type="button" class="btn btn-sm btn-danger" onclick="removeRow(this, 'cargo')">🗑️</button>
+                   </td>
+               `;
+               tableBody.appendChild(newRow);
+
+               renumberCargoRows();
+           }
+
+           function removeRow(button, type) {
+               const row = button.closest('tr');
+               row.remove();
+
+               if (type === 'cargo') {
+                   renumberCargoRows();
+               }
+           }
+
+           function renumberCargoRows() {
+               const rows = document.querySelectorAll("#cargoTable tbody tr");
+
+               rows.forEach((row, index) => {
+                   // Set Sr. No.
+                   row.cells[0].textContent = index + 1;
+
+                   // Update input names for model binding
+                   const inputs = row.querySelectorAll("input");
+                   const fieldNames = ["Location", "Cargos", "IDMarkings", "Weight", "Dimensions", "Remarks"];
+
+                   inputs.forEach((input, i) => {
+                       input.name = `CargoDetails[${index}].${fieldNames[i]}`;
+                   });
+               });
+           }
+
+
+      
+
+              
+         // =================================================================================
+         $(document).ready(function () {
+            toggleCargoCheckbox();
+        });
+
+
+
+        function toggleCargoCheckbox() {
+            if ($('#hideCargoCheckbox').is(':checked')) {
+                $('#cargo-details-section').hide();
+                $('#cargo-details-section :input').prop('disabled', true);
+            } else {
+                $('#cargo-details-section').show();
+                $('#cargo-details-section :input').prop('disabled', false);
+            }
+        }
+
+             // =================================================================================
+            // ✅ Dropdown image preview (safe check)
+            const dropdown = document.getElementById("headerImageDropdown");
+            const preview = document.querySelector("#headerPreview img");
+            if (dropdown && preview) {
+                dropdown.addEventListener("change", function () {
+                    const selectedImg = this.options[this.selectedIndex].getAttribute("data-img");
+                    preview.src = selectedImg;
+                    preview.src = selectedImg;
+                    preview.style.display = "block";
+                });
+            }
+
+                         function removeRow(button) {
+                    const row = button.closest("tr");
+                    if (row) {
+                        const tableBody = row.closest("tbody");
+                        row.remove();
+
+                        // 🔁 Reorder Sr. No / SL. NO after deletion
+                        renumberRows(tableBody);
+                    }
+                }
+
+                function renumberRows(tbody) {
+                    const rows = tbody.querySelectorAll("tr");
+
+                    rows.forEach((row, index) => {
+                        const slCell = row.querySelector("td:first-child");
+                        if (slCell) {
+                            slCell.textContent = index + 1;
+                        }
+                    });
+                }
+
+      // ================================================================================
+                   function uploadStamp() {
+               const fileInput = document.getElementById('stampFile');
+               const file = fileInput.files[0];
+
+               if (!file) {
+                   alert("Please select a file to upload.");
+                   return;
+               }
+
+               const formData = new FormData();
+               formData.append("stampFile", file); // matches controller param
+
+               fetch('/Loadout/UploadStamp', { // ✅ Correct route and casing
+                   method: 'POST',
+                   body: formData
+               })
+               .then(response => response.json())
+               .then(data => {
+                   if (data.success) {
+                       document.getElementById('StampPath').value = data.filePath;
+
+                       const preview = document.getElementById('stampPreview');
+                       preview.src = data.filePath;
+                       preview.style.display = 'block';
+
+                       alert("Stamp uploaded successfully.");
+                   } else {
+                       alert("Upload failed: " + data.message);
+                   }
+               })
+               .catch(error => {
+                   console.error("Error during upload:", error);
+                   alert("An error occurred while uploading the stamp.");
+               });
+           }
+
+                   document.getElementById("stampNA").addEventListener("change", function () {
+               const section = document.getElementById("stampSection");
+               const fileInput = document.getElementById("stampFile");
+               const hiddenInput = document.getElementById("StampPath");
+               const preview = document.getElementById("stampPreview");
+
+               if (this.checked) {
+                   section.style.display = "none";
+                   fileInput.value = "";
+                   hiddenInput.value = "";
+                   preview.style.display = "none";
+               } else {
+                   section.style.display = "block";
+               }
+           });
+     // =================================================================================
+
+        const apiBaseUrl = "@Html.Raw(ViewBag.ApiBaseUrl)"; // e.g., https://localhost:7048/api/
+
+        function uploadSignature() {
+            const fileInput = document.getElementById('signatureUpload');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert("Please select a file to upload.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            fetch(`${apiBaseUrl}LoadOut/upload-signature`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.filePath) {
+                    document.querySelector('input[name="SignaturePath"]').value = data.filePath;
+                    alert("Signature uploaded successfully.");
+                } else {
+                    alert("Upload failed.");
+                }
+            })
+            .catch(error => {
+                console.error("Upload error:", error);
+                alert("An error occurred.");
+            });
+        }
+
+        // Handle NA Checkbox to hide/show section
+        document.getElementById("signatureNA").addEventListener("change", function () {
+            const section = document.getElementById("signatureSection");
+            const fileInput = document.getElementById("signatureUpload");
+            const pathInput = document.querySelector('input[name="SignaturePath"]');
+
+            if (this.checked) {
+                section.style.display = "none";
+                fileInput.value = "";
+                pathInput.value = "";
+            } else {
+                section.style.display = "block";
+            }
+        });
+
+
+
+        // =================================================================================
+
+          // const apiBaseUrl = "@Html.Raw(ViewBag.ApiBaseUrl)"; // Ex: https://localhost:7048/api/
+
+        function uploadClientSignature() {
+            const fileInput = document.getElementById('signatureClientUpload');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert("Please select a file to upload.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            fetch(`${apiBaseUrl}LoadOut/upload-signature-Client`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.filePath) {
+                    document.querySelector('input[name="SignatureClient"]').value = data.filePath;
+                    alert("Client signature uploaded successfully.");
+                } else {
+                    alert("Upload failed.");
+                }
+            })
+            .catch(error => {
+                console.error("Upload error:", error);
+                alert("An error occurred while uploading.");
+            });
+        }
+
+        // Handle "Client Signature Not Applicable" checkbox toggle
+        document.getElementById("clientSignatureNA").addEventListener("change", function () {
+            const section = document.getElementById("clientSignatureSection");
+            const fileInput = document.getElementById("signatureClientUpload");
+            const pathInput = document.querySelector('input[name="SignatureClient"]');
+
+            if (this.checked) {
+                section.style.display = "none";
+                fileInput.value = "";
+                pathInput.value = "";
+            } else {
+                section.style.display = "block";
+            }
+        });
+
+                          const checkbox = document.getElementById('noDateCheckbox');
+        const dateInput = document.getElementById('issuedDateInput');
+        const dateLabel = document.getElementById('issuedDateLabel');
+
+        checkbox.addEventListener('change', function () {
+            const isHidden = this.checked;
+            dateInput.style.display = isHidden ? 'none' : 'block';
+            dateLabel.style.display = isHidden ? 'none' : 'block';
+        });
+
+        // Run this on page load in case the checkbox is pre-checked
+        window.addEventListener('DOMContentLoaded', function () {
+            checkbox.dispatchEvent(new Event('change'));
+        });
+    </script>
+}
+<style>
+    .is-invalid {
+        border-color: #dc3545;
+    }
+</style>
