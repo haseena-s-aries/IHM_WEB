@@ -207,7 +207,116 @@
             overflow-wrap: anywhere;
         }
 
+        .mark-layout-btn {
+            margin-top: 10px;
+            width: 100%;
+            border: 1px solid #1e95ff;
+            background: #eef7ff;
+            color: #1e95ff;
+            border-radius: 10px;
+            padding: 9px 12px;
+            font-size: 12px;
+            font-weight: 900;
+        }
 
+        .marker-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 25, 45, .72);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 16px;
+        }
+
+        .marker-panel {
+            width: min(100%, 980px);
+            max-height: 92vh;
+            background: #fff;
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .marker-head {
+            padding: 12px 16px;
+            border-bottom: 1px solid #d8e3ee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .marker-title {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 900;
+        }
+
+        .marker-close {
+            border: 0;
+            background: transparent;
+            font-size: 22px;
+            line-height: 1;
+        }
+
+        .marker-body {
+            padding: 14px;
+            overflow: auto;
+        }
+
+        .marker-image-wrap {
+            position: relative;
+            width: 100%;
+            border: 1px solid #d8e3ee;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #f5f8fd;
+        }
+
+        .marker-image {
+            width: 100%;
+            display: block;
+        }
+
+        .marker-pin {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            transform: translate(-50%, -100%);
+            color: #ff4d4f;
+            font-size: 24px;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,.35));
+            pointer-events: none;
+        }
+
+        .marker-foot {
+            padding: 12px 16px;
+            border-top: 1px solid #d8e3ee;
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            color: #607d9a;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .marker-save {
+            border: 0;
+            background: #20c997;
+            color: white;
+            border-radius: 10px;
+            padding: 9px 14px;
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+            .marker-save:disabled {
+                opacity: .55;
+            }
         /* STATUS */
 
         .status-box {
@@ -380,7 +489,17 @@
                             </div>
                             <div class="info-value">@Val(checkpoint.Description)</div>
                         </div>
-
+                        <button type="button"
+                                class="mark-layout-btn"
+                                onclick="event.preventDefault(); event.stopPropagation(); openMarkerModal(this);"
+                                data-job-id="@jobId"
+                                data-area-id="@Model.Id"
+                                data-checkpoint-id="@checkpoint.Id"
+                                data-label="@code"
+                                data-image-path="@Model.LayoutFilePath">
+                            <i class="fa-solid fa-location-dot"></i>
+                            Mark Layout
+                        </button>
                         <div class="status-box">
                             <div class="status-left">
                                 <i class="fa-solid fa-user-check"></i>
@@ -393,5 +512,183 @@
             }
         </div>
     </main>
+    <div id="markerModal" class="marker-modal">
+        <div class="marker-panel">
+            <div class="marker-head">
+                <h3 id="markerTitle" class="marker-title">Mark Layout</h3>
+                <button type="button" class="marker-close" onclick="closeMarkerModal()">×</button>
+            </div>
+
+            <div class="marker-body">
+                <div id="markerImageWrap" class="marker-image-wrap">
+                    <img id="markerImage" class="marker-image" src="" alt="Layout" />
+                    <i id="markerPin" class="fa-solid fa-location-dot marker-pin" style="display:none;"></i>
+                </div>
+            </div>
+
+            <div class="marker-foot">
+                <span id="markerHint">Click on the layout image to place marker.</span>
+                <button id="markerSaveBtn" type="button" class="marker-save" onclick="saveMarker()" disabled>
+                    Save Marker
+                </button>
+            </div>
+        </div>
+    </div>
+    <script>
+        let markerState = {
+            jobId: 0,
+            areaId: 0,
+            checkpointId: 0,
+            imagePath: "",
+            label: "",
+            xPercent: null,
+            yPercent: null
+        };
+
+        function normalizeImageUrl(path) {
+            if (!path) return "";
+            if (path.startsWith("http")) return path;
+            return path.startsWith("/") ? path : "/" + path;
+        }
+
+        async function openMarkerModal(button) {
+            markerState = {
+                jobId: Number(button.dataset.jobId),
+                areaId: Number(button.dataset.areaId),
+                checkpointId: Number(button.dataset.checkpointId),
+                imagePath: button.dataset.imagePath || "",
+                label: button.dataset.label || "",
+                xPercent: null,
+                yPercent: null
+            };
+
+            if (!markerState.imagePath) {
+                alert("Layout image not uploaded for this area.");
+                return;
+            }
+
+            document.getElementById("markerTitle").innerText =
+                "Mark Layout - " + markerState.label;
+
+            document.getElementById("markerImage").src =
+                normalizeImageUrl(markerState.imagePath);
+
+            document.getElementById("markerPin").style.display = "none";
+            document.getElementById("markerSaveBtn").disabled = true;
+            document.getElementById("markerModal").style.display = "flex";
+
+            await loadExistingMarker();
+        }
+
+        function closeMarkerModal() {
+            document.getElementById("markerModal").style.display = "none";
+        }
+
+        function placePin(xPercent, yPercent) {
+            markerState.xPercent = xPercent;
+            markerState.yPercent = yPercent;
+
+            const pin = document.getElementById("markerPin");
+            pin.style.left = xPercent + "%";
+            pin.style.top = yPercent + "%";
+            pin.style.display = "block";
+
+            document.getElementById("markerSaveBtn").disabled = false;
+        }
+
+        async function loadExistingMarker() {
+            try {
+                const response = await fetch(`/SurveyJobs/GetIhmMarkers?jobId=${markerState.jobId}`);
+                if (!response.ok) return;
+
+                const markers = await response.json();
+                const normalizedPath = markerState.imagePath.toLowerCase();
+
+                const existing = markers.find(x =>
+                    Number(x.ihmCheckpointId ?? x.IhmCheckpointId) === markerState.checkpointId &&
+                    String(x.imagePath ?? x.ImagePath ?? "").toLowerCase() === normalizedPath
+                );
+
+                if (existing) {
+                    placePin(
+                        Number(existing.xPercent ?? existing.XPercent),
+                        Number(existing.yPercent ?? existing.YPercent)
+                    );
+                    document.getElementById("markerSaveBtn").disabled = true;
+                    document.getElementById("markerHint").innerText =
+                        "Existing marker loaded. Click another point to update.";
+                } else {
+                    document.getElementById("markerHint").innerText =
+                        "Click on the layout image to place marker.";
+                }
+            } catch {
+                document.getElementById("markerHint").innerText =
+                    "Click on the layout image to place marker.";
+            }
+        }
+
+        document.getElementById("markerImageWrap").addEventListener("click", function (event) {
+            const img = document.getElementById("markerImage");
+            const rect = img.getBoundingClientRect();
+
+            if (
+                event.clientX < rect.left ||
+                event.clientX > rect.right ||
+                event.clientY < rect.top ||
+                event.clientY > rect.bottom
+            ) {
+                return;
+            }
+
+            const xPercent = ((event.clientX - rect.left) / rect.width) * 100;
+            const yPercent = ((event.clientY - rect.top) / rect.height) * 100;
+
+            placePin(
+                Math.max(0, Math.min(100, xPercent)),
+                Math.max(0, Math.min(100, yPercent))
+            );
+        });
+
+        async function saveMarker() {
+            if (markerState.xPercent === null || markerState.yPercent === null) {
+                alert("Please click on layout image first.");
+                return;
+            }
+
+            const saveBtn = document.getElementById("markerSaveBtn");
+            saveBtn.disabled = true;
+            saveBtn.innerText = "Saving...";
+
+            try {
+                const response = await fetch("/SurveyJobs/SaveIhmMarker", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        surveyJobId: markerState.jobId,
+                        ihmAreaId: markerState.areaId,
+                        ihmCheckpointId: markerState.checkpointId,
+                        imagePath: markerState.imagePath,
+                        xPercent: markerState.xPercent,
+                        yPercent: markerState.yPercent
+                    })
+                });
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(text || "Failed to save marker.");
+                }
+
+                document.getElementById("markerHint").innerText = "Marker saved.";
+                saveBtn.innerText = "Saved";
+                setTimeout(closeMarkerModal, 700);
+            } catch (error) {
+                alert(error.message || "Failed to save marker.");
+                saveBtn.disabled = false;
+                saveBtn.innerText = "Save Marker";
+            }
+        }
+    </script>
 </body>
 </html>

@@ -222,7 +222,104 @@ namespace Health_Matrix_Consuming_Side.Controllers
 
             return View(viewModel);
         }
+        [HttpGet]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        public async Task<IActionResult> UsageAnalytics(
+            DateTime? from,
+            DateTime? to,
+            string? role,
+            string? department,
+            int? userId,
+            string? module,
+            string? activityStatus)
+        {
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (string.IsNullOrWhiteSpace(jwt))
+                return RedirectToAction("Login", "Auth");
 
+            var sessionRole = HttpContext.Session.GetString("UserRole") ?? string.Empty;
+            if (!string.Equals(sessionRole, "Admin", StringComparison.OrdinalIgnoreCase))
+                return Forbid();
+
+            var client = _clientFactory.CreateClient("ApiClient");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+
+            var url = "usage-analytics" + BuildUsageAnalyticsQuery(
+                from,
+                to,
+                role,
+                department,
+                userId,
+                module,
+                activityStatus);
+
+            var model = new UsageAnalyticsViewModel
+            {
+                Filters = new UsageAnalyticsFilters
+                {
+                    From = from,
+                    To = to,
+                    Role = role,
+                    Department = department,
+                    UserId = userId,
+                    Module = module,
+                    ActivityStatus = activityStatus
+                }
+            };
+
+            try
+            {
+                var response = await client.GetAsync(url);
+                var json = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    model = JsonConvert.DeserializeObject<UsageAnalyticsViewModel>(json)
+                        ?? model;
+                    return View(model);
+                }
+
+                _logger.LogWarning("Usage analytics API returned {StatusCode}: {Body}", response.StatusCode, json);
+                model.LoadError = response.StatusCode == System.Net.HttpStatusCode.Forbidden
+                    ? "Usage analytics is available only for Admin users."
+                    : "Usage analytics could not be loaded. Please confirm the API is running with the latest build.";
+                return View(model);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Usage analytics load failed.");
+                model.LoadError = "Usage analytics could not be loaded. Please confirm the API is running and try again.";
+                return View(model);
+            }
+        }
+
+        private static string BuildUsageAnalyticsQuery(
+            DateTime? from,
+            DateTime? to,
+            string? role,
+            string? department,
+            int? userId,
+            string? module,
+            string? activityStatus)
+        {
+            var query = new List<string>();
+
+            void Add(string key, string? value)
+            {
+                if (string.IsNullOrWhiteSpace(value) || value == "All") return;
+                query.Add($"{Uri.EscapeDataString(key)}={Uri.EscapeDataString(value)}");
+            }
+
+            if (from.HasValue) Add("from", from.Value.ToString("O"));
+            if (to.HasValue) Add("to", to.Value.ToString("O"));
+            Add("role", role);
+            Add("department", department);
+            if (userId.HasValue && userId.Value > 0) Add("userId", userId.Value.ToString());
+            Add("module", module);
+            Add("activityStatus", activityStatus);
+
+            return query.Count == 0 ? string.Empty : "?" + string.Join("&", query);
+        }
         [HttpGet]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public async Task<IActionResult> SavedReports()

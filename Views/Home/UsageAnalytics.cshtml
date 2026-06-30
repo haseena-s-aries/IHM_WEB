@@ -1,0 +1,779 @@
+@model UsageAnalyticsViewModel
+@{
+    Layout = null;
+    ViewData["Title"] = "Usage Analytics";
+
+    string DateValue(DateTime? value) => value?.ToString("yyyy-MM-dd") ?? "";
+    string DateText(DateTime? value) => value?.ToString("dd MMM yyyy, hh:mm tt") ?? "Never";
+    string NumberOrNa(int? value) => value.HasValue ? value.Value.ToString("N0") : "Not available";
+    string? Selected(string? current, string? value) =>
+        string.Equals(current, value, StringComparison.OrdinalIgnoreCase) ? "selected" : null;
+    var last12MonthKeys = Enumerable.Range(0, 12)
+    .Select(i => DateTime.Today.AddMonths(-11 + i))
+    .Select(d => d.ToString("yyyy-MM"))
+    .ToList();
+
+    var last12MonthLabels = last12MonthKeys
+        .Select(x => DateTime.Parse(x + "-01").ToString("MMM yyyy"))
+        .ToList();
+
+    var last12ActivityCounts = last12MonthKeys
+        .Select(month => Model.MonthlyUsageTrend
+            .Where(x => x.Month == month)
+            .Sum(x => x.ActivityCount))
+        .ToList();
+
+    var last12UniqueUsers = last12MonthKeys
+        .Select(month => Model.MonthlyUsageTrend
+            .Where(x => x.Month == month)
+            .Where(x => x.UniqueActiveUsers.HasValue)
+            .Sum(x => x.UniqueActiveUsers!.Value))
+        .ToList();
+
+    var last12LineChartPayload = new
+    {
+        labels = last12MonthLabels,
+        datasets = new object[]
+        {
+        new
+        {
+            label = "Activity Count",
+            data = last12ActivityCounts,
+            borderColor = "#2563eb",
+            backgroundColor = "rgba(37, 99, 235, .12)",
+            pointBackgroundColor = "#2563eb",
+            pointBorderColor = "#2563eb",
+            pointRadius = 4,
+            pointHoverRadius = 6,
+            borderWidth = 3,
+            tension = .42,
+            fill = true,
+            yAxisID = "y"
+        },
+        new
+        {
+            label = "Unique Active Users",
+            data = last12UniqueUsers,
+            borderColor = "#10b981",
+            backgroundColor = "rgba(16, 185, 129, .12)",
+            pointBackgroundColor = "#10b981",
+            pointBorderColor = "#10b981",
+            pointRadius = 4,
+            pointHoverRadius = 6,
+            borderWidth = 3,
+            tension = .42,
+            fill = true,
+            yAxisID = "y1"
+        }
+        }
+    };
+
+    var last12LineChartJson = Newtonsoft.Json.JsonConvert.SerializeObject(last12LineChartPayload);
+    string MonthLabel(string value)
+    {
+        return DateTime.TryParse(value + "-01", out var month)
+            ? month.ToString("MMM yyyy")
+            : value;
+    }
+
+    var chartMonths = Model.MonthlyUsageTrend
+        .Select(x => x.Month)
+        .Distinct()
+        .OrderBy(x => x)
+        .ToList();
+    var monthlyLineItems = Model.MonthlyUsageTrend
+    .GroupBy(x => x.Month)
+    .Select(g => new
+    {
+        Month = g.Key,
+        ActivityCount = g.Sum(x => x.ActivityCount),
+        UniqueUsers = g.Where(x => x.UniqueActiveUsers.HasValue)
+            .Sum(x => x.UniqueActiveUsers!.Value)
+    })
+    .OrderBy(x => x.Month)
+    .ToList();
+
+    var monthlyLineChartPayload = new
+    {
+        labels = monthlyLineItems.Select(x => MonthLabel(x.Month)).ToList(),
+        datasets = new object[]
+        {
+        new
+        {
+            label = "Activity Count",
+            data = monthlyLineItems.Select(x => x.ActivityCount).ToList(),
+            borderColor = "#2563eb",
+            backgroundColor = "rgba(37, 99, 235, .12)",
+            pointBackgroundColor = "#2563eb",
+            pointBorderColor = "#2563eb",
+            pointRadius = 4,
+            pointHoverRadius = 6,
+            borderWidth = 3,
+            tension = .42,
+            fill = true,
+            yAxisID = "y"
+        },
+        new
+        {
+            label = "Unique Active Users",
+            data = monthlyLineItems.Select(x => x.UniqueUsers).ToList(),
+            borderColor = "#10b981",
+            backgroundColor = "rgba(16, 185, 129, .12)",
+            pointBackgroundColor = "#10b981",
+            pointBorderColor = "#10b981",
+            pointRadius = 4,
+            pointHoverRadius = 6,
+            borderWidth = 3,
+            tension = .42,
+            fill = true,
+            yAxisID = "y1"
+        }
+        }
+    };
+
+    var monthlyLineChartJson = Newtonsoft.Json.JsonConvert.SerializeObject(monthlyLineChartPayload);
+    var chartModules = Model.MonthlyUsageTrend
+        .Select(x => x.ModuleName)
+        .Distinct()
+        .OrderBy(x => x)
+        .ToList();
+    var moduleColors = new[] { "#629af3", "#9a75f0", "#f5b942", "#39a0c8", "#e2574c", "#7bc96f", "#c084fc", "#f97316", "#14b8a6", "#64748b" };
+    var chartDatasets = chartModules.Select((moduleName, index) => new
+    {
+        label = moduleName,
+        type = "bar",
+        yAxisID = "y",
+        stack = "records",
+        backgroundColor = moduleColors[index % moduleColors.Length],
+        borderColor = moduleColors[index % moduleColors.Length],
+        borderWidth = 1,
+        borderRadius = 4,
+        data = chartMonths.Select(month => Model.MonthlyUsageTrend
+            .Where(x => x.Month == month && x.ModuleName == moduleName)
+            .Sum(x => x.ActivityCount)).ToList()
+    }).Cast<object>().ToList();
+    chartDatasets.Add(new
+    {
+        label = "Unique Active Users",
+        type = "line",
+        yAxisID = "y1",
+        borderColor = "#10b981",
+        backgroundColor = "rgba(16,185,129,.14)",
+        pointBackgroundColor = "#10b981",
+        pointBorderColor = "#10b981",
+        pointRadius = 4,
+        pointHoverRadius = 6,
+        borderWidth = 3,
+        tension = .35,
+        fill = true,
+        data = chartMonths.Select(month => Model.MonthlyUsageTrend
+            .Where(x => x.Month == month)
+            .Where(x => x.UniqueActiveUsers.HasValue)
+            .Sum(x => x.UniqueActiveUsers!.Value)).ToList()
+    });
+    var chartPayload = new
+    {
+        labels = chartMonths.Select(MonthLabel).ToList(),
+        datasets = chartDatasets
+    };
+    var chartJson = Newtonsoft.Json.JsonConvert.SerializeObject(chartPayload);
+    var mostModuleNames = Model.TopLists.MostUsedModules.Take(5).Select(x => x.ModuleName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+    var leastModules = Model.TopLists.LeastUsedModules
+        .Where(x => !mostModuleNames.Contains(x.ModuleName))
+        .Take(5)
+        .ToList();
+    if (!leastModules.Any())
+    {
+        leastModules = Model.TopLists.LeastUsedModules.Skip(5).Take(5).ToList();
+    }
+    var hasDepartmentData = false;
+    var userActivityRows = Model.LastActivityPerUser
+        .Select(x => new
+        {
+            Row = x,
+            DisplayName = string.IsNullOrWhiteSpace(x.UserName)
+                ? (!string.IsNullOrWhiteSpace(x.Email) ? x.Email : $"User #{x.UserId}")
+                : x.UserName
+        })
+        .ToList();
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Usage Analytics</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/admin-dashboard.css" asp-append-version="true" />
+    <style>
+        body {
+            background: #f6f5f1;
+            font-family: "Plus Jakarta Sans", sans-serif;
+        }
+
+        .analytics-shell {
+            padding: 24px;
+        }
+
+        .analytics-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+            .analytics-top h1 {
+                margin: 0;
+                font-size: 28px;
+                font-weight: 800;
+                color: #14241f;
+            }
+
+            .analytics-top p {
+                margin: 6px 0 0;
+                color: #5b6b66;
+            }
+
+        .analytics-back {
+            border: 1px solid #d9dfdc;
+            background: #fff;
+            color: #14241f;
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-weight: 700;
+        }
+
+        .analytics-panel {
+            background: #fff;
+            border: 1px solid #e7e9e6;
+            border-radius: 18px;
+            box-shadow: 0 8px 24px -16px rgba(20,36,31,.18);
+            padding: 18px;
+            margin-bottom: 18px;
+        }
+
+            .analytics-panel h2 {
+                font-size: 17px;
+                font-weight: 800;
+                margin: 0 0 14px;
+                color: #14241f;
+            }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(130px,1fr));
+            gap: 12px;
+            align-items: end;
+        }
+
+            .filter-grid label {
+                font-size: 11px;
+                font-weight: 800;
+                text-transform: uppercase;
+                color: #5b6b66;
+                margin-bottom: 5px;
+            }
+
+        .metric-grid-analytics {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(160px,1fr));
+            gap: 14px;
+        }
+
+        .analytics-metric {
+            border: 1px solid #e7e9e6;
+            border-radius: 16px;
+            padding: 16px;
+            background: #fbfcfb;
+        }
+
+            .analytics-metric small {
+                display: block;
+                color: #5b6b66;
+                font-weight: 700;
+            }
+
+            .analytics-metric strong {
+                display: block;
+                color: #14241f;
+                font-size: 28px;
+                font-weight: 800;
+                margin-top: 5px;
+            }
+
+            .analytics-metric span {
+                display: block;
+                color: #73827d;
+                font-size: 12px;
+                margin-top: 3px;
+            }
+
+        .analytics-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+
+        .analytics-grid-single {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 18px;
+        }
+
+        .analytics-table {
+            width: 100%;
+        }
+
+            .analytics-table th {
+                color: #5b6b66;
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: .04em;
+                white-space: nowrap;
+            }
+
+            .analytics-table td {
+                vertical-align: middle;
+                color: #24342f;
+            }
+
+        .status-pill {
+            display: inline-flex;
+            border-radius: 999px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 800;
+            background: #edf6f2;
+            color: #126650;
+        }
+
+            .status-pill.warn {
+                background: #fff5df;
+                color: #9a6500;
+            }
+
+            .status-pill.danger {
+                background: #ffe9e6;
+                color: #bc3327;
+            }
+
+        .muted-empty {
+            padding: 18px;
+            border: 1px dashed #cfd8d4;
+            border-radius: 14px;
+            color: #70807a;
+            text-align: center;
+        }
+
+        .note-box {
+            background: #eef7f4;
+            color: #174d40;
+            border: 1px solid #cce8df;
+            border-radius: 14px;
+            padding: 14px 16px;
+            font-weight: 600;
+        }
+
+        .trend-chart-wrap {
+            height: 430px;
+            padding: 10px 8px 2px;
+        }
+
+        @@media (max-width: 1100px) {
+            .filter-grid, .metric-grid-analytics, .analytics-grid-2 {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @@media (max-width: 700px) {
+            .analytics-shell {
+                padding: 14px;
+            }
+
+            .analytics-top, .filter-grid, .metric-grid-analytics, .analytics-grid-2 {
+                grid-template-columns: 1fr;
+                display: grid;
+            }
+
+            .analytics-back {
+                width: max-content;
+            }
+
+            .trend-chart-wrap {
+                height: 340px;
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="analytics-shell">
+        <div class="analytics-top">
+            <div>
+                <h1>Usage Analytics</h1>
+                <p>Application-level usage report calculated from existing AURAS records.</p>
+            </div>
+            <a class="analytics-back" href="@Url.Action("AdminDashboard", "Home")"><i class="fa-solid fa-arrow-left"></i> Dashboard</a>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.LoadError))
+        {
+            <div class="status-banner error"><i class="fa-solid fa-triangle-exclamation"></i>@Model.LoadError</div>
+        }
+
+        <section class="analytics-panel">
+            <h2>Filters</h2>
+            <form method="get" class="filter-grid">
+                <div>
+                    <label>From</label>
+                    <input class="form-control" type="date" name="from" value="@DateValue(Model.Filters.From)" />
+                </div>
+                <div>
+                    <label>To</label>
+                    <input class="form-control" type="date" name="to" value="@DateValue(Model.Filters.To)" />
+                </div>
+                <div>
+                    <label>Role</label>
+                    <select class="form-select" name="role">
+                        <option value="">All</option>
+                        @foreach (var item in Model.AvailableFilters.Roles)
+                        {
+                            <option value="@item" selected="@Selected(Model.Filters.Role, item)">@item</option>
+                        }
+                    </select>
+                </div>
+                @if (hasDepartmentData)
+                {
+                    <div>
+                        <label>Department / Team</label>
+                        <select class="form-select" name="department">
+                            <option value="">All</option>
+                            @foreach (var item in Model.AvailableFilters.Departments)
+                            {
+                                <option value="@item" selected="@Selected(Model.Filters.Department, item)">@item</option>
+                            }
+                        </select>
+                    </div>
+                }
+                <div>
+                    <label>User</label>
+                    <select class="form-select" name="userId">
+                        <option value="">All</option>
+                        @foreach (var item in Model.AvailableFilters.Users)
+                        {
+                            <option value="@item.Id" selected="@(Model.Filters.UserId == item.Id ? "selected" : null)">@item.Name</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label>Module</label>
+                    <select class="form-select" name="module">
+                        <option value="">All</option>
+                        @foreach (var item in Model.AvailableFilters.Modules)
+                        {
+                            <option value="@item" selected="@Selected(Model.Filters.Module, item)">@item</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label>Activity Status</label>
+                    <select class="form-select" name="activityStatus">
+                        <option value="">All</option>
+                        @foreach (var item in Model.AvailableFilters.ActivityStatuses)
+                        {
+                            <option value="@item" selected="@Selected(Model.Filters.ActivityStatus, item)">@item</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <button class="btn btn-success w-100" type="submit"><i class="fa-solid fa-filter"></i> Apply</button>
+                </div>
+                <div>
+                    <a class="btn btn-outline-secondary w-100" href="@Url.Action("UsageAnalytics", "Home")">Reset</a>
+                </div>
+            </form>
+        </section>
+
+        <section class="metric-grid-analytics">
+            <article class="analytics-metric"><small>Total registered users</small><strong>@Model.UserSummary.TotalRegisteredUsers.ToString("N0")</strong><span>From Users table</span></article>
+            <article class="analytics-metric"><small>Active users</small><strong>@NumberOrNa(Model.UserSummary.ActiveUsers)</strong><span>Status inferred where available</span></article>
+            <article class="analytics-metric"><small>Inactive / disabled users</small><strong>@NumberOrNa(Model.UserSummary.InactiveUsers)</strong><span>Status inferred where available</span></article>
+            <article class="analytics-metric"><small>Users active in range</small><strong>@Model.UserSummary.UsersWithActivityInRange.ToString("N0")</strong><span>Created/updated records</span></article>
+            <article class="analytics-metric"><small>No activity 30+ days</small><strong>@Model.UserSummary.UsersWithNoActivityLast30Days.ToString("N0")</strong><span>Using inferred activity</span></article>
+            <article class="analytics-metric"><small>No activity 60+ days</small><strong>@Model.UserSummary.UsersWithNoActivityLast60Days.ToString("N0")</strong><span>Using inferred activity</span></article>
+            <article class="analytics-metric"><small>No activity 90+ days</small><strong>@Model.UserSummary.UsersWithNoActivityLast90Days.ToString("N0")</strong><span>Using inferred activity</span></article>
+            <article class="analytics-metric"><small>Modules tracked</small><strong>@Model.ModuleWiseUsage.Count.ToString("N0")</strong><span>Reliable date columns only</span></article>
+        </section>
+
+        <div class="@(hasDepartmentData ? "analytics-grid-2" : "analytics-grid-single") mt-3">
+            <section class="analytics-panel">
+                <h2>Role Summary</h2>
+                @if (!Model.RoleSummary.Any())
+                {
+                    <div class="muted-empty">Not available</div>
+                }
+                else
+                {
+                    <table class="table analytics-table">
+                        <thead><tr><th>Role</th><th>Users</th><th>Active</th></tr></thead>
+                        <tbody>
+                            @foreach (var item in Model.RoleSummary)
+                            {
+                                <tr><td>@item.Name</td><td>@item.UserCount</td><td>@NumberOrNa(item.ActiveUserCount)</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </section>
+
+            @if (hasDepartmentData)
+            {
+                <section class="analytics-panel">
+                    <h2>Department / Team Summary</h2>
+                    @if (!Model.HasDepartmentSummary)
+                    {
+                        <div class="muted-empty">Not available</div>
+                    }
+                    else
+                    {
+                        <table class="table analytics-table">
+                            <thead><tr><th>Department / Team</th><th>Users</th><th>Active</th></tr></thead>
+                            <tbody>
+                                @foreach (var item in Model.DepartmentSummary)
+                                {
+                                    <tr><td>@item.Name</td><td>@item.UserCount</td><td>@NumberOrNa(item.ActiveUserCount)</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </section>
+            }
+        </div>
+
+        <section class="analytics-panel">
+            <h2>Module-wise Usage</h2>
+            <div class="table-responsive">
+                <table class="table analytics-table">
+                    <thead>
+                        <tr>
+                            <th>Module</th>
+                            <th>Activity</th>
+                            <th>Created</th>
+                            <th>Updated</th>
+                            <th>Unique users</th>
+                            <th>Last activity</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.ModuleWiseUsage)
+                        {
+                            <tr>
+                                <td><strong>@item.ModuleName</strong></td>
+                                <td>@item.ActivityCount</td>
+                                <td>@item.CreatedRecordCount</td>
+                                <td>@NumberOrNa(item.UpdatedRecordCount)</td>
+                                <td>@NumberOrNa(item.UniqueActiveUsers)</td>
+                                <td>@DateText(item.LastActivityDate)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="analytics-panel">
+            <h2>Last Activity Per User</h2>
+            <div class="table-responsive">
+                <table class="table analytics-table">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Activity</th>
+                            <th>Last activity</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in userActivityRows)
+                        {
+                            var statusClass = item.Row.ActivityStatus.Contains("90") || item.Row.ActivityStatus == "Never Active" ? "danger" :
+                            item.Row.ActivityStatus.Contains("30") || item.Row.ActivityStatus.Contains("60") ? "warn" : "";
+                            <tr>
+                                <td><strong>@item.DisplayName</strong></td>
+                                <td>@(item.Row.Email ?? "-")</td>
+                                <td>@(item.Row.Role ?? "Not available")</td>
+                                <td>@item.Row.TotalActivityCount</td>
+                                <td>@DateText(item.Row.LastActivityDate)</td>
+                                <td><span class="status-pill @statusClass">@item.Row.ActivityStatus</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="analytics-grid-2">
+            <section class="analytics-panel">
+                <h2>Monthly Usage Trend</h2>
+                @if (!chartMonths.Any())
+                {
+                    <div class="muted-empty">Not available</div>
+                }
+                else
+                {
+                    <div class="trend-chart-wrap">
+                        <canvas id="last12MonthUsageLineChart"></canvas>
+                    </div>
+                }
+            </section>
+
+            <section class="analytics-panel">
+                <h2>Top Lists</h2>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">Top active users</h6>
+                        <ol>
+                            @foreach (var item in Model.TopLists.TopActiveUsers.Take(5))
+                            {
+                                var displayName = string.IsNullOrWhiteSpace(item.UserName)
+                                ? (!string.IsNullOrWhiteSpace(item.Email) ? item.Email : $"User #{item.UserId}")
+                                : item.UserName;
+                                <li>@displayName <small class="text-muted">(@item.TotalActivityCount)</small></li>
+                            }
+                        </ol>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">Most used modules</h6>
+                        <ol>
+                            @foreach (var item in Model.TopLists.MostUsedModules.Take(5))
+                            {
+                                <li>@item.ModuleName <small class="text-muted">(@item.ActivityCount)</small></li>
+                            }
+                        </ol>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">Least used modules</h6>
+                        <ol>
+                            @if (!leastModules.Any())
+                            {
+                                <li class="text-muted">No separate least-used module</li>
+                            }
+                            @foreach (var item in leastModules)
+                            {
+                                <li>@item.ModuleName <small class="text-muted">(@item.ActivityCount)</small></li>
+                            }
+                        </ol>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">Never active users</h6>
+                        <ol>
+                            @foreach (var item in Model.TopLists.NeverActiveUsers.Take(5))
+                            {
+                                var displayName = string.IsNullOrWhiteSpace(item.UserName)
+                                ? (!string.IsNullOrWhiteSpace(item.Email) ? item.Email : $"User #{item.UserId}")
+                                : item.UserName;
+                                <li>@displayName</li>
+                            }
+                        </ol>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <section class="analytics-panel">
+            <h2>Limitation Note</h2>
+            <div class="note-box">@Model.LimitationNote</div>
+        </section>
+
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        (() => {
+            const canvas = document.getElementById('last12MonthUsageLineChart');
+            if (!canvas || typeof Chart === 'undefined') return;
+
+            const chartData = @Html.Raw(last12LineChartJson);
+
+            new Chart(canvas, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#5b6b66',
+                                font: { size: 13, weight: '600' },
+                                boxWidth: 42,
+                                boxHeight: 12
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(20, 20, 20, .88)',
+                            titleFont: { weight: '800' },
+                            bodyFont: { weight: '600' },
+                            padding: 10
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(20,36,31,.10)'
+                            },
+                            ticks: {
+                                color: '#666',
+                                maxRotation: 0,
+                                autoSkip: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Activity Count',
+                                color: '#555'
+                            },
+                            grid: {
+                                color: 'rgba(20,36,31,.12)'
+                            },
+                            ticks: {
+                                color: '#666',
+                                precision: 0
+                            }
+                        },
+                        y1: {
+                            position: 'right',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Unique Active Users',
+                                color: '#555'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            ticks: {
+                                color: '#666',
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

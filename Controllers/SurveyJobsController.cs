@@ -269,6 +269,71 @@ namespace Survery_Certification_App_Consume.Controllers
                 return RedirectToAction("SurveyAreas", new { jobId });
             }
         }
+        [HttpGet]
+        public async Task<IActionResult> GetIhmMarkers(int jobId)
+        {
+            try
+            {
+                var client = CreateApiClient();
+                var markers = await GetAsync<List<IhmImageMarkerDto>>(
+                    client,
+                    $"ihm-survey/jobs/{jobId}/markers"
+                ) ?? new List<IhmImageMarkerDto>();
+
+                return Json(markers);
+            }
+            catch (Exception ex)
+            {
+                Response.StatusCode = 500;
+                return Json(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveIhmMarker([FromBody] SaveIhmMarkerRequest request)
+        {
+            try
+            {
+                var client = CreateApiClient();
+                var userId = HttpContext.Session.GetInt32("UserId") ?? 0;
+
+                var payload = new
+                {
+                    surveyJobId = request.SurveyJobId,
+                    ihmAreaId = request.IhmAreaId,
+                    ihmCheckpointId = request.IhmCheckpointId,
+                    imagePath = request.ImagePath,
+                    xPercent = request.XPercent,
+                    yPercent = request.YPercent,
+                    notes = request.Notes,
+                    createdByUserId = userId
+                };
+
+                var response = await client.PostAsync(
+                    "ihm-survey/markers",
+                    new StringContent(
+                        JsonConvert.SerializeObject(payload),
+                        Encoding.UTF8,
+                        "application/json"
+                    )
+                );
+
+                var body = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Response.StatusCode = (int)response.StatusCode;
+                    return Content(body, "application/json");
+                }
+
+                return Content(body, "application/json");
+            }
+            catch (Exception ex)
+            {
+                Response.StatusCode = 500;
+                return Json(new { message = ex.Message });
+            }
+        }
         public async Task<IActionResult> CheckpointDetail(int jobId, int areaId, int checkpointId)
         {
             try
@@ -286,7 +351,16 @@ namespace Survery_Certification_App_Consume.Controllers
                     TempData["ErrorMessage"] = "Survey area not found.";
                     return RedirectToAction("SurveyAreas", new { jobId });
                 }
+                var attachments = await GetAsync<List<IhmLayoutAttachmentDto>>(
+                    client,
+                    $"ihm-survey/jobs/{jobId}/layout-attachments"
+                ) ?? new List<IhmLayoutAttachmentDto>();
 
+                var areaLayout = attachments.FirstOrDefault(x =>
+                    string.Equals(x.Target, areaId.ToString(), StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(x.Target, area.AreaName, StringComparison.OrdinalIgnoreCase));
+
+                area.LayoutFilePath = areaLayout?.FilePath;
                 var checkpoint = area.Checkpoints.FirstOrDefault(x => x.Id == checkpointId);
                 if (checkpoint == null)
                 {

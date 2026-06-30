@@ -11,7 +11,29 @@
         public Dictionary<int, Dictionary<string, IhmLayoutAttachmentDto>> LayoutAttachmentsByJob { get; set; } = new();
         public string? ErrorMessage { get; set; }
     }
+    public class IhmImageMarkerDto
+    {
+        public int Id { get; set; }
+        public int SurveyJobId { get; set; }
+        public int? IhmAreaId { get; set; }
+        public int? IhmCheckpointId { get; set; }
+        public string ImagePath { get; set; } = "";
+        public decimal XPercent { get; set; }
+        public decimal YPercent { get; set; }
+        public string? MarkerLabel { get; set; }
+        public string? Notes { get; set; }
+    }
 
+    public class SaveIhmMarkerRequest
+    {
+        public int SurveyJobId { get; set; }
+        public int? IhmAreaId { get; set; }
+        public int? IhmCheckpointId { get; set; }
+        public string ImagePath { get; set; } = "";
+        public decimal XPercent { get; set; }
+        public decimal YPercent { get; set; }
+        public string? Notes { get; set; }
+    }
     public class IhmLayoutAttachmentDto
     {
         public string Target { get; set; } = "";
@@ -23,6 +45,7 @@
     {
         public int Id { get; set; }
         public string AreaName { get; set; } = "";
+        public string? LayoutFilePath { get; set; }
         public List<IhmCheckpointOptionDto> Checkpoints { get; set; } = new();
         public string LocationSummary => string.Join(", ", Checkpoints
             .Select(x => x.Location).Where(x => !string.IsNullOrWhiteSpace(x))

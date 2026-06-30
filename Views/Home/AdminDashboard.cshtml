@@ -9,7 +9,9 @@
     var displayName = Context.Session.GetString("UserEmail") ?? "Administrator";
     string Initial(string? value) => string.IsNullOrWhiteSpace(value) ? "?" : value.Trim()[..1].ToUpperInvariant();
     var today = DateTime.Now;
-}
+    var userRole = Context.Session.GetString("UserRole") ?? "";
+    var isAdmin = string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase);
+}   
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -36,10 +38,15 @@
                 <a class="active" href="#overview"><i class="fa-solid fa-table-columns"></i><span>Overview</span></a>
                 <a href="#approvals"><i class="fa-solid fa-user-check"></i><span>Approvals</span><b>@pendingCount</b></a>
                 <a href="@Url.Action("Index", "UserManager")"><i class="fa-solid fa-users"></i><span>Users</span></a>
+                @if (isAdmin)
+                {
+                    <a href="@Url.Action("UsageAnalytics", "Home")"><i class="fa-solid fa-chart-line"></i> Usage analytics</a>
+                }
                 <a href="@Url.Action("Ihm", "SurveyJobs")"><i class="fa-solid fa-flask-vial"></i><span>IHM Surveys</span></a>
                 <a href="@Url.Action("Ex", "SurveyJobs")"><i class="fa-solid fa-shield-halved"></i><span>Ex Surveys</span></a>
                 <a href="@Url.Action("Index", "Vessel")"><i class="fa-solid fa-ship"></i><span>Vessels</span></a>
                 <a href="@Url.Action("Index", "TaskManager")"><i class="fa-solid fa-list-check"></i><span>Tasks</span></a>
+                
             </nav>
 
             <section class="saved-reports-side saved-reports-preview" id="savedReports">
