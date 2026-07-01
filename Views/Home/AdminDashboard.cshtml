@@ -36,7 +36,10 @@
 
             <nav class="side-nav" aria-label="Admin navigation">
                 <a class="active" href="#overview"><i class="fa-solid fa-table-columns"></i><span>Overview</span></a>
-                <a href="#approvals"><i class="fa-solid fa-user-check"></i><span>Approvals</span><b>@pendingCount</b></a>
+                @if (isAdmin)
+                {
+                    <a href="#approvals"><i class="fa-solid fa-user-check"></i><span>Approvals</span><b>@pendingCount</b></a>
+                }
                 <a href="@Url.Action("Index", "UserManager")"><i class="fa-solid fa-users"></i><span>Users</span></a>
                 @if (isAdmin)
                 {
@@ -88,7 +91,7 @@
                 </a>
                 <div class="admin-profile">
                     <span class="avatar">@Initial(displayName)</span>
-                    <span><strong>Administrator</strong><small>@displayName</small></span>
+                    <span><strong>@(isAdmin ? "Administrator" : "Manager")</strong><small>@displayName</small></span>
                 </div>
             </header>
 
@@ -105,7 +108,7 @@
                 <section class="hero-row" id="overview">
                     <article class="hero-banner">
                         <span class="hero-date"><i class="fa-regular fa-calendar"></i>@today.ToString("dddd, MMMM d")</span>
-                        <h1>Welcome back, Admin</h1>
+                        <h1>Welcome back, @(isAdmin ? "Admin" : "Manager")</h1>
                         <p>
                             @surveys.TotalSurveyJobs surveys in progress, @counts.TotalCertificates certificate@(counts.TotalCertificates == 1 ? "" : "s") on record, and the fleet is sailing smoothly today.
                         </p>

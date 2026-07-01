@@ -1,17 +1,48 @@
-﻿@model Survery_Certification_App_Consume.Models.IhmCheckpointOptionDto
+@model Survery_Certification_App_Consume.Models.IhmCheckpointOptionDto
 @{
     Layout = null;
 
     var jobId = (int)(ViewBag.JobId ?? 0);
     var areaId = (int)(ViewBag.AreaId ?? 0);
     var areaName = ViewBag.AreaName?.ToString() ?? "Area";
+    var layouts = ViewBag.Layouts as List<Survery_Certification_App_Consume.Models.IhmLayoutAttachmentDto>
+        ?? new List<Survery_Certification_App_Consume.Models.IhmLayoutAttachmentDto>();
+    var layoutOptionsJson = Newtonsoft.Json.JsonConvert.SerializeObject(layouts.Select(layout => new
+    {
+        target = layout.Target,
+        originalFileName = layout.OriginalFileName,
+        filePath = layout.FilePath,
+        isCommon = string.Equals(layout.Target, "common", StringComparison.OrdinalIgnoreCase)
+    }));
+    var checkpointLabels = ViewBag.CheckpointLabels as Dictionary<int, string>
+        ?? new Dictionary<int, string>();
+    var checkpointLabelsJson = Newtonsoft.Json.JsonConvert.SerializeObject(checkpointLabels);
+    var apiRoot = ViewBag.ApiRoot?.ToString() ?? "";
 
     string Val(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+    string Raw(string? value) => value?.Trim() ?? "";
+    string NormalizeResult(string? value)
+    {
+        var clean = (value ?? "").Trim().ToLowerInvariant().Replace(" ", "").Replace("_", "").Replace("-", "");
+        return clean switch
+        {
+            "present" or "2" => "Present",
+            "notpresent" or "3" => "NotPresent",
+            "notapplicable" or "4" => "NotApplicable",
+            "samplerequired" or "5" => "SampleRequired",
+            _ => "Pending"
+        };
+    }
 
-    var result = Val(Model.Result ?? Model.CheckResult);
-    var auditResult = Model.IsAudited ? "Audited" : "Pending";
-    var pchmStatus = Model.IsAudited ? "Completed" : "Pending";
-    var objectToCheck = $"{Val(Model.EquipmentName)} - {Val(Model.Component)}";
+    var sampleLabel = Val(Model.SampleNo ?? Model.Location);
+    var auditResult = NormalizeResult(Model.Result ?? Model.CheckResult);
+    var auditComplete = auditResult != "Pending";
+    var auditStatusText = auditComplete ? "Saved and completed" : "Pending";
+    var layoutPath = layouts.FirstOrDefault(x =>
+        string.Equals(x.Target, areaId.ToString(), StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(x.Target, areaName, StringComparison.OrdinalIgnoreCase))?.FilePath
+        ?? layouts.FirstOrDefault(x => string.Equals(x.Target, "common", StringComparison.OrdinalIgnoreCase))?.FilePath
+        ?? "";
 }
 
 <!DOCTYPE html>
@@ -20,35 +51,28 @@
     <meta charset="utf-8" />
     <title>Audit Check Point</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-
     <style>
-        * {
-            box-sizing: border-box;
-        }
-
+        * { box-sizing: border-box; }
         body {
             margin: 0;
-            background: #eef4fb;
+            background: #f4f7fb;
             color: #102033;
             font-family: "Segoe UI", Arial, sans-serif;
         }
-
         .appbar {
             min-height: 64px;
-            background: #ffffff;
-            border-bottom: 1px solid #d8e3ee;
             display: flex;
             align-items: center;
             gap: 14px;
-            padding: 10px 18px;
+            padding: 10px 20px;
+            background: #ffffff;
+            border-bottom: 1px solid #d8e3ee;
             position: sticky;
             top: 0;
-            z-index: 30;
+            z-index: 50;
         }
-
         .back-btn {
             width: 38px;
             height: 38px;
@@ -58,33 +82,21 @@
             text-decoration: none;
             border-radius: 10px;
         }
-
-        .title {
-            margin: 0;
-            font-size: 16px;
-            font-weight: 900;
-        }
-
-        .sub {
-            margin: 2px 0 0;
-            color: #607d9a;
-            font-size: 12px;
-        }
-
+        .title { margin: 0; font-size: 15px; font-weight: 800; }
+        .sub { margin: 2px 0 0; color: #607d9a; font-size: 11px; }
         .save-btn {
             margin-left: auto;
             border: 0;
-            border-radius: 10px;
-            background: #20c997;
-            color: #ffffff;
+            border-radius: 8px;
+            background: #4caf8c;
+            color: #0d1b2a;
             font-size: 12px;
             font-weight: 900;
-            padding: 9px 14px;
+            padding: 9px 16px;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 7px;
         }
-
         .tabs {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -92,484 +104,847 @@
             border-bottom: 1px solid #d8e3ee;
             position: sticky;
             top: 64px;
-            z-index: 25;
+            z-index: 45;
         }
-
         .tab {
+            border: 0;
+            background: transparent;
             color: #607d9a;
             text-align: center;
-            padding: 12px 6px 10px;
+            padding: 10px 6px 9px;
             font-size: 11px;
-            font-weight: 900;
+            font-weight: 800;
             letter-spacing: .8px;
-            text-decoration: none;
             border-bottom: 3px solid transparent;
         }
-
-            .tab.active {
-                color: #00c9a7;
-                border-bottom-color: #00c9a7;
-            }
-
-            .tab i {
-                display: block;
-                font-size: 15px;
-                margin-bottom: 4px;
-            }
-
-        .page {
-            width: 100%;
-            padding: 18px;
-        }
-
-        .section-title {
-            margin: 18px 0 10px;
-            color: #506c88;
-            font-size: 13px;
+        .tab.active { color: #00d4aa; border-bottom-color: #00d4aa; }
+        .tab i { display: block; font-size: 16px; margin-bottom: 4px; }
+        .page { padding: 20px; max-width: 1180px; margin: 0 auto; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+        .section-label {
+            margin: 0 0 12px;
+            color: #607d9a;
+            font-size: 11px;
             font-weight: 900;
-            letter-spacing: 1.6px;
+            letter-spacing: 1.5px;
             text-transform: uppercase;
         }
-
-        .white-card {
+        .card-box {
             background: #ffffff;
-            border: 1px solid #d6e3f1;
+            border: 1px solid #d8e3ee;
             border-radius: 14px;
-            padding: 16px;
-            margin-bottom: 12px;
+            padding: 14px;
+            margin-bottom: 18px;
         }
-
-        .info-grid {
+        .info-row {
             display: grid;
-            grid-template-columns: 130px 1fr;
-            gap: 12px 24px;
-            max-width: 720px;
+            grid-template-columns: 150px 1fr;
+            gap: 12px;
+            padding-bottom: 10px;
+            align-items: start;
         }
-
+        .info-row:last-child { padding-bottom: 0; }
         .info-label {
-            color: #506c88;
+            color: #607d9a;
             font-size: 12px;
-            font-weight: 800;
             display: flex;
             align-items: center;
             gap: 10px;
         }
-
-            .info-label i {
-                width: 16px;
-                text-align: center;
-            }
-
+        .info-label i { width: 16px; }
         .info-value {
             color: #102033;
             font-size: 12px;
-            font-weight: 900;
+            font-weight: 700;
+            overflow-wrap: anywhere;
         }
-
-        .hazmat-value {
-            color: #ff4545;
-        }
-
-        .status-banner {
-            background: #dfe6f0;
-            border: 1px solid #b7c7d9;
-            border-radius: 14px;
-            padding: 14px 16px;
+        .hazmat { color: #ff5252; }
+        .audit-chip {
             display: flex;
             align-items: center;
-            gap: 12px;
-            min-height: 56px;
-        }
-
-        .status-icon {
-            color: #506c88;
-            font-size: 20px;
-        }
-
-        .status-main {
-            font-size: 14px;
-            font-weight: 900;
-            color: #102033;
-            line-height: 1.2;
-        }
-
-        .status-sub {
-            color: #506c88;
-            font-size: 12px;
-            font-weight: 700;
-            margin-top: 2px;
-        }
-
-        .form-card {
-            background: #ffffff;
-            border: 1px solid #d6e3f1;
+            gap: 10px;
+            padding: 12px 14px;
             border-radius: 14px;
-            padding: 14px 16px;
+            border: 1px solid rgba(76, 175, 140, .35);
+            background: rgba(76, 175, 140, .12);
             margin-bottom: 12px;
         }
-
+        .audit-chip.pending {
+            border-color: rgba(143, 168, 196, .35);
+            background: rgba(143, 168, 196, .12);
+        }
+        .audit-chip strong { display: block; font-size: 13px; }
+        .audit-chip small { color: #607d9a; font-size: 11px; }
+        .field {
+            width: 100%;
+            border: 1px solid #d8e3ee;
+            background: #eef4fb;
+            color: #102033;
+            border-radius: 12px;
+            padding: 10px 12px;
+            font-size: 13px;
+            font-weight: 650;
+        }
+        textarea.field { min-height: 96px; resize: vertical; line-height: 1.5; }
         .field-row {
             display: grid;
-            grid-template-columns: 150px 1fr;
+            grid-template-columns: 170px 1fr;
             gap: 12px;
             align-items: center;
             margin-bottom: 12px;
         }
-
-            .field-row:last-child {
-                margin-bottom: 0;
-            }
-
-        .field-label {
-            color: #506c88;
-            font-size: 12px;
-            font-weight: 800;
-            display: flex;
-            align-items: center;
-            gap: 9px;
-        }
-
-            .field-label i {
-                width: 16px;
-                text-align: center;
-            }
-
-        .field-value {
-            color: #102033;
-            font-size: 12px;
-            font-weight: 900;
-        }
-
-        .select-like {
-            width: 100%;
-            border: 0;
-            outline: 0;
-            background: transparent;
-            color: #102033;
-            font-size: 16px;
-            padding: 0;
-            appearance: none;
-        }
-
-        .select-wrap {
-            position: relative;
-        }
-
-            .select-wrap::after {
-                content: "\f0d7";
-                font-family: "Font Awesome 6 Free";
-                font-weight: 900;
-                position: absolute;
-                right: 4px;
-                top: 50%;
-                transform: translateY(-50%);
-                color: #555;
-                pointer-events: none;
-            }
-
         .switch-row {
-            background: #ffffff;
-            border: 1px solid #d6e3f1;
-            border-radius: 14px;
-            padding: 16px;
-            margin-bottom: 12px;
             display: flex;
             align-items: center;
             gap: 14px;
         }
-
-        .flag-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: 9px;
-            background: #edf3f8;
-            display: grid;
-            place-items: center;
-            color: #506c88;
-            flex: 0 0 auto;
-        }
-
-        .switch-text {
-            flex: 1;
-        }
-
-        .switch-title {
-            font-size: 13px;
-            font-weight: 900;
-            color: #102033;
-        }
-
-        .switch-sub {
-            font-size: 12px;
-            color: #506c88;
-            margin-top: 2px;
-        }
-
-        .switch {
-            position: relative;
-            width: 50px;
-            height: 28px;
-            flex: 0 0 auto;
-        }
-
-            .switch input {
-                display: none;
-            }
-
+        .switch-row .copy { flex: 1; }
+        .switch-title { font-size: 13px; font-weight: 900; }
+        .switch-sub { color: #607d9a; font-size: 12px; }
+        .switch { position: relative; width: 50px; height: 28px; flex: 0 0 auto; }
+        .switch input { display: none; }
         .slider {
             position: absolute;
             inset: 0;
-            background: #d7e0ea;
-            border: 2px solid #8193a8;
+            background: #e1e9f2;
+            border: 1px solid #aab9ca;
             border-radius: 999px;
             cursor: pointer;
         }
-
-            .slider::before {
-                content: "";
-                position: absolute;
-                width: 18px;
-                height: 18px;
-                left: 4px;
-                top: 3px;
-                background: #506c88;
-                border-radius: 50%;
-                transition: .2s;
-            }
-
-        .switch input:checked + .slider {
-            background: #dff7f2;
-            border-color: #20c997;
+        .slider:before {
+            content: "";
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            left: 4px;
+            top: 3px;
+            background: #607d9a;
+            border-radius: 50%;
+            transition: .2s;
         }
-
-            .switch input:checked + .slider::before {
-                transform: translateX(20px);
-                background: #20c997;
-            }
-
-        .remarks-card {
-            background: #ffffff;
-            border: 1px solid #d6e3f1;
+        .switch input:checked + .slider { background: rgba(0, 212, 170, .22); border-color: #00d4aa; }
+        .switch input:checked + .slider:before { transform: translateX(20px); background: #00d4aa; }
+        .layout-shell {
+            min-height: calc(100vh - 170px);
+            position: relative;
+            border: 1px solid #d8e3ee;
             border-radius: 14px;
-            padding: 0;
-            margin-bottom: 12px;
             overflow: hidden;
+            background: #ffffff;
         }
-
-        .textarea-label {
-            color: #506c88;
+        .layout-toolbar {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            z-index: 4;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .layout-toolbar select {
+            flex: 1;
+            min-width: 0;
+            background: rgba(255, 255, 255, .96);
+            color: #102033;
+            border: 1px solid #d8e3ee;
+            border-radius: 12px;
+            padding: 10px 12px;
             font-size: 12px;
             font-weight: 800;
-            padding: 10px 14px 0;
         }
-
-        .textarea-box {
-            display: grid;
-            grid-template-columns: 24px 1fr;
-            gap: 10px;
-            padding: 10px 14px 16px;
-            min-height: 100px;
-            align-items: start;
-        }
-
-            .textarea-box i {
-                margin-top: 12px;
-                color: #506c88;
-                font-size: 14px;
-            }
-
-        .remarks-text {
-            width: 100%;
-            min-height: 80px;
-            border: 0;
-            outline: none;
-            resize: vertical;
-            background: transparent;
-            font-size: 13px;
-            line-height: 1.6;
+        .layout-action {
+            border: 1px solid #d8e3ee;
+            background: rgba(255, 255, 255, .96);
             color: #102033;
-            font-weight: 600;
-            padding: 0;
+            border-radius: 12px;
+            padding: 10px 12px;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
         }
-
-            .remarks-text::placeholder {
-                color: #8ba0b7;
-            }
-
-        .location-remarks {
+        #markerSaveBtn { display: none; }
+        .layout-stage {
+            min-height: calc(100vh - 170px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            padding: 64px 12px 54px;
+            cursor: zoom-in;
+            touch-action: manipulation;
+            user-select: none;
+        }
+        .image-wrap {
+            position: relative;
+            display: inline-block;
+            max-width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #d8e3ee;
+            background: #f4f7fb;
+            transform-origin: 0 0;
+            will-change: transform;
+        }
+        .layout-image { display: block; max-width: 100%; height: auto; }
+        #markerPins { position: absolute; inset: 0; pointer-events: none; }
+        .marker-pin {
+            position: absolute;
+            width: 0;
+            height: 0;
+            color: #ff5252;
+            --pin-color: #ff5252;
+            text-align: center;
+            pointer-events: auto;
+        }
+        .pin-content {
+            position: absolute;
+            left: calc(-36px * var(--pin-scale, 1));
+            top: calc(18px * var(--pin-scale, 1));
+            width: 72px;
+            height: 64px;
+            transform: scale(var(--pin-scale, 1));
+            transform-origin: 50% 0;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,.35));
+        }
+        .marker-pin.active { color: #1e90ff; --pin-color: #1e90ff; }
+        .pin-label {
             display: block;
+            min-width: 34px;
+            max-width: 74px;
+            margin: 0 auto -3px;
+            padding: 4px 7px;
+            border: 2px solid #fff;
+            border-radius: 999px;
+            background: var(--pin-color);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 900;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
-
-        @@media(max-width: 768px) {
-            .page {
-                padding: 14px;
-            }
-
-            .info-grid,
-            .field-row {
-                grid-template-columns: 1fr;
-                gap: 5px;
-            }
-
-            .save-btn span {
-                display: none;
-            }
+        .marker-pin i { font-size: 32px; line-height: 32px; }
+        .layout-hint {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 16px;
+            text-align: center;
+            z-index: 4;
+        }
+        .layout-hint span {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .94);
+            border: 1px solid #d8e3ee;
+            color: #607d9a;
+            font-size: 11px;
+            font-weight: 800;
+        }
+        .empty-state {
+            color: #607d9a;
+            text-align: center;
+            padding: 50px 16px;
+            font-weight: 750;
+        }
+        .upload-bar { padding: 16px; }
+        .upload-btn {
+            width: 100%;
+            height: 46px;
+            border: 0;
+            border-radius: 12px;
+            background: #00d4aa;
+            color: #0d1b2a;
+            font-weight: 900;
+        }
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            padding: 0 16px 16px;
+        }
+        .photo-card {
+            position: relative;
+            aspect-ratio: 1 / .9;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #eef4fb;
+            border: 1px solid #d8e3ee;
+        }
+        .photo-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .photo-card.image-error::after {
+            content: "Image not available";
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            color: #607d9a;
+            font-size: 12px;
+            font-weight: 800;
+            background: #eef4fb;
+        }
+        .delete-photo {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 34px;
+            height: 34px;
+            border: 0;
+            border-radius: 50%;
+            background: rgba(0,0,0,.58);
+            color: #fff;
+        }
+        .alert-line {
+            margin-bottom: 14px;
+            border-radius: 12px;
+            padding: 10px 12px;
+            font-weight: 800;
+        }
+        .alert-line.success { background: rgba(76,175,140,.16); color: #7be0bd; border: 1px solid rgba(76,175,140,.35); }
+        .alert-line.error { background: rgba(255,82,82,.14); color: #ff9c9c; border: 1px solid rgba(255,82,82,.35); }
+        @@media(max-width: 760px) {
+            .page { padding: 16px; }
+            .info-row, .field-row { grid-template-columns: 1fr; gap: 6px; }
+            .photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .save-btn span { display: none; }
+            .layout-toolbar { flex-direction: column; align-items: stretch; }
+            .layout-stage { padding-top: 112px; }
         }
     </style>
 </head>
-
 <body>
     <header class="appbar">
         <a class="back-btn" href="/SurveyJobs/AreaCheckpoints?jobId=@jobId&areaId=@areaId">
             <i class="fa-solid fa-chevron-left"></i>
         </a>
-
         <div>
             <h1 class="title">Audit Check Point</h1>
-            <p class="sub">@Val(Model.SampleNo ?? Model.Location)</p>
+            <p class="sub">@sampleLabel</p>
         </div>
-
         <button class="save-btn" type="submit" form="auditForm">
             <i class="fa-solid fa-floppy-disk"></i>
             <span>Save</span>
         </button>
     </header>
 
-    <nav class="tabs">
-        <a class="tab active" href="#details">
-            <i class="fa-regular fa-file-lines"></i>
-            DETAILS
-        </a>
-        <a class="tab" href="#area">
-            <i class="fa-solid fa-location-dot"></i>
-            AREA
-        </a>
-        <a class="tab" href="#images">
-            <i class="fa-regular fa-image"></i>
-            IMAGES
-        </a>
+    <nav class="tabs" aria-label="Checkpoint tabs">
+        <button class="tab active" type="button" data-tab="details"><i class="fa-regular fa-file-lines"></i>DETAILS</button>
+        <button class="tab" type="button" data-tab="area"><i class="fa-solid fa-location-dot"></i>AREA</button>
+        <button class="tab" type="button" data-tab="images"><i class="fa-solid fa-camera"></i>IMAGES</button>
     </nav>
 
     <main class="page">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert-line success">@TempData["SuccessMessage"]</div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert-line error">@TempData["ErrorMessage"]</div>
+        }
+
         <form id="auditForm" method="post" action="/SurveyJobs/SaveCheckpointAudit">
             @Html.AntiForgeryToken()
-
             <input type="hidden" name="JobId" value="@jobId" />
             <input type="hidden" name="AreaId" value="@areaId" />
             <input type="hidden" name="CheckpointId" value="@Model.Id" />
+            <input type="hidden" name="SampleNo" value="@Raw(Model.SampleNo)" />
+            <input type="hidden" name="Description" value="@Raw(Model.Description)" />
+            <input type="hidden" name="TableType" value="@Raw(Model.TableType)" />
+            <input type="hidden" name="Location" value="@Raw(Model.Location)" />
+            <input type="hidden" name="EquipmentName" value="@Raw(Model.EquipmentName)" />
+            <input type="hidden" name="Component" value="@Raw(Model.Component)" />
+            <input type="hidden" name="MaterialCategory" value="@Raw(Model.MaterialCategory)" />
+            <input type="hidden" name="HazardousMaterial" value="@Raw(Model.HazardousMaterial)" />
+            <input type="hidden" name="QuantityUnitKg" value="@Model.QuantityUnitKg" />
+            <input type="hidden" name="QuantityNo" value="@Model.QuantityNo" />
+            <input type="hidden" name="QuantityTotalKg" value="@Model.QuantityTotalKg" />
+            <input type="hidden" name="ManufacturerBrandName" value="@Raw(Model.ManufacturerBrandName)" />
+            <input type="hidden" name="DocumentAnalysisResult" value="@Raw(Model.DocumentAnalysisResult)" />
+            <input type="hidden" name="SamplingCheck" value="@Raw(Model.SamplingCheck)" />
+            <input type="hidden" name="VisualCheck" value="@Raw(Model.VisualCheck)" />
+            <input type="hidden" name="CheckResult" value="@Raw(Model.CheckResult)" />
 
-            <section id="details">
-                <h3 class="section-title">Checkpoint Info</h3>
-
-                <div class="white-card">
-                    <div class="info-grid">
-                        <div class="info-label"><i class="fa-solid fa-location-dot"></i> Area</div>
-                        <div class="info-value">@areaName</div>
-
-                        <div class="info-label"><i class="fa-solid fa-location-dot"></i> Location</div>
-                        <div class="info-value">@Val(Model.Location)</div>
-
-                        <div class="info-label"><i class="fa-solid fa-gear"></i> Equipment</div>
-                        <div class="info-value">@Val(Model.EquipmentName)</div>
-
-                        <div class="info-label"><i class="fa-solid fa-shapes"></i> Component</div>
-                        <div class="info-value">@Val(Model.Component)</div>
-
-                        <div class="info-label"><i class="fa-solid fa-magnifying-glass"></i> Object To Check</div>
-                        <div class="info-value">@objectToCheck</div>
-
-                        <div class="info-label"><i class="fa-solid fa-triangle-exclamation"></i> Hazmat</div>
-                        <div class="info-value hazmat-value">@Val(Model.HazardousMaterial)</div>
-                    </div>
+            <section id="detailsPanel" class="tab-panel active">
+                <h3 class="section-label">Checkpoint Info</h3>
+                <div class="card-box">
+                    <div class="info-row"><div class="info-label"><i class="fa-solid fa-location-dot"></i>Area</div><div class="info-value">@areaName</div></div>
+                    <div class="info-row"><div class="info-label"><i class="fa-solid fa-map-pin"></i>Location</div><div class="info-value">@Val(Model.Location)</div></div>
+                    <div class="info-row"><div class="info-label"><i class="fa-solid fa-gear"></i>Equipment</div><div class="info-value">@Val(Model.EquipmentName)</div></div>
+                    <div class="info-row"><div class="info-label"><i class="fa-solid fa-shapes"></i>Component</div><div class="info-value">@Val(Model.Component)</div></div>
+                    <div class="info-row"><div class="info-label"><i class="fa-solid fa-magnifying-glass"></i>Object To Check</div><div class="info-value">@Val(Model.Description)</div></div>
+                    <div class="info-row"><div class="info-label"><i class="fa-solid fa-triangle-exclamation"></i>Hazmat</div><div class="info-value hazmat">@Val(Model.HazardousMaterial)</div></div>
                 </div>
 
-                <h3 class="section-title">Audit Results</h3>
-
-                <div class="status-banner">
-                    <i class="fa-solid fa-clipboard-check status-icon"></i>
+                <h3 class="section-label">Audit Results</h3>
+                <div class="audit-chip @(auditComplete ? "" : "pending")">
+                    <i class="fa-solid @(auditComplete ? "fa-circle-check" : "fa-clock")"></i>
                     <div>
-                        <div class="status-main">@pchmStatus</div>
-                        <div class="status-sub">@auditResult</div>
+                        <strong id="auditResultLabel">@auditResult.Replace("Not", "Not ").Replace("SampleRequired", "Sample Required")</strong>
+                        <small>@auditStatusText</small>
                     </div>
                 </div>
 
-                <div class="form-card">
+                <div class="card-box">
+                    <div class="info-row"><div class="info-label"><i class="fa-regular fa-file-lines"></i>Document Analysis</div><div class="info-value">@Val(Model.DocumentAnalysisResult)</div></div>
+                    <div class="info-row"><div class="info-label"><i class="fa-regular fa-square-check"></i>Result of Check</div><div class="info-value">@Val(Model.CheckResult)</div></div>
                     <div class="field-row">
-                        <div class="field-label">
-                            <i class="fa-regular fa-rectangle-list"></i>
-                            Document Analysis
-                        </div>
-                        <div class="field-value">Unknown</div>
-                    </div>
-
-                    <div class="field-row">
-                        <div class="field-label">
-                            <i class="fa-regular fa-square-check"></i>
-                            Result of Check
-                        </div>
-                        <div class="field-value">@result</div>
-                    </div>
-                </div>
-
-                <div class="form-card">
-                    <label class="textarea-label">Audit Result</label>
-                    <div class="select-wrap">
-                        <select name="AuditResult" class="select-like">
-                            <option value="Pending" selected="@(auditResult == "Pending")">Pending</option>
-                            <option value="Audited" selected="@(auditResult == "Audited")">Audited</option>
+                        <div class="info-label"><i class="fa-solid fa-clipboard-check"></i>Audit Result</div>
+                        <select class="field" name="AuditResult" id="auditResult">
+                            @if (auditResult == "Pending")
+                            {
+                                <option value="Pending" selected>Pending</option>
+                            }
+                            else
+                            {
+                                <option value="Pending">Pending</option>
+                            }
+                            @if (auditResult == "Present")
+                            {
+                                <option value="Present" selected>Present</option>
+                            }
+                            else
+                            {
+                                <option value="Present">Present</option>
+                            }
+                            @if (auditResult == "NotPresent")
+                            {
+                                <option value="NotPresent" selected>Not Present</option>
+                            }
+                            else
+                            {
+                                <option value="NotPresent">Not Present</option>
+                            }
+                            @if (auditResult == "NotApplicable")
+                            {
+                                <option value="NotApplicable" selected>Not Applicable</option>
+                            }
+                            else
+                            {
+                                <option value="NotApplicable">Not Applicable</option>
+                            }
+                            @if (auditResult == "SampleRequired")
+                            {
+                                <option value="SampleRequired" selected>Sample Required</option>
+                            }
+                            else
+                            {
+                                <option value="SampleRequired">Sample Required</option>
+                            }
                         </select>
                     </div>
                 </div>
 
-                <h3 class="section-title">Flags & Remarks</h3>
-
-                <div class="switch-row">
-                    <div class="flag-icon">
-                        <i class="fa-solid fa-flag"></i>
-                    </div>
-
-                    <div class="switch-text">
+                <h3 class="section-label">Flags & Remarks</h3>
+                <div class="card-box switch-row">
+                    <span class="info-label"><i class="fa-solid fa-flag"></i></span>
+                    <div class="copy">
                         <div class="switch-title">Mark as PCHM</div>
                         <div class="switch-sub">Potential Concentration of Hazardous Material</div>
                     </div>
-
                     <label class="switch">
-                        <input type="checkbox" name="IsPchm" />
+                        @if (Model.IsPchm)
+                        {
+                            <input type="checkbox" name="IsPchm" value="true" checked />
+                        }
+                        else
+                        {
+                            <input type="checkbox" name="IsPchm" value="true" />
+                        }
                         <span class="slider"></span>
                     </label>
                 </div>
 
-                <div class="remarks-card">
-                    <div class="textarea-label">Remarks</div>
-                    <div class="textarea-box">
-                        <i class="fa-solid fa-list-check"></i>
-                        <textarea name="Remarks" class="remarks-text">Machinery Arrangement Plan & Onboard Visit</textarea>
-                    </div>
+                <div class="card-box">
+                    <label class="section-label" for="remarks">Remarks</label>
+                    <textarea id="remarks" name="Remarks" class="field" placeholder="Enter remarks...">@Raw(Model.Remarks)</textarea>
                 </div>
-
-                <div class="remarks-card">
-
-                    <div class="textarea-label">
-                        Location Remarks (if any)
-                    </div>
-
-                    <div class="textarea-box">
-
-                        <i class="fa-solid fa-location-crosshairs"></i>
-
-                        <textarea name="LocationRemarks"
-                                  class="remarks-text"
-                                  rows="4"
-                                  placeholder="Enter location remarks here...">@Model.LocationRemarks</textarea>
-
-                    </div>
-
+                <div class="card-box">
+                    <label class="section-label" for="locationRemarks">Location Remarks</label>
+                    <textarea id="locationRemarks" name="LocationRemarks" class="field" placeholder="Enter location remarks here...">@Raw(Model.LocationRemarks)</textarea>
                 </div>
             </section>
-
-
-            
         </form>
+
+        <section id="areaPanel" class="tab-panel">
+            <div class="layout-shell">
+                <div class="layout-toolbar">
+                    <select id="layoutSelect" aria-label="Layout image"></select>
+                    <button id="markerSaveBtn" class="layout-action" type="button" onclick="saveMarker()" disabled>
+                        <i class="fa-solid fa-floppy-disk"></i> Save Marker
+                    </button>
+                </div>
+                <div class="layout-stage">
+                    @if (string.IsNullOrWhiteSpace(layoutPath))
+                    {
+                        <div class="empty-state">Layout image not uploaded for this area.</div>
+                    }
+                    else
+                    {
+                        <div id="imageWrap" class="image-wrap">
+                            <img id="layoutImage" class="layout-image" src="" alt="Layout" />
+                            <div id="markerPins"></div>
+                        </div>
+                    }
+                </div>
+                <div class="layout-hint">
+                    <span id="markerHint"><i class="fa-solid fa-hand-pointer"></i>Tap to add or update marker</span>
+                </div>
+            </div>
+        </section>
+
+        <section id="imagesPanel" class="tab-panel">
+            <div class="card-box">
+                <div class="upload-bar">
+                    <input id="photoInput" type="file" accept="image/*" multiple hidden />
+                    <button id="uploadBtn" class="upload-btn" type="button" onclick="document.getElementById('photoInput').click()">
+                        <i class="fa-solid fa-camera"></i> Add Checkpoint Images
+                    </button>
+                </div>
+                <div id="photoGrid" class="photo-grid"></div>
+                <div id="photoEmpty" class="empty-state">No checkpoint images uploaded yet</div>
+            </div>
+        </section>
     </main>
+
+    <script>
+        const checkpointContext = {
+            jobId: @jobId,
+            areaId: @areaId,
+            checkpointId: @Model.Id,
+            sampleNo: @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(sampleLabel)),
+            initialLayoutPath: @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(layoutPath))
+        };
+        const layoutOptions = @Html.Raw(layoutOptionsJson);
+        const checkpointLabels = @Html.Raw(checkpointLabelsJson);
+        const apiRoot = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(apiRoot));
+        let currentImagePath = checkpointContext.initialLayoutPath || (layoutOptions[0]?.filePath ?? "");
+        let loadedMarkers = [];
+        let selectedPoint = null;
+        const mapView = {
+            scale: 1,
+            x: 0,
+            y: 0
+        };
+
+        document.querySelectorAll(".tab").forEach(button => {
+            button.addEventListener("click", () => activateTab(button.dataset.tab));
+        });
+
+        function activateTab(name) {
+            document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x.dataset.tab === name));
+            document.querySelectorAll(".tab-panel").forEach(x => x.classList.toggle("active", x.id === `${name}Panel`));
+            if (name === "area") initializeAreaTab();
+            if (name === "images") loadPhotos();
+        }
+
+        function normalizeUrl(path) {
+            if (!path) return "";
+            if (path.startsWith("http")) return path;
+            const cleanPath = path.startsWith("/") ? path : "/" + path;
+            return apiRoot ? `${apiRoot}${cleanPath}` : cleanPath;
+        }
+
+        function normalizePathForCompare(path) {
+            if (!path) return "";
+
+            try {
+                const url = path.startsWith("http")
+                    ? new URL(path)
+                    : new URL(normalizeUrl(path), window.location.origin);
+
+                return url.pathname.toLowerCase().replace(/^\/+/, "");
+            } catch {
+                return String(path)
+                    .toLowerCase()
+                    .replace(/^https?:\/\/[^/]+/i, "")
+                    .replace(/^\/+/, "");
+            }
+        }
+
+        function samePath(left, right) {
+            return normalizePathForCompare(left) === normalizePathForCompare(right);
+        }
+
+        function getValue(row, camel, pascal) {
+            return row[camel] ?? row[pascal];
+        }
+
+        function escapeHtml(value) {
+            const div = document.createElement("div");
+            div.textContent = value ?? "";
+            return div.innerHTML;
+        }
+
+        function initializeAreaTab() {
+            const image = document.getElementById("layoutImage");
+            if (!image || image.dataset.ready === "true") return;
+
+            const select = document.getElementById("layoutSelect");
+            select.innerHTML = "";
+            layoutOptions.forEach(layout => {
+                const option = document.createElement("option");
+                option.value = layout.filePath || "";
+                option.textContent = `${layout.isCommon ? "Common" : "Area"} - ${layout.originalFileName || layout.filePath}`;
+                select.appendChild(option);
+            });
+            select.value = currentImagePath;
+            select.addEventListener("change", async () => {
+                currentImagePath = select.value;
+                selectedPoint = null;
+                document.getElementById("markerSaveBtn").disabled = true;
+                resetMapView();
+                image.src = normalizeUrl(currentImagePath);
+                await loadMarkers();
+            });
+
+            image.src = normalizeUrl(currentImagePath);
+            image.dataset.ready = "true";
+            document.getElementById("imageWrap").addEventListener("click", placeMarkerFromClick);
+            initializeMapZoom();
+            loadMarkers();
+        }
+
+        function initializeMapZoom() {
+            const stage = document.querySelector(".layout-stage");
+            const wrap = document.getElementById("imageWrap");
+            if (!stage || !wrap || stage.dataset.zoomReady === "true") return;
+
+            stage.dataset.zoomReady = "true";
+            applyMapTransform();
+
+            stage.addEventListener("wheel", event => {
+                event.preventDefault();
+                const rect = wrap.getBoundingClientRect();
+                const oldScale = mapView.scale;
+                const direction = event.deltaY < 0 ? 1 : -1;
+                const nextScale = Math.max(1, Math.min(5, oldScale + direction * 0.25));
+                if (nextScale === oldScale) return;
+
+                const localX = (event.clientX - rect.left) / oldScale;
+                const localY = (event.clientY - rect.top) / oldScale;
+                mapView.scale = nextScale;
+                mapView.x += localX * (oldScale - nextScale);
+                mapView.y += localY * (oldScale - nextScale);
+                applyMapTransform();
+            }, { passive: false });
+        }
+
+        function resetMapView() {
+            mapView.scale = 1;
+            mapView.x = 0;
+            mapView.y = 0;
+            applyMapTransform();
+        }
+
+        function applyMapTransform() {
+            const wrap = document.getElementById("imageWrap");
+            if (!wrap) return;
+            wrap.style.transform = `translate(${mapView.x}px, ${mapView.y}px) scale(${mapView.scale})`;
+            wrap.style.setProperty("--pin-scale", 1 / mapView.scale);
+        }
+
+        async function loadMarkers() {
+            const response = await fetch(`/SurveyJobs/GetIhmMarkers?jobId=${checkpointContext.jobId}`);
+            if (!response.ok) return;
+            loadedMarkers = await response.json();
+            renderMarkers();
+        }
+
+        function renderMarkers() {
+            const container = document.getElementById("markerPins");
+            if (!container) return;
+            container.innerHTML = "";
+
+            const hasUnsavedPoint = selectedPoint !== null;
+            loadedMarkers
+                .filter(marker => {
+                    const checkpointId = Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId"));
+                    return samePath(getValue(marker, "imagePath", "ImagePath"), currentImagePath) &&
+                        !(hasUnsavedPoint && checkpointId === checkpointContext.checkpointId);
+                })
+                .forEach(marker => {
+                    const checkpointId = Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId"));
+                    addPin(
+                        Number(getValue(marker, "xPercent", "XPercent")),
+                        Number(getValue(marker, "yPercent", "YPercent")),
+                        getValue(marker, "markerLabel", "MarkerLabel") || checkpointLabels[checkpointId] || "",
+                        checkpointId === checkpointContext.checkpointId,
+                        Number(getValue(marker, "id", "Id"))
+                    );
+                });
+
+            if (selectedPoint) {
+                addPin(selectedPoint.x, selectedPoint.y, checkpointContext.sampleNo, true);
+            }
+        }
+
+        function addPin(x, y, label, active, markerId) {
+            const pin = document.createElement("div");
+            pin.className = `marker-pin${active ? " active" : ""}`;
+            pin.style.left = `${x}%`;
+            pin.style.top = `${y}%`;
+            pin.dataset.markerId = markerId || "";
+            pin.title = markerId ? "Double tap to remove marker" : "";
+            pin.innerHTML = `<div class="pin-content"><span class="pin-label">${escapeHtml(label || "-")}</span><i class="fa-solid fa-location-dot"></i></div>`;
+
+            if (markerId) {
+                let lastTapAt = 0;
+                pin.addEventListener("click", event => {
+                    event.stopPropagation();
+                });
+                pin.addEventListener("dblclick", event => {
+                    event.stopPropagation();
+                    deleteMarker(markerId);
+                });
+                pin.addEventListener("touchend", event => {
+                    event.stopPropagation();
+                    const now = Date.now();
+                    if (now - lastTapAt < 350) {
+                        event.preventDefault();
+                        deleteMarker(markerId);
+                    }
+                    lastTapAt = now;
+                });
+            }
+
+            document.getElementById("markerPins").appendChild(pin);
+        }
+
+        function placeMarkerFromClick(event) {
+            const image = document.getElementById("layoutImage");
+            const rect = image.getBoundingClientRect();
+            if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) return;
+            selectedPoint = {
+                x: Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100)),
+                y: Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100))
+            };
+            document.getElementById("markerHint").innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>Saving marker...';
+            renderMarkers();
+            saveMarker();
+        }
+
+        async function deleteMarker(markerId) {
+            if (!markerId) return;
+            if (!confirm("Remove this marker?")) return;
+
+            const response = await fetch(`/SurveyJobs/DeleteIhmMarker?markerId=${markerId}`, {
+                method: "POST"
+            });
+
+            if (!response.ok) {
+                alert(await response.text() || "Failed to delete marker.");
+                return;
+            }
+
+            selectedPoint = null;
+            document.getElementById("markerSaveBtn").disabled = true;
+            document.getElementById("markerHint").innerHTML = '<i class="fa-solid fa-circle-check"></i>Marker removed.';
+            await loadMarkers();
+        }
+
+        async function saveMarker() {
+            if (!selectedPoint) return;
+            const button = document.getElementById("markerSaveBtn");
+            button.disabled = true;
+            button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving';
+            try {
+                const response = await fetch("/SurveyJobs/SaveIhmMarker", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        surveyJobId: checkpointContext.jobId,
+                        ihmAreaId: checkpointContext.areaId,
+                        ihmCheckpointId: checkpointContext.checkpointId,
+                        imagePath: currentImagePath,
+                        xPercent: selectedPoint.x,
+                        yPercent: selectedPoint.y
+                    })
+                });
+                if (!response.ok) throw new Error(await response.text() || "Failed to save marker.");
+                selectedPoint = null;
+                document.getElementById("markerHint").innerHTML = '<i class="fa-solid fa-circle-check"></i>Marker saved.';
+                await loadMarkers();
+            } catch (error) {
+                alert(error.message || "Failed to save marker.");
+                button.disabled = false;
+            } finally {
+                button.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Marker';
+            }
+        }
+
+        async function loadPhotos() {
+            const grid = document.getElementById("photoGrid");
+            const empty = document.getElementById("photoEmpty");
+            if (grid.dataset.loaded === "true") return;
+            grid.innerHTML = "";
+            const response = await fetch(`/SurveyJobs/GetCheckpointPhotos?checkpointId=${checkpointContext.checkpointId}`);
+            if (!response.ok) {
+                empty.textContent = "Unable to load checkpoint images.";
+                return;
+            }
+            const photos = await response.json();
+            renderPhotos(photos);
+            grid.dataset.loaded = "true";
+        }
+
+        function renderPhotos(photos) {
+            const grid = document.getElementById("photoGrid");
+            const empty = document.getElementById("photoEmpty");
+            grid.innerHTML = "";
+            empty.style.display = photos.length ? "none" : "block";
+            photos.forEach(photo => {
+                const id = getValue(photo, "id", "Id");
+                const path = getValue(photo, "filePath", "FilePath");
+                if (!path) return;
+                const card = document.createElement("div");
+                card.className = "photo-card";
+                card.innerHTML = `<img src="${normalizeUrl(path)}" alt="Checkpoint image" onerror="this.parentElement.classList.add('image-error'); this.remove();" />
+                    <button class="delete-photo" type="button" onclick="deletePhoto(${id})"><i class="fa-solid fa-trash"></i></button>`;
+                grid.appendChild(card);
+            });
+        }
+
+        document.getElementById("photoInput").addEventListener("change", async event => {
+            const files = Array.from(event.target.files || []);
+            if (!files.length) return;
+            const button = document.getElementById("uploadBtn");
+            button.disabled = true;
+            button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+            const formData = new FormData();
+            files.forEach(file => formData.append("files", file));
+            try {
+                const response = await fetch(`/SurveyJobs/UploadCheckpointPhotos?jobId=${checkpointContext.jobId}&checkpointId=${checkpointContext.checkpointId}`, {
+                    method: "POST",
+                    body: formData
+                });
+                if (!response.ok) throw new Error(await response.text() || "Upload failed.");
+                document.getElementById("photoGrid").dataset.loaded = "false";
+                await loadPhotos();
+            } catch (error) {
+                alert(error.message || "Upload failed.");
+            } finally {
+                button.disabled = false;
+                button.innerHTML = '<i class="fa-solid fa-camera"></i> Add Checkpoint Images';
+                event.target.value = "";
+            }
+        });
+
+        async function deletePhoto(photoId) {
+            if (!confirm("Delete this checkpoint image?")) return;
+            const response = await fetch(`/SurveyJobs/DeleteCheckpointPhoto?photoId=${photoId}`, { method: "POST" });
+            if (!response.ok) {
+                alert(await response.text() || "Delete failed.");
+                return;
+            }
+            document.getElementById("photoGrid").dataset.loaded = "false";
+            await loadPhotos();
+        }
+    </script>
 </body>
 </html>

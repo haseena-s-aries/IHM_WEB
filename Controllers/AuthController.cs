@@ -42,6 +42,7 @@ namespace YourMvcApp.Controllers
         {
             var response = await _httpClient.GetAsync("User/pending-users");
 
+
             if (!response.IsSuccessStatusCode)
             {
                 ViewBag.PendingCount = 0;
@@ -49,6 +50,15 @@ namespace YourMvcApp.Controllers
             }
 
             var users = await response.Content.ReadFromJsonAsync<List<PendingUser>>();
+
+            var isAdmin = string.Equals(HttpContext.Session.GetString("UserRole"), "Admin", StringComparison.OrdinalIgnoreCase);
+
+            if (!isAdmin)
+            {
+                users = users?
+                    .Where(user => !string.Equals(user.RequestedRole, "Admin", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
             ViewBag.PendingCount = users?.Count ?? 0;
             return View(users);
         }

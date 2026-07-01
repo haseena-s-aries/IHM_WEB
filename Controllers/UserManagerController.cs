@@ -18,7 +18,18 @@ public class UserManagerController : Controller
     }
     public IActionResult Index()
     {
-        return View(); // Must have Views/UserManager/Index.cshtml
+        ViewBag.UserRole = HttpContext.Session.GetString("UserRole") ?? "";
+        return View();
+    }
+
+    private bool IsAdmin()
+    {
+        return string.Equals(HttpContext.Session.GetString("UserRole"), "Admin", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsAdminRole(string? role)
+    {
+        return string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
     }
 
     private HttpRequestMessage CreateApiRequest(HttpMethod method, string url, HttpContent? content = null)
@@ -31,11 +42,11 @@ public class UserManagerController : Controller
         return request;
     }
 
-    // ✅ Get All Users (AJAX)
     public async Task<IActionResult> GetAll()
     {
         var response = await _httpClient.SendAsync(
             CreateApiRequest(HttpMethod.Get, $"{_apiBaseUrl}/GetAll"));
+
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync();
@@ -45,15 +56,16 @@ public class UserManagerController : Controller
         }
 
         var jsonData = await response.Content.ReadAsStringAsync();
-        var users = JsonConvert.DeserializeObject<List<User>>(jsonData);
+        var userDtos = JsonConvert.DeserializeObject<List<UserDto>>(jsonData) ?? new List<UserDto>();
 
-        var userDtos = (users ?? new List<User>()).Select(u => new UserDto
+        if (!IsAdmin())
         {
-            Id = u.Id,
-            FullName = u.FullName,
-            Email = u.Email,
-            Role = u.Role
-        }).ToList();
+            userDtos = userDtos
+                .Where(u => !IsAdminRole(u.Role))
+                .Where(u => !IsAdminRole(u.RequestedRole))
+                .Where(u => u.IsApproved)
+                .ToList();
+        }
 
         return Json(userDtos);
     }
@@ -69,6 +81,9 @@ public class UserManagerController : Controller
         var jsonData = await response.Content.ReadAsStringAsync();
         var user = JsonConvert.DeserializeObject<UserDto>(jsonData);
 
+        if (!IsAdmin() && (IsAdminRole(user?.Role) || IsAdminRole(user?.RequestedRole)))
+            return Forbid();
+
         return Json(user);
     }
 
@@ -78,7 +93,14 @@ public class UserManagerController : Controller
     {
         if (!ModelState.IsValid)
             return Json(new { success = false, message = "Invalid data" });
-
+        if (!IsAdmin() && (IsAdminRole(user.Role) || IsAdminRole(user.RequestedRole)))
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Only Admin can manage Admin users."
+            });
+        }
         var jsonContent = new StringContent(JsonConvert.SerializeObject(user), Encoding.UTF8, "application/json");
         HttpResponseMessage response;
 
@@ -111,6 +133,20 @@ public class UserManagerController : Controller
     [HttpPost]
     public async Task<IActionResult> Delete(int id)
     {
+        if (!IsAdmin())
+        {
+            var getResponse = await _httpClient.SendAsync(
+                CreateApiRequest(HttpMethod.Get, $"{_apiBaseUrl}/GetById/{id}"));
+
+            if (getResponse.IsSuccessStatusCode)
+            {
+                var jsonData = await getResponse.Content.ReadAsStringAsync();
+                var user = JsonConvert.DeserializeObject<UserDto>(jsonData);
+
+                if (IsAdminRole(user?.Role))
+                    return Forbid();
+            }
+        }
         var response = await _httpClient.SendAsync(
             CreateApiRequest(HttpMethod.Delete, $"User/delete-user/{id}"));
         if (response.IsSuccessStatusCode)

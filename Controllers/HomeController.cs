@@ -145,6 +145,8 @@ namespace Health_Matrix_Consuming_Side.Controllers
             {
                 return RedirectToAction("Login", "Auth");
             }
+            var sessionRole = HttpContext.Session.GetString("UserRole") ?? "";
+            var isAdmin = string.Equals(sessionRole, "Admin", StringComparison.OrdinalIgnoreCase);
 
             // Create client and attach JWT
             var client = _clientFactory.CreateClient("ApiClient");
@@ -179,6 +181,20 @@ namespace Health_Matrix_Consuming_Side.Controllers
             {
                 var userJson = await userResponse.Content.ReadAsStringAsync();
                 var users = JsonConvert.DeserializeObject<List<UserDto>>(userJson);
+                if (!isAdmin)
+                {
+                    users = users?
+                        .Where(user => !string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                }
+
+                if (!isAdmin)
+                {
+                    users = users?
+                        .Where(user => !string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                }
+
                 totalUsers = users?.Count ?? 0;
                 dashboardUsers = users?
                     .OrderBy(user => user.FullName)
@@ -192,6 +208,12 @@ namespace Health_Matrix_Consuming_Side.Controllers
                 var pendingJson = await pendingResponse.Content.ReadAsStringAsync();
                 pendingUsers = JsonConvert.DeserializeObject<List<PendingUser>>(pendingJson)
                     ?? new List<PendingUser>();
+                if (!isAdmin)
+                {
+                    pendingUsers = pendingUsers
+                        .Where(user => !string.Equals(user.RequestedRole, "Admin", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                }
             }
 
             List<SavedReportViewModel> savedReports = new();

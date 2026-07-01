@@ -55,23 +55,57 @@
     public class IhmCheckpointOptionDto
     {
         public int Id { get; set; }
+        public int SurveyJobId { get; set; }
+        public int IhmAreaId { get; set; }
         public string? SampleNo { get; set; }
         public string? Location { get; set; }
         public string? EquipmentName { get; set; }
         public string? Component { get; set; }
         public string? Description { get; set; }
+        public string? TableType { get; set; }
         public string? SamplingCheck { get; set; }
         public string? VisualCheck { get; set; }
         public string? CheckResult { get; set; }
         public string? Result { get; set; }
+        public string? DocumentAnalysisResult { get; set; }
+        public string? MaterialCategory { get; set; }
         public string? HazardousMaterial { get; set; }
+        public string? QuantityUnitKg { get; set; }
+        public string? QuantityNo { get; set; }
+        public string? QuantityTotalKg { get; set; }
+        public string? ManufacturerBrandName { get; set; }
+        public bool IsPchm { get; set; }
+        public string? Remarks { get; set; }
         public string? LocationRemarks { get; set; }
         public bool IsVisual => string.Equals(VisualCheck, "V", StringComparison.OrdinalIgnoreCase);
         public bool IsSample => string.Equals(SamplingCheck, "S", StringComparison.OrdinalIgnoreCase);
 
         public bool IsAudited =>
-            !string.IsNullOrWhiteSpace(CheckResult) ||
-            !string.IsNullOrWhiteSpace(Result);
+            IsCompletedAuditValue(Result) ||
+            IsCompletedAuditValue(CheckResult);
+
+        private static bool IsCompletedAuditValue(string? value)
+        {
+            var normalized = (value ?? "")
+                .Trim()
+                .ToLowerInvariant()
+                .Replace(" ", "")
+                .Replace("_", "")
+                .Replace("-", "");
+
+            return normalized is "present" or "notpresent" or "notapplicable" or "samplerequired" or
+                "2" or "3" or "4" or "5" or "audited" or "completed";
+        }
+    }
+
+    public class IhmSamplingPhotoDto
+    {
+        public int Id { get; set; }
+        public int SurveyJobId { get; set; }
+        public int IhmCheckpointId { get; set; }
+        public string OriginalFileName { get; set; } = "";
+        public string FilePath { get; set; } = "";
+        public DateTime? UploadedAt { get; set; }
     }
 
     public class SurveyJobDto
@@ -86,6 +120,7 @@
         public string? ImoNumber { get; set; }
         public string? SiteName { get; set; }
         public DateTime? StartDate { get; set; }
+        public DateTime? SurveyDate { get; set; }
         public DateTime? EndDate { get; set; }
         public string? AuditPort { get; set; }
         public string? AuditAddress { get; set; }

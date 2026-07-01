@@ -1,4 +1,9 @@
-﻿<!DOCTYPE html>
+﻿@{
+    var currentRole = ViewBag.UserRole as string ?? Context.Session.GetString("UserRole") ?? "";
+    var isAdmin = string.Equals(currentRole, "Admin", StringComparison.OrdinalIgnoreCase);
+}
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -133,7 +138,10 @@
                         <div class="mb-3">
                             <label class="form-label">Role:</label>
                             <select id="userRole" name="Role" class="form-control">
-                                <option value="Admin">Admin</option>
+                                @if (string.Equals(Context.Session.GetString("UserRole"), "Admin", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <option value="Admin">Admin</option>
+                                }
                                 <option value="Manager">Manager</option>
                                 <option value="Surveyor">Surveyor</option>
                                 <option value="User">User</option>
@@ -170,6 +178,8 @@
         let allUsers = [];
         let currentPage = 1;
         const usersPerPage = 10;
+        const currentUserRole = "@currentRole";
+        const isCurrentUserAdmin = currentUserRole.toLowerCase() === "admin";
 
         // Load users on page ready
         $(document).ready(function () {
@@ -308,6 +318,9 @@
             $("#userName").val("");
             $("#userEmail").val("");
             $("#userRole").val("User");
+         if (!isCurrentUserAdmin) {
+            $("#userRole option[value='Admin']").remove();
+        }
             $("#userPassword").val("").prop("disabled", false).parent().show();
             $("#confirmPassword").val("").prop("disabled", false).parent().show();
             $("#userModal").modal("show");
@@ -322,7 +335,16 @@
                     $("#userId").val(user.id);
                     $("#userName").val(user.fullName);
                     $("#userEmail").val(user.email);
-                    $("#userRole").val(user.role);
+                            if (!isCurrentUserAdmin && (user.role || "").toLowerCase() === "admin") {
+            alert("You do not have permission to access Admin users.");
+            return;
+        }
+
+        if (!isCurrentUserAdmin) {
+            $("#userRole option[value='Admin']").remove();
+        }
+
+        $("#userRole").val(user.role);
                     $("#userPassword").val("").prop("disabled", true).parent().hide();
                     $("#confirmPassword").val("").prop("disabled", true).parent().hide();
                     $("#userModal").modal("show");
@@ -350,7 +372,10 @@
                     return;
                 }
             }
-
+                    if (!isCurrentUserAdmin && ($("#userRole").val() || "").toLowerCase() === "admin") {
+            alert("Only Admin can create Admin users.");
+            return;
+        }
             let user = {
                 Id: id,
                 FullName: $("#userName").val(),

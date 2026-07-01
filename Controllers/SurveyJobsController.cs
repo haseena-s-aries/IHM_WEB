@@ -259,8 +259,30 @@ namespace Survery_Certification_App_Consume.Controllers
                     return RedirectToAction("SurveyAreas", new { jobId });
                 }
 
+                var attachments = await GetAsync<List<IhmLayoutAttachmentDto>>(
+                    client,
+                    $"ihm-survey/jobs/{jobId}/layout-attachments"
+                ) ?? new List<IhmLayoutAttachmentDto>();
+
+                var areaLayouts = attachments
+                    .Where(x =>
+                        string.Equals(x.Target, "common", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(x.Target, areaId.ToString(), StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(x.Target, area.AreaName, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                var areaLayout = areaLayouts.FirstOrDefault(x =>
+                    string.Equals(x.Target, areaId.ToString(), StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(x.Target, area.AreaName, StringComparison.OrdinalIgnoreCase));
+
+                var commonLayout = areaLayouts.FirstOrDefault(x =>
+                    string.Equals(x.Target, "common", StringComparison.OrdinalIgnoreCase));
+
+                area.LayoutFilePath = areaLayout?.FilePath ?? commonLayout?.FilePath;
+
                 ViewBag.Job = job;
                 ViewBag.JobId = jobId;
+                ViewBag.Layouts = areaLayouts;
                 return View(area);
             }
             catch (Exception ex)
@@ -281,6 +303,30 @@ namespace Survery_Certification_App_Consume.Controllers
                 ) ?? new List<IhmImageMarkerDto>();
 
                 return Json(markers);
+            }
+            catch (Exception ex)
+            {
+                Response.StatusCode = 500;
+                return Json(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteIhmMarker(int markerId)
+        {
+            try
+            {
+                var client = CreateApiClient();
+                var response = await client.DeleteAsync($"ihm-survey/markers/{markerId}");
+                var body = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Response.StatusCode = (int)response.StatusCode;
+                    return Content(body);
+                }
+
+                return Ok();
             }
             catch (Exception ex)
             {
@@ -371,6 +417,24 @@ namespace Survery_Certification_App_Consume.Controllers
                 ViewBag.JobId = jobId;
                 ViewBag.AreaId = areaId;
                 ViewBag.AreaName = area.AreaName;
+                ViewBag.ApiRoot = (client.BaseAddress?.ToString() ?? "")
+                    .Replace("/api/", "/")
+                    .Replace("/api", "")
+                    .TrimEnd('/');
+                ViewBag.CheckpointLabels = area.Checkpoints
+                    .Where(x => x.Id > 0)
+                    .ToDictionary(
+                        x => x.Id,
+                        x => string.IsNullOrWhiteSpace(x.SampleNo)
+                            ? x.Location ?? x.Id.ToString()
+                            : x.SampleNo
+                    );
+                ViewBag.Layouts = attachments
+                    .Where(x =>
+                        string.Equals(x.Target, "common", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(x.Target, areaId.ToString(), StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(x.Target, area.AreaName, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
 
                 return View(checkpoint);
             }
@@ -378,6 +442,161 @@ namespace Survery_Certification_App_Consume.Controllers
             {
                 TempData["ErrorMessage"] = "Failed to load checkpoint: " + ex.Message;
                 return RedirectToAction("AreaCheckpoints", new { jobId, areaId });
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveCheckpointAudit(SaveCheckpointAuditRequest request)
+        {
+            try
+            {
+                var client = CreateApiClient();
+                var payload = new
+                {
+                    sampleNo = request.SampleNo,
+                    description = request.Description ?? "",
+                    tableType = request.TableType,
+                    location = request.Location,
+                    equipmentName = request.EquipmentName,
+                    component = request.Component,
+                    materialCategory = request.MaterialCategory,
+                    hazardousMaterial = request.HazardousMaterial,
+                    quantityUnitKg = ToNullableDecimal(request.QuantityUnitKg),
+                    quantityNo = ToNullableDecimal(request.QuantityNo),
+                    quantityTotalKg = ToNullableDecimal(request.QuantityTotalKg),
+                    manufacturerBrandName = request.ManufacturerBrandName,
+                    documentAnalysisResult = request.DocumentAnalysisResult,
+                    samplingCheck = request.SamplingCheck,
+                    visualCheck = request.VisualCheck,
+                    checkResult = request.CheckResult,
+                    result = ToCheckpointResultValue(request.AuditResult),
+                    isPchm = request.IsPchm,
+                    remarks = request.Remarks,
+                    locationRemarks = request.LocationRemarks,
+                    updatedByUserId = HttpContext.Session.GetInt32("UserId") ?? 0
+                };
+
+                var response = await client.PutAsync(
+                    $"ihm-survey/checkpoints/{request.CheckpointId}/details",
+                    new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json"));
+                var body = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(body)
+                        ? "Unable to save checkpoint."
+                        : body;
+                    return RedirectToAction("CheckpointDetail", new
+                    {
+                        jobId = request.JobId,
+                        areaId = request.AreaId,
+                        checkpointId = request.CheckpointId
+                    });
+                }
+
+                TempData["SuccessMessage"] = "Checkpoint saved successfully.";
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Unable to save checkpoint: " + ex.Message;
+            }
+
+            return RedirectToAction("CheckpointDetail", new
+            {
+                jobId = request.JobId,
+                areaId = request.AreaId,
+                checkpointId = request.CheckpointId
+            });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetCheckpointPhotos(int checkpointId)
+        {
+            try
+            {
+                var client = CreateApiClient();
+                var photos = await GetAsync<List<IhmSamplingPhotoDto>>(
+                    client,
+                    $"ihm-survey/checkpoints/{checkpointId}/photos"
+                ) ?? new List<IhmSamplingPhotoDto>();
+
+                return Json(photos);
+            }
+            catch (Exception ex)
+            {
+                Response.StatusCode = 500;
+                return Json(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> UploadCheckpointPhotos(int jobId, int checkpointId, List<IFormFile> files)
+        {
+            if (files == null || files.Count == 0 || files.All(x => x.Length == 0))
+                return BadRequest("Please select one or more images.");
+
+            try
+            {
+                var client = CreateApiClient();
+                var uploaded = new List<IhmSamplingPhotoDto>();
+
+                foreach (var file in files.Where(x => x.Length > 0))
+                {
+                    var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+                    if (extension is not (".jpg" or ".jpeg" or ".png" or ".webp"))
+                        return BadRequest("Only JPG, JPEG, PNG and WEBP images are supported.");
+
+                    using var content = new MultipartFormDataContent();
+                    await using var stream = file.OpenReadStream();
+                    content.Add(new StreamContent(stream), "file", file.FileName);
+
+                    var response = await client.PostAsync(
+                        $"ihm-survey/jobs/{jobId}/checkpoints/{checkpointId}/photos",
+                        content);
+                    var body = await response.Content.ReadAsStringAsync();
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        Response.StatusCode = (int)response.StatusCode;
+                        return Content(body);
+                    }
+
+                    var photo = JsonConvert.DeserializeObject<IhmSamplingPhotoDto>(body);
+                    if (photo != null)
+                        uploaded.Add(photo);
+                }
+
+                return Json(uploaded);
+            }
+            catch (Exception ex)
+            {
+                Response.StatusCode = 500;
+                return Json(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteCheckpointPhoto(int photoId)
+        {
+            try
+            {
+                var client = CreateApiClient();
+                var response = await client.DeleteAsync($"ihm-survey/sampling-photos/{photoId}");
+                var body = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Response.StatusCode = (int)response.StatusCode;
+                    return Content(body);
+                }
+
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                Response.StatusCode = 500;
+                return Json(new { message = ex.Message });
             }
         }
         public async Task<IActionResult> ProjectInfo(int jobId)
@@ -501,6 +720,43 @@ namespace Survery_Certification_App_Consume.Controllers
         }
 
         [HttpPost]
+        public async Task<IActionResult> UpdateSurveyDate(int jobId, string surveyDate, string surveyType)
+        {
+            var returnAction = surveyType == "IHM Survey" ? "Ihm" : "Ex";
+
+            if (string.IsNullOrWhiteSpace(surveyDate))
+            {
+                TempData["ErrorMessage"] = "Survey date is required.";
+                return RedirectToAction(returnAction);
+            }
+
+            try
+            {
+                var client = CreateApiClient();
+                var payload = new { surveyDate };
+                var response = await client.PostAsync(
+                    $"survey/jobs/{jobId}/survey-date",
+                    new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json")
+                );
+                var body = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    TempData["ErrorMessage"] = "Survey date update failed: " + body;
+                    return RedirectToAction(returnAction);
+                }
+
+                TempData["SuccessMessage"] = "Survey date saved successfully.";
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Survey date update failed: " + ex.Message;
+            }
+
+            return RedirectToAction(returnAction);
+        }
+
+        [HttpPost]
         public async Task<IActionResult> Delete(int jobId, string surveyType)
         {
             var returnAction = surveyType == "IHM Survey" ? "Ihm" : "Ex";
@@ -590,7 +846,7 @@ namespace Survery_Certification_App_Consume.Controllers
         {
             if (files == null || files.Count == 0 || files.All(x => x.Length == 0))
             {
-                TempData["ErrorMessage"] = "Please select one or more layout images.";
+                TempData["ErrorMessage"] = "Please select one layout image or PDF file.";
                 return RedirectToAction("Ihm");
             }
 
@@ -623,8 +879,8 @@ namespace Survery_Certification_App_Consume.Controllers
                 var file = files.First(x => x.Length > 0);
                 {
                     var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-                    if (extension is not (".jpg" or ".jpeg" or ".png" or ".webp"))
-                        throw new InvalidOperationException("Only JPG, PNG, and WEBP images are supported.");
+                    if (extension is not (".jpg" or ".jpeg" or ".png" or ".webp" or ".pdf"))
+                        throw new InvalidOperationException("Only JPG, PNG, WEBP images and PDF files are supported.");
 
                     using var content = new MultipartFormDataContent();
                     content.Add(new StringContent(
@@ -717,6 +973,24 @@ namespace Survery_Certification_App_Consume.Controllers
             var json = await response.Content.ReadAsStringAsync();
             return JsonConvert.DeserializeObject<T>(json);
         }
+        private static decimal? ToNullableDecimal(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Trim() == "-")
+                return null;
+
+            return decimal.TryParse(value, out var result) ? result : null;
+        }
+        private static int ToCheckpointResultValue(string? result)
+        {
+            return (result ?? "").Trim().ToLowerInvariant().Replace(" ", "").Replace("_", "").Replace("-", "") switch
+            {
+                "present" or "2" => 2,
+                "notpresent" or "3" => 3,
+                "notapplicable" or "4" => 4,
+                "samplerequired" or "5" => 5,
+                _ => 1
+            };
+        }
     }
 
     public class SurveyJobCreateRequest
@@ -732,5 +1006,32 @@ namespace Survery_Certification_App_Consume.Controllers
         public string? EndDate { get; set; }
         public int? PrimarySurveyorUserId { get; set; }
         public int? SecondarySurveyorUserId { get; set; }
+    }
+
+    public class SaveCheckpointAuditRequest
+    {
+        public int JobId { get; set; }
+        public int AreaId { get; set; }
+        public int CheckpointId { get; set; }
+        public string? SampleNo { get; set; }
+        public string? Description { get; set; }
+        public string? TableType { get; set; }
+        public string? Location { get; set; }
+        public string? EquipmentName { get; set; }
+        public string? Component { get; set; }
+        public string? MaterialCategory { get; set; }
+        public string? HazardousMaterial { get; set; }
+        public string? QuantityUnitKg { get; set; }
+        public string? QuantityNo { get; set; }
+        public string? QuantityTotalKg { get; set; }
+        public string? ManufacturerBrandName { get; set; }
+        public string? DocumentAnalysisResult { get; set; }
+        public string? SamplingCheck { get; set; }
+        public string? VisualCheck { get; set; }
+        public string? CheckResult { get; set; }
+        public string? AuditResult { get; set; }
+        public bool IsPchm { get; set; }
+        public string? Remarks { get; set; }
+        public string? LocationRemarks { get; set; }
     }
 }

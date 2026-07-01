@@ -28,7 +28,8 @@
         .search-box input::placeholder { color:#ffffff66; }
     
         .content { padding:16px; }
-        .job-card { background:white; border:1px solid #e0e4ec; border-radius:14px; padding:18px; margin-bottom:12px; box-shadow:0 3px 10px #0000000a; }
+        .job-card { background:white; border:1px solid #e0e4ec; border-radius:14px; padding:18px; margin-bottom:12px; box-shadow:0 3px 10px #0000000a; cursor:pointer; transition:.16s; }
+        .job-card:hover { transform:translateY(-1px); box-shadow:0 8px 22px #00000012; }
         .job-head { display:flex; align-items:center; gap:12px; }
         .job-icon { width:46px; height:46px; border-radius:12px; background:linear-gradient(135deg,#0b1d33,#1e3a5f); color:white; display:flex; align-items:center; justify-content:center; }
         .job-title { font-size:16px; font-weight:800; margin:0; }
@@ -38,6 +39,9 @@
         .info-row { display:flex; gap:8px; align-items:center; color:#607080; font-size:13px; margin-bottom:6px; }
         .info-row strong { width:58px; color:#607080; }
         .info-row span { color:#1a2333; font-weight:600; }
+        .survey-date-box { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:12px 0; padding:9px 10px; border-radius:8px; background:#1976d20f; color:#1976d2; font-size:12px; font-weight:800; }
+        .survey-date-box input { border:1px solid #b8d8f7; border-radius:7px; padding:5px 7px; color:#1a2333; background:#fff; }
+        .survey-date-box button { border:0; border-radius:7px; background:#1976d2; color:#fff; padding:6px 10px; font-size:12px; font-weight:800; }
         .assigned { margin:12px 0; padding:9px 10px; border-radius:8px; background:#43a04714; color:#43a047; font-size:12px; font-weight:700; }
         .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
         .action-btn { border:0; border-radius:8px; padding:8px 12px; font-size:12px; font-weight:800; text-decoration:none; display:inline-flex; align-items:center; gap:5px; }
@@ -101,7 +105,17 @@
         {
             foreach (var job in Model.Jobs)
             {
-                <article class="job-card" data-search="@($"{job.JobNumber} {job.ClientName} {job.VesselName} {job.SiteName} {job.Status}".ToLower())">
+                var jobOpenUrl = Model.IsAdmin
+                    ? $"/SurveyJobs/ProjectInfo?jobId={job.Id}"
+                    : $"/SurveyJobs/Work?jobId={job.Id}&surveyType={Uri.EscapeDataString(Model.SurveyType)}";
+                var surveyDateText = job.SurveyDate.HasValue
+                    ? job.SurveyDate.Value.ToLocalTime().ToString("dd-MM-yyyy")
+                    : "Not selected";
+                var surveyDateValue = job.SurveyDate.HasValue
+                    ? job.SurveyDate.Value.ToString("yyyy-MM-dd")
+                    : "";
+
+                <article class="job-card" data-card-href="@jobOpenUrl" data-search="@($"{job.JobNumber} {job.ClientName} {job.VesselName} {job.SiteName} {job.Status}".ToLower())">
                     <div class="job-head">
                         <div class="job-icon"><i class="fa-solid @(isIhm ? "fa-clipboard-list" : "fa-helmet-safety")"></i></div>
 
@@ -132,6 +146,19 @@
                     {
                         <div class="info-row"><i class="fa-solid fa-location-dot"></i><strong>Site</strong><span>@job.SiteName</span></div>
                     }
+
+                    <form class="survey-date-box" method="post" action="/SurveyJobs/UpdateSurveyDate">
+                        <input type="hidden" name="jobId" value="@job.Id" />
+                        <input type="hidden" name="surveyType" value="@Model.SurveyType" />
+                        <span>
+                            <i class="fa-regular fa-calendar-check"></i>
+                            Survey Date: @surveyDateText
+                        </span>
+                        <span class="d-inline-flex align-items-center gap-2">
+                            <input type="date" name="surveyDate" value="@surveyDateValue" required />
+                            <button type="submit">@(job.SurveyDate.HasValue ? "Change" : "Select")</button>
+                        </span>
+                    </form>
 
                     @{
                         var primarySurveyorName = job.Assignments?
@@ -335,9 +362,9 @@
                                     </div>
 
                                     <div class="mt-3">
-                                        <label class="form-label fw-bold">Layout image *</label>
-                                        <input class="form-control layout-file-input" type="file" name="files" accept=".jpg,.jpeg,.png,.webp" required />
-                                        <div class="form-text">Uploading a new image replaces the current attachment for this selection.</div>
+                                        <label class="form-label fw-bold">Layout file *</label>
+                                        <input class="form-control layout-file-input" type="file" name="files" accept=".jpg,.jpeg,.png,.webp,.pdf" required />
+                                        <div class="form-text">Uploading a new image or PDF replaces the current attachment for this selection.</div>
                                     </div>
 
                                     <div class="current-layout-attachment mt-3 p-3 border rounded">
@@ -474,6 +501,13 @@
             const q = this.value.toLowerCase();
             document.querySelectorAll(".job-card").forEach(card => {
                 card.style.display = card.dataset.search.includes(q) ? "" : "none";
+            });
+        });
+
+        document.querySelectorAll(".job-card[data-card-href]").forEach(card => {
+            card.addEventListener("click", event => {
+                if (event.target.closest("a, button, input, select, textarea, label, form")) return;
+                window.location.href = card.dataset.cardHref;
             });
         });
 
