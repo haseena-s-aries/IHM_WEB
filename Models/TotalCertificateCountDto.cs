@@ -9,6 +9,9 @@ namespace Survey_Certification_App.Models
         public int TowageCount { get; set; }
         public int SeaFasteningCount { get; set; }
         public int LoadoutCount { get; set; }
-
+        public int TotalSurveyJobs { get; set; }
+        public int IhmSurveyJobs { get; set; }
+        public int ExSurveyJobs { get; set; }
+        public int SubmittedSurveyJobs { get; set; }
     }
 }

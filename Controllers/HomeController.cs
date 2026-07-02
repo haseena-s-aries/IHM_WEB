@@ -94,14 +94,32 @@ namespace Health_Matrix_Consuming_Side.Controllers
             // Make the GET request using _client
             var response = await _client.GetAsync("AdminDashboard/certificate-report"); // ✅ Relative to https://localhost:7048/api/
 
+            TotalCertificateCountDto model = new();
+
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
-                var model = JsonConvert.DeserializeObject<TotalCertificateCountDto>(json);
-                return View(model); // Pass data to the view
+                model = JsonConvert.DeserializeObject<TotalCertificateCountDto>(json)
+                    ?? new TotalCertificateCountDto();
             }
 
-            return View(new TotalCertificateCountDto()); // Return empty model if API fails
+            var role = HttpContext.Session.GetString("UserRole") ?? "";
+            var userId = HttpContext.Session.GetInt32("UserId") ?? 0;
+            var isSurveyor = role.Equals("Surveyor", StringComparison.OrdinalIgnoreCase);
+
+            if (isSurveyor && userId > 0)
+            {
+                var ihmJobs = await GetSurveyJobsForDashboard("IhmSurvey", userId);
+                var exJobs = await GetSurveyJobsForDashboard("ExSurvey", userId);
+
+                model.IhmSurveyJobs = ihmJobs.Count;
+                model.ExSurveyJobs = exJobs.Count;
+                model.TotalSurveyJobs = model.IhmSurveyJobs + model.ExSurveyJobs;
+                model.SubmittedSurveyJobs = ihmJobs.Concat(exJobs)
+                    .Count(x => string.Equals(x.Status, "Submitted", StringComparison.OrdinalIgnoreCase));
+            }
+
+            return View(model); // Return empty model if API fails
         }
 
         public async Task<IActionResult> GetProtectedData()
@@ -891,7 +909,30 @@ namespace Health_Matrix_Consuming_Side.Controllers
             return File(fileBytes, "application/pdf");
         }
 
+        private async Task<List<SurveyJobDto>> GetSurveyJobsForDashboard(string moduleType, int userId)
+        {
+            var jwt = HttpContext.Session.GetString("JWT");
+            var client = _clientFactory.CreateClient("ApiClient");
 
+            if (!string.IsNullOrWhiteSpace(jwt))
+            {
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", jwt);
+            }
+
+            var url =
+                $"survey/jobs?moduleType={Uri.EscapeDataString(moduleType)}&assignedSurveyorUserId={userId}";
+
+            var response = await client.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+            {
+                return new List<SurveyJobDto>();
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonConvert.DeserializeObject<List<SurveyJobDto>>(json)
+                ?? new List<SurveyJobDto>();
+        }
 
 
 

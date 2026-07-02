@@ -119,7 +119,22 @@
         }
         .tab.active { color: #00d4aa; border-bottom-color: #00d4aa; }
         .tab i { display: block; font-size: 16px; margin-bottom: 4px; }
-        .page { padding: 20px; max-width: 1180px; margin: 0 auto; }
+
+        .page {
+            padding: 20px;
+            max-width: 1480px;
+            margin: 0 auto;
+        }
+
+        #areaPanel {
+            margin-left: calc(50% - 50vw);
+            margin-right: calc(50% - 50vw);
+        }
+
+            #areaPanel .layout-shell {
+                width: min(100vw - 24px, 1500px);
+                margin: 0 auto;
+            }
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
         .section-label {
@@ -265,30 +280,56 @@
             white-space: nowrap;
         }
         #markerSaveBtn { display: none; }
+
         .layout-stage {
             min-height: calc(100vh - 170px);
+            overflow: auto;
+            padding: 12px 12px 54px;
+            cursor: grab;
+            touch-action: none;
+            user-select: none;
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
-            padding: 64px 12px 54px;
-            cursor: zoom-in;
-            touch-action: manipulation;
-            user-select: none;
         }
+
+            .layout-stage.dragging {
+                cursor: grabbing;
+            }
+
         .image-wrap {
             position: relative;
             display: inline-block;
-            max-width: 100%;
             border-radius: 12px;
-            overflow: hidden;
+            overflow: visible;
             border: 1px solid #d8e3ee;
             background: #f4f7fb;
             transform-origin: 0 0;
             will-change: transform;
         }
-        .layout-image { display: block; max-width: 100%; height: auto; }
-        #markerPins { position: absolute; inset: 0; pointer-events: none; }
+
+        .layout-stage:has(.image-wrap) {
+            align-items: flex-start;
+            justify-content: flex-start;
+        }
+
+        .layout-stage:not(.dragging) .image-wrap {
+            margin: auto;
+        }
+        .layout-image {
+            display: block;
+            width: auto;
+            max-width: none;
+            height: auto;
+        }
+
+        #markerPins {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
         .marker-pin {
             position: absolute;
             width: 0;
@@ -301,7 +342,7 @@
         .pin-content {
             position: absolute;
             left: calc(-36px * var(--pin-scale, 1));
-            top: calc(18px * var(--pin-scale, 1));
+            top: calc(-64px * var(--pin-scale, 1));
             width: 72px;
             height: 64px;
             transform: scale(var(--pin-scale, 1));
@@ -573,12 +614,9 @@
 
         <section id="areaPanel" class="tab-panel">
             <div class="layout-shell">
-                <div class="layout-toolbar">
-                    <select id="layoutSelect" aria-label="Layout image"></select>
-                    <button id="markerSaveBtn" class="layout-action" type="button" onclick="saveMarker()" disabled>
-                        <i class="fa-solid fa-floppy-disk"></i> Save Marker
-                    </button>
-                </div>
+                <button id="markerSaveBtn" class="layout-action" type="button" onclick="saveMarker()" disabled hidden>
+                    <i class="fa-solid fa-floppy-disk"></i> Save Marker
+                </button>
                 <div class="layout-stage">
                     @if (string.IsNullOrWhiteSpace(layoutPath))
                     {
@@ -670,11 +708,50 @@
         function samePath(left, right) {
             return normalizePathForCompare(left) === normalizePathForCompare(right);
         }
-
+        function normalizePathForSave(path) {
+            return normalizePathForCompare(path);
+        }
         function getValue(row, camel, pascal) {
             return row[camel] ?? row[pascal];
         }
+                function firstValue(row, names) {
+            for (const name of names) {
+                const value = row?.[name];
+                if (value !== undefined && value !== null && value !== "") return value;
+            }
+            return null;
+        }
 
+        function getMarkerCoordinate(marker, axis) {
+            const image = document.getElementById("layoutImage");
+            const raw = Number(firstValue(
+                marker,
+                axis === "x"
+                    ? ["xPercent", "XPercent", "markerX", "MarkerX", "posX", "PosX", "coordinateX", "CoordinateX", "x", "X"]
+                    : ["yPercent", "YPercent", "markerY", "MarkerY", "posY", "PosY", "coordinateY", "CoordinateY", "y", "Y"]
+            ));
+
+            if (!Number.isFinite(raw)) return null;
+
+            // Common format for web rendering is 0..100 percent.
+            if (raw >= 0 && raw <= 1) return raw * 100;
+            if (raw >= 0 && raw <= 100) return raw;
+
+            // Old pixel fallback only. Convert once for display; do not default to 0,0.
+            const size = axis === "x" ? image?.clientWidth : image?.clientHeight;
+            if (size && raw > 100 && raw <= size) return (raw / size) * 100;
+
+            return null;
+        }
+
+        function getMarkerLabel(marker, checkpointId) {
+            return firstValue(marker, [
+                "markerLabel", "MarkerLabel",
+                "label", "Label",
+                "markerCode", "MarkerCode",
+                "checkpointCode", "CheckpointCode"
+            ]) || checkpointLabels[checkpointId] || "";
+        }
         function escapeHtml(value) {
             const div = document.createElement("div");
             div.textContent = value ?? "";
@@ -685,32 +762,16 @@
             const image = document.getElementById("layoutImage");
             if (!image || image.dataset.ready === "true") return;
 
-            const select = document.getElementById("layoutSelect");
-            select.innerHTML = "";
-            layoutOptions.forEach(layout => {
-                const option = document.createElement("option");
-                option.value = layout.filePath || "";
-                option.textContent = `${layout.isCommon ? "Common" : "Area"} - ${layout.originalFileName || layout.filePath}`;
-                select.appendChild(option);
-            });
-            select.value = currentImagePath;
-            select.addEventListener("change", async () => {
-                currentImagePath = select.value;
-                selectedPoint = null;
-                document.getElementById("markerSaveBtn").disabled = true;
-                resetMapView();
-                image.src = normalizeUrl(currentImagePath);
-                await loadMarkers();
-            });
+            
 
             image.src = normalizeUrl(currentImagePath);
             image.dataset.ready = "true";
-            document.getElementById("imageWrap").addEventListener("click", placeMarkerFromClick);
+         
             initializeMapZoom();
             loadMarkers();
         }
 
-        function initializeMapZoom() {
+                 function initializeMapZoom() {
             const stage = document.querySelector(".layout-stage");
             const wrap = document.getElementById("imageWrap");
             if (!stage || !wrap || stage.dataset.zoomReady === "true") return;
@@ -718,20 +779,79 @@
             stage.dataset.zoomReady = "true";
             applyMapTransform();
 
+            let isDragging = false;
+            let dragStartX = 0;
+            let dragStartY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+            window.layoutDragMoved = false;
+            stage.addEventListener("pointerdown", event => {
+                if (event.button !== undefined && event.button !== 0) return;
+                isDragging = true;
+                moved = false;
+                window.layoutDragMoved = false;
+                dragStartX = event.clientX;
+                dragStartY = event.clientY;
+                startScrollLeft = stage.scrollLeft;
+                startScrollTop = stage.scrollTop;
+                stage.classList.add("dragging");
+                stage.setPointerCapture(event.pointerId);
+            });
+
+            stage.addEventListener("pointermove", event => {
+                if (!isDragging) return;
+
+                const dx = event.clientX - dragStartX;
+                const dy = event.clientY - dragStartY;
+
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+                moved = true;
+                window.layoutDragMoved = true;
+            }
+
+                stage.scrollLeft = startScrollLeft - dx;
+                stage.scrollTop = startScrollTop - dy;
+            });
+
+                    stage.addEventListener("pointerup", event => {
+            isDragging = false;
+            stage.classList.remove("dragging");
+
+            if (stage.hasPointerCapture(event.pointerId)) {
+                stage.releasePointerCapture(event.pointerId);
+            }
+
+            if (moved) {
+                event.preventDefault();
+                event.stopPropagation();
+                setTimeout(() => window.layoutDragMoved = false, 0);
+                return;
+            }
+
+            handleLayoutPointerTap(event);
+        });
+
             stage.addEventListener("wheel", event => {
                 event.preventDefault();
-                const rect = wrap.getBoundingClientRect();
+
                 const oldScale = mapView.scale;
-                const direction = event.deltaY < 0 ? 1 : -1;
-                const nextScale = Math.max(1, Math.min(5, oldScale + direction * 0.25));
+                const zoomFactor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
+                const nextScale = Math.max(1, Math.min(6, oldScale * zoomFactor));
                 if (nextScale === oldScale) return;
 
-                const localX = (event.clientX - rect.left) / oldScale;
-                const localY = (event.clientY - rect.top) / oldScale;
+                const stageRect = stage.getBoundingClientRect();
+                const pointerX = event.clientX - stageRect.left;
+                const pointerY = event.clientY - stageRect.top;
+
+                const beforeX = (stage.scrollLeft + pointerX) / oldScale;
+                const beforeY = (stage.scrollTop + pointerY) / oldScale;
+
                 mapView.scale = nextScale;
-                mapView.x += localX * (oldScale - nextScale);
-                mapView.y += localY * (oldScale - nextScale);
                 applyMapTransform();
+
+                stage.scrollLeft = beforeX * nextScale - pointerX;
+                stage.scrollTop = beforeY * nextScale - pointerY;
             }, { passive: false });
         }
 
@@ -742,10 +862,11 @@
             applyMapTransform();
         }
 
-        function applyMapTransform() {
+                function applyMapTransform() {
             const wrap = document.getElementById("imageWrap");
             if (!wrap) return;
-            wrap.style.transform = `translate(${mapView.x}px, ${mapView.y}px) scale(${mapView.scale})`;
+                      wrap.style.zoom = "";
+        wrap.style.transform = `scale(${mapView.scale})`;
             wrap.style.setProperty("--pin-scale", 1 / mapView.scale);
         }
 
@@ -761,77 +882,189 @@
             if (!container) return;
             container.innerHTML = "";
 
-            const hasUnsavedPoint = selectedPoint !== null;
-            loadedMarkers
-                .filter(marker => {
-                    const checkpointId = Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId"));
-                    return samePath(getValue(marker, "imagePath", "ImagePath"), currentImagePath) &&
-                        !(hasUnsavedPoint && checkpointId === checkpointContext.checkpointId);
-                })
-                .forEach(marker => {
-                    const checkpointId = Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId"));
-                    addPin(
-                        Number(getValue(marker, "xPercent", "XPercent")),
-                        Number(getValue(marker, "yPercent", "YPercent")),
-                        getValue(marker, "markerLabel", "MarkerLabel") || checkpointLabels[checkpointId] || "",
-                        checkpointId === checkpointContext.checkpointId,
-                        Number(getValue(marker, "id", "Id"))
-                    );
-                });
+                    const hasUnsavedPoint = selectedPoint !== null;
+        const visibleByCheckpoint = new Map();
 
-            if (selectedPoint) {
-                addPin(selectedPoint.x, selectedPoint.y, checkpointContext.sampleNo, true);
+            loadedMarkers
+        .filter(marker => {
+            const checkpointId = Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId"));
+            return samePath(getValue(marker, "imagePath", "ImagePath"), normalizePathForSave(currentImagePath)) &&
+                !(hasUnsavedPoint && checkpointId === checkpointContext.checkpointId);
+        })
+        .forEach((marker, index) => {
+            const checkpointId = Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId"));
+            const markerId = Number(getValue(marker, "id", "Id") || getValue(marker, "markerId", "MarkerId") || getValue(marker, "localId", "LocalId") || 0);
+            const sortId = markerId > 0 ? markerId : index;
+            const existing = visibleByCheckpoint.get(checkpointId);
+
+            if (!existing || sortId > existing.sortId) {
+                visibleByCheckpoint.set(checkpointId, { marker, markerId, sortId });
             }
+        });
+
+        [...visibleByCheckpoint.values()]
+                .forEach(({ marker, markerId }) => {
+                    const checkpointId = Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId"));
+                            const x = getMarkerCoordinate(marker, "x");
+        const y = getMarkerCoordinate(marker, "y");
+
+        if (x === null || y === null) {
+            console.warn("Skipping marker with missing/invalid coordinates", marker);
+            return;
         }
 
-        function addPin(x, y, label, active, markerId) {
+        addPin(
+            x,
+            y,
+            getMarkerLabel(marker, checkpointId),
+            checkpointId === checkpointContext.checkpointId,
+            markerId
+        );
+                });
+        if (selectedPoint) {
+            addPin(selectedPoint.x * 100, selectedPoint.y * 100, checkpointContext.sampleNo, true);
+        }
+        }
+
+               function addPin(x, y, label, active, markerId) {
+                           if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+        x = Math.max(0, Math.min(100, x));
+        y = Math.max(0, Math.min(100, y));
             const pin = document.createElement("div");
             pin.className = `marker-pin${active ? " active" : ""}`;
             pin.style.left = `${x}%`;
             pin.style.top = `${y}%`;
             pin.dataset.markerId = markerId || "";
-            pin.title = markerId ? "Double tap to remove marker" : "";
             pin.innerHTML = `<div class="pin-content"><span class="pin-label">${escapeHtml(label || "-")}</span><i class="fa-solid fa-location-dot"></i></div>`;
 
-            if (markerId) {
-                let lastTapAt = 0;
-                pin.addEventListener("click", event => {
-                    event.stopPropagation();
-                });
-                pin.addEventListener("dblclick", event => {
-                    event.stopPropagation();
-                    deleteMarker(markerId);
-                });
-                pin.addEventListener("touchend", event => {
-                    event.stopPropagation();
-                    const now = Date.now();
-                    if (now - lastTapAt < 350) {
-                        event.preventDefault();
-                        deleteMarker(markerId);
-                    }
-                    lastTapAt = now;
-                });
+                 pin.addEventListener("pointerdown", event => {
+            event.stopPropagation();
+        });
+
+        pin.addEventListener("pointerup", event => {
+            event.preventDefault();
+            event.stopPropagation();
+        });
+
+        pin.addEventListener("click", event => {
+            event.stopPropagation();
+        });
+
+        pin.addEventListener("dblclick", event => {
+            event.preventDefault();
+            event.stopPropagation();
+            clearTimeout(layoutClickTimer);
+
+            if (!markerId) {
+                alert("Marker id missing. Please refresh and try again.");
+                return;
             }
+
+            deleteMarker(markerId, true);
+        });
 
             document.getElementById("markerPins").appendChild(pin);
         }
 
-        function placeMarkerFromClick(event) {
-            const image = document.getElementById("layoutImage");
-            const rect = image.getBoundingClientRect();
-            if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) return;
-            selectedPoint = {
-                x: Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100)),
-                y: Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100))
-            };
-            document.getElementById("markerHint").innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>Saving marker...';
-            renderMarkers();
-            saveMarker();
+                let layoutClickTimer = null;
+        let lastLayoutTapTime = 0;
+
+        function validateMarkerSelection() {
+            if (!checkpointContext.checkpointId || Number(checkpointContext.checkpointId) <= 0) {
+                document.getElementById("markerHint").innerHTML =
+                    '<i class="fa-solid fa-circle-exclamation"></i>Select checkpoint/sample before placing marker.';
+                return false;
+            }
+
+            if (!checkpointContext.sampleNo) {
+                document.getElementById("markerHint").innerHTML =
+                    '<i class="fa-solid fa-circle-exclamation"></i>Marker code is missing for this checkpoint.';
+                return false;
+            }
+
+            return true;
         }
 
-        async function deleteMarker(markerId) {
-            if (!markerId) return;
-            if (!confirm("Remove this marker?")) return;
+                function getLayoutPoint(event) {
+            const image = document.getElementById("layoutImage");
+            if (!image) return null;
+
+            const rect = image.getBoundingClientRect();
+
+            if (
+                event.clientX < rect.left ||
+                event.clientX > rect.right ||
+                event.clientY < rect.top ||
+                event.clientY > rect.bottom ||
+                !rect.width ||
+                !rect.height
+            ) {
+                return null;
+            }
+
+            return {
+                x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+                y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height))
+            };
+        }
+
+        function getCurrentCheckpointMarker() {
+            return loadedMarkers.find(marker =>
+                Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId")) === Number(checkpointContext.checkpointId) &&
+                samePath(getValue(marker, "imagePath", "ImagePath"), normalizePathForSave(currentImagePath))
+            );
+        }
+
+        function getMarkerId(marker) {
+            return Number(
+                getValue(marker, "id", "Id") ||
+                getValue(marker, "markerId", "MarkerId") ||
+                getValue(marker, "localId", "LocalId") ||
+                0
+            );
+        }
+
+        function handleLayoutPointerTap(event) {
+            if (event.defaultPrevented || window.layoutDragMoved) return;
+
+            const point = getLayoutPoint(event);
+            if (!point) return;
+
+            const now = Date.now();
+            const isDoubleTap = now - lastLayoutTapTime < 320;
+            lastLayoutTapTime = now;
+
+            clearTimeout(layoutClickTimer);
+
+            if (isDoubleTap) {
+                const marker = getCurrentCheckpointMarker();
+                const markerId = getMarkerId(marker);
+
+                if (!markerId) {
+                    document.getElementById("markerHint").innerHTML =
+                        '<i class="fa-solid fa-circle-exclamation"></i>No saved marker found to remove.';
+                    return;
+                }
+
+                deleteMarker(markerId, true);
+                return;
+            }
+
+            layoutClickTimer = setTimeout(() => {
+                if (!validateMarkerSelection()) return;
+
+                selectedPoint = point;
+                document.getElementById("markerHint").innerHTML =
+                    '<i class="fa-solid fa-spinner fa-spin"></i>Saving marker...';
+
+                renderMarkers();
+                saveMarker();
+            }, 260);
+        }
+
+            async function deleteMarker(markerId, askConfirm = true) {
+        if (!markerId) return;
+        if (askConfirm && !confirm("Are you sure you want to remove this marker?")) return;
 
             const response = await fetch(`/SurveyJobs/DeleteIhmMarker?markerId=${markerId}`, {
                 method: "POST"
@@ -854,6 +1087,7 @@
             button.disabled = true;
             button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving';
             try {
+         
                 const response = await fetch("/SurveyJobs/SaveIhmMarker", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -861,7 +1095,7 @@
                         surveyJobId: checkpointContext.jobId,
                         ihmAreaId: checkpointContext.areaId,
                         ihmCheckpointId: checkpointContext.checkpointId,
-                        imagePath: currentImagePath,
+                        imagePath: normalizePathForSave(currentImagePath),
                         xPercent: selectedPoint.x,
                         yPercent: selectedPoint.y
                     })

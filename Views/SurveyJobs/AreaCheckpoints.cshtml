@@ -284,19 +284,37 @@
         }
 
         .marker-image-wrap {
-            position: relative;
             width: 100%;
+            max-height: 70vh;
+            overflow: auto;
             border: 1px solid #d8e3ee;
             border-radius: 12px;
-            overflow: hidden;
             background: #f5f8fd;
         }
 
-        .marker-image {
-            width: 100%;
-            display: block;
+        .marker-stage {
+            position: relative;
+            display: inline-block;
+            line-height: 0;
         }
 
+        .marker-image {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            object-fit: contain;
+        }
+
+        .marker-pins {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9;
+        }
         .marker-pin {
             position: absolute;
             transform: translate(-50%, -100%);
@@ -304,6 +322,7 @@
             filter: drop-shadow(0 2px 3px rgba(0,0,0,.35));
             pointer-events: auto;
             text-align: center;
+            cursor: pointer;
         }
 
             .marker-pin.active {
@@ -496,7 +515,7 @@
                 var surveyStatus = checkpoint.IsAudited ? "Surveyed" : "Not surveyed yet";
                 var result = Val(checkpoint.Result ?? checkpoint.CheckResult);
 
-                <a class="cp-card" href="/SurveyJobs/CheckpointDetail?jobId=@jobId&areaId=@Model.Id&checkpointId=@checkpoint.Id">
+                <article class="cp-card" onclick="window.location.href='/SurveyJobs/CheckpointDetail?jobId=@jobId&areaId=@Model.Id&checkpointId=@checkpoint.Id'">
                     <div class="cp-head">
                         <div class="cp-left">
                             <span class="type-badge @typeClass">
@@ -551,8 +570,9 @@
                             </div>
                             <div class="result-text">Result: @result</div>
                         </div>
+                        
                     </div>
-                </a>
+                </article>
             }
         </div>
     </main>
@@ -568,8 +588,10 @@
                     <select id="layoutSelect" onchange="changeLayoutImage(this.value)"></select>
                 </div>
                 <div id="markerImageWrap" class="marker-image-wrap">
-                    <img id="markerImage" class="marker-image" src="" alt="Layout" />
-                    <div id="markerPins"></div>
+                    <div id="markerStage" class="marker-stage">
+                        <img id="markerImage" class="marker-image" src="" alt="Layout" />
+                        <div id="markerPins" class="marker-pins"></div>
+                    </div>
                 </div>
             </div>
 
@@ -584,7 +606,10 @@
     <script>
         const layoutOptions = @Html.Raw(layoutOptionsJson);
         let loadedMarkers = [];
-        let markerState = {
+                let markerClickTimer = null;
+                let lastMarkerTapTime = 0;
+        const MARKER_CLICK_DELAY = 260;
+                let markerState = {
             jobId: 0,
             areaId: 0,
             checkpointId: 0,
@@ -600,15 +625,133 @@
             return path.startsWith("/") ? path : "/" + path;
         }
 
-        function samePath(left, right) {
-            return String(left || "").toLowerCase() === String(right || "").toLowerCase();
+                function normalizeMarkerPath(path) {
+            let value = String(path || "").trim();
+
+            if (!value) return "";
+
+            try {
+                const url = new URL(value, window.location.origin);
+                value = url.pathname;
+            } catch {
+                value = value.replace(/^https?:\/\/[^/]+/i, "");
+            }
+
+            return value
+                .replace(/\\/g, "/")
+                .replace(/^\/+/, "")
+                .toLowerCase();
         }
 
-        function markerValue(marker, camelName, pascalName) {
+        function samePath(left, right) {
+            return normalizeMarkerPath(left) === normalizeMarkerPath(right);
+        }
+
+                function markerValue(marker, camelName, pascalName) {
             return marker[camelName] ?? marker[pascalName];
         }
+                function markerValueAny(marker, names) {
+            for (const name of names) {
+                if (marker && marker[name] !== undefined && marker[name] !== null) {
+                    return marker[name];
+                }
+            }
 
-        function populateLayoutSelect() {
+            return null;
+        }
+
+                function markerX(marker) {
+            return markerValueAny(marker, [
+                "xPercent", "XPercent",
+                "xpercent",
+                "normalizedX", "NormalizedX",
+                "normalizedx",
+                "xPercentValue", "XPercentValue"
+            ]);
+        }
+
+        function markerY(marker) {
+            return markerValueAny(marker, [
+                "yPercent", "YPercent",
+                "ypercent",
+                "normalizedY", "NormalizedY",
+                "normalizedy",
+                "yPercentValue", "YPercentValue"
+            ]);
+        }
+                function markerIdValue(marker) {
+            return Number(markerValueAny(marker, [
+                "id", "Id",
+                "markerId", "MarkerId",
+                "localId", "LocalId"
+            ]) || 0);
+        }
+
+        function normalizeMarkerForState(marker) {
+            return {
+                id: markerIdValue(marker),
+                Id: markerIdValue(marker),
+                surveyJobId: Number(markerValue(marker, "surveyJobId", "SurveyJobId") || markerState.jobId),
+                SurveyJobId: Number(markerValue(marker, "surveyJobId", "SurveyJobId") || markerState.jobId),
+                ihmAreaId: Number(markerValue(marker, "ihmAreaId", "IhmAreaId") || markerState.areaId),
+                IhmAreaId: Number(markerValue(marker, "ihmAreaId", "IhmAreaId") || markerState.areaId),
+                ihmCheckpointId: Number(markerValue(marker, "ihmCheckpointId", "IhmCheckpointId") || markerState.checkpointId),
+                IhmCheckpointId: Number(markerValue(marker, "ihmCheckpointId", "IhmCheckpointId") || markerState.checkpointId),
+                imagePath: markerValue(marker, "imagePath", "ImagePath") || markerState.imagePath,
+                ImagePath: markerValue(marker, "imagePath", "ImagePath") || markerState.imagePath,
+                xPercent: markerX(marker),
+                XPercent: markerX(marker),
+                yPercent: markerY(marker),
+                YPercent: markerY(marker),
+                markerLabel: markerLabelText(marker, markerState.label),
+                MarkerLabel: markerLabelText(marker, markerState.label)
+            };
+        }
+        function markerLabelText(marker, fallback) {
+            return markerValueAny(marker, [
+                "markerLabel", "MarkerLabel",
+                "checkpointCode", "CheckpointCode",
+                "sampleCode", "SampleCode",
+                "visualCode", "VisualCode",
+                "sampleNo", "SampleNo"
+            ]) || fallback || "";
+        }
+                function percentToUnit(value) {
+            const number = Number(value);
+            if (!Number.isFinite(number)) return null;
+
+            if (number < 0 || number > 1) {
+                console.warn("Invalid marker coordinate", value);
+                return null;
+            }
+
+            return number;
+        }
+        function syncMarkerOverlaySize() {
+            const img = document.getElementById("markerImage");
+            const stage = document.getElementById("markerStage");
+            const layer = document.getElementById("markerPins");
+
+            if (!img || !stage || !layer || !img.complete || !img.naturalWidth || !img.naturalHeight) {
+                return false;
+            }
+
+            const imageWidth = img.clientWidth || img.getBoundingClientRect().width;
+            const imageHeight = img.clientHeight || img.getBoundingClientRect().height;
+
+            if (!imageWidth || !imageHeight) {
+                return false;
+            }
+
+            stage.style.width = `${imageWidth}px`;
+            stage.style.height = `${imageHeight}px`;
+
+            layer.style.width = `${imageWidth}px`;
+            layer.style.height = `${imageHeight}px`;
+
+            return true;
+        }
+                function populateLayoutSelect() {
             const toolbar = document.getElementById("markerToolbar");
             const select = document.getElementById("layoutSelect");
             select.innerHTML = "";
@@ -651,10 +794,14 @@
             document.getElementById("markerTitle").innerText =
                 "Mark Layout - " + markerState.label;
 
-            document.getElementById("markerImage").src =
-                normalizeImageUrl(markerState.imagePath);
+                    const markerImage = document.getElementById("markerImage");
+        markerImage.onload = function () {
+            syncMarkerOverlaySize();
+            renderMarkers();
+        };
+        markerImage.src = normalizeImageUrl(markerState.imagePath);
 
-            document.getElementById("markerPins").innerHTML = "";
+                    document.getElementById("markerPins").innerHTML = "";
             document.getElementById("markerSaveBtn").disabled = true;
             document.getElementById("markerSaveBtn").innerText = "Save Marker";
             document.getElementById("markerModal").style.display = "flex";
@@ -671,55 +818,161 @@
             markerState.imagePath = imagePath;
             markerState.xPercent = null;
             markerState.yPercent = null;
-            document.getElementById("markerImage").src = normalizeImageUrl(imagePath);
-            document.getElementById("markerSaveBtn").disabled = true;
+                   const markerImage = document.getElementById("markerImage");
+        markerImage.onload = function () {
+            syncMarkerOverlaySize();
+            renderMarkers();
+        };
+        markerImage.src = normalizeImageUrl(markerState.imagePath);
+                    document.getElementById("markerSaveBtn").disabled = true;
             document.getElementById("markerSaveBtn").innerText = "Save Marker";
             await loadExistingMarkers();
         }
 
-        function setSelectedPin(xPercent, yPercent) {
+                function setSelectedPin(xPercent, yPercent) {
             markerState.xPercent = xPercent;
             markerState.yPercent = yPercent;
             renderMarkers();
-            document.getElementById("markerSaveBtn").disabled = false;
+
+            const saveBtn = document.getElementById("markerSaveBtn");
+            saveBtn.disabled = false;
+            saveBtn.innerText = "Save Marker";
         }
 
-        function renderMarkers() {
+                function renderMarkers() {
             const container = document.getElementById("markerPins");
             container.innerHTML = "";
 
             const hasUnsavedSelectedPin = markerState.xPercent !== null && markerState.yPercent !== null;
-            const visibleMarkers = loadedMarkers.filter(marker => {
-                const checkpointId = Number(markerValue(marker, "ihmCheckpointId", "IhmCheckpointId"));
-                return samePath(markerValue(marker, "imagePath", "ImagePath"), markerState.imagePath) &&
-                    !(hasUnsavedSelectedPin && checkpointId === markerState.checkpointId);
-            });
+                  const visibleMarkers = loadedMarkers.filter(marker => {
+            const checkpointId = Number(markerValue(marker, "ihmCheckpointId", "IhmCheckpointId"));
 
-            visibleMarkers.forEach(marker => {
+            return samePath(markerValue(marker, "imagePath", "ImagePath"), markerState.imagePath) &&
+                !(hasUnsavedSelectedPin && checkpointId === markerState.checkpointId);
+        });
+                    console.log("Visible layout markers", visibleMarkers.map(marker => ({
+            id: markerValue(marker, "id", "Id"),
+            checkpointId: markerValue(marker, "ihmCheckpointId", "IhmCheckpointId"),
+            imagePath: markerValue(marker, "imagePath", "ImagePath"),
+            normalizedPath: normalizeMarkerPath(markerValue(marker, "imagePath", "ImagePath")),
+            currentPath: normalizeMarkerPath(markerState.imagePath),
+            x: markerX(marker),
+            y: markerY(marker),
+            label: markerLabelText(marker)
+        })));
+
+                    visibleMarkers.forEach(marker => {
                 const checkpointId = Number(markerValue(marker, "ihmCheckpointId", "IhmCheckpointId"));
                 const isActive = checkpointId === markerState.checkpointId;
-                const x = Number(markerValue(marker, "xPercent", "XPercent"));
-                const y = Number(markerValue(marker, "yPercent", "YPercent"));
-                const label = markerValue(marker, "markerLabel", "MarkerLabel") || (isActive ? markerState.label : "");
-                addMarkerPin(x, y, label, isActive);
-            });
+                        const rawX = markerX(marker);
+        const rawY = markerY(marker);
 
-            if (hasUnsavedSelectedPin) {
-                addMarkerPin(markerState.xPercent, markerState.yPercent, markerState.label, true);
+        if (rawX === null || rawX === undefined || rawX === "" || rawY === null || rawY === undefined || rawY === "") {
+            console.warn("Skipped marker without xPercent/yPercent", marker);
+            return;
+        }
+
+        const x = Number(rawX);
+        const y = Number(rawY);
+
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+            console.warn("Skipped marker with invalid coordinate", marker);
+            return;
+        }
+                const label = markerLabelText(marker, isActive ? markerState.label : "");
+                addMarkerPin(x, y, label, isActive, markerIdValue(marker));
+            });
+           
+
+                    if (hasUnsavedSelectedPin) {
+                addMarkerPin(markerState.xPercent, markerState.yPercent, markerState.label, true, 0);
             }
         }
 
-        function addMarkerPin(xPercent, yPercent, label, isActive) {
+                function addMarkerPin(xPercent, yPercent, label, isActive, markerId) {
+            const img = document.getElementById("markerImage");
+            const layerReady = syncMarkerOverlaySize();
+            if (!layerReady) return;
+
+            const xUnit = percentToUnit(xPercent);
+            const yUnit = percentToUnit(yPercent);
+
+                    if (xUnit === null || yUnit === null) {
+            console.warn("Skipping marker with invalid/raw pixel coordinate", {
+                xPercent,
+                yPercent,
+                label,
+                markerId
+            });
+            return;
+        }
+
+            const imageWidth = img.clientWidth || img.getBoundingClientRect().width;
+            const imageHeight = img.clientHeight || img.getBoundingClientRect().height;
+
+            const markerLeft = xUnit * imageWidth;
+            const markerTop = yUnit * imageHeight;
+
+            console.log("Rendered marker position", {
+                markerId,
+                label,
+                xPercent,
+                yPercent,
+                xUnit,
+                yUnit,
+                renderedImageWidth: imageWidth,
+                renderedImageHeight: imageHeight,
+                naturalWidth: img.naturalWidth,
+                naturalHeight: img.naturalHeight,
+                markerLeft,
+                markerTop
+            });
+
             const pin = document.createElement("div");
             pin.className = `marker-pin${isActive ? " active" : ""}`;
-            pin.style.left = `${xPercent}%`;
-            pin.style.top = `${yPercent}%`;
+            pin.style.left = `${markerLeft}px`;
+            pin.style.top = `${markerTop}px`;
             pin.title = isActive ? "Selected checkpoint" : "Marked checkpoint";
+            pin.dataset.markerId = markerId || "";
             pin.innerHTML = `<span class="pin-label">${escapeHtml(label || "-")}</span><i class="fa-solid fa-location-dot"></i>`;
+            function removeThisMarker(event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (markerClickTimer) {
+                clearTimeout(markerClickTimer);
+                markerClickTimer = null;
+            }
+
+            const id = Number(pin.dataset.markerId || 0);
+
+            if (!id) {
+                alert("Please save this marker before removing it.");
+                return;
+            }
+
+            const ok = window.confirm("Are you sure you want to remove this marker?");
+            if (ok) {
+                deleteMarker(id, false);
+            }
+        }
+
+        pin.addEventListener("dblclick", removeThisMarker);
+
+        pin.addEventListener("touchend", function (event) {
+            const now = Date.now();
+
+            if (now - lastMarkerTapTime < 400) {
+                removeThisMarker(event);
+            }
+
+            lastMarkerTapTime = now;
+        });
+
             document.getElementById("markerPins").appendChild(pin);
         }
 
-        function escapeHtml(value) {
+                function escapeHtml(value) {
             const div = document.createElement("div");
             div.textContent = value ?? "";
             return div.innerHTML;
@@ -731,8 +984,10 @@
                 if (!response.ok) return;
 
                 loadedMarkers = await response.json();
+                        console.log("IHM markers API response", loadedMarkers);
+        console.log("Current layout path", markerState.imagePath, normalizeMarkerPath(markerState.imagePath));
 
-                const existing = loadedMarkers.find(marker =>
+                        const existing = loadedMarkers.find(marker =>
                     Number(markerValue(marker, "ihmCheckpointId", "IhmCheckpointId")) === markerState.checkpointId &&
                     samePath(markerValue(marker, "imagePath", "ImagePath"), markerState.imagePath)
                 );
@@ -756,30 +1011,38 @@
                     "Click on the layout image to place marker.";
             }
         }
+                      document.getElementById("markerStage").addEventListener("click", function (event) {
+            if (event.target.closest(".marker-pin")) return;
 
-        document.getElementById("markerImageWrap").addEventListener("click", function (event) {
-            const img = document.getElementById("markerImage");
-            const rect = img.getBoundingClientRect();
-
-            if (
-                event.clientX < rect.left ||
-                event.clientX > rect.right ||
-                event.clientY < rect.top ||
-                event.clientY > rect.bottom
-            ) {
+            if (event.detail > 1) {
+                if (markerClickTimer) {
+                    clearTimeout(markerClickTimer);
+                    markerClickTimer = null;
+                }
                 return;
             }
 
-            const xPercent = ((event.clientX - rect.left) / rect.width) * 100;
-            const yPercent = ((event.clientY - rect.top) / rect.height) * 100;
+            markerClickTimer = setTimeout(function () {
+                markerClickTimer = null;
 
-            setSelectedPin(
-                Math.max(0, Math.min(100, xPercent)),
-                Math.max(0, Math.min(100, yPercent))
-            );
+                const img = document.getElementById("markerImage");
+                const rect = img.getBoundingClientRect();
+
+                const xPercent = Number(((event.clientX - rect.left) / rect.width).toFixed(6));
+                const yPercent = Number(((event.clientY - rect.top) / rect.height).toFixed(6));
+
+                console.log("WEB CLICK COORDINATES", { xPercent, yPercent, rect });
+
+                if (xPercent < 0 || xPercent > 1 || yPercent < 0 || yPercent > 1) {
+                    return;
+                }
+
+                setSelectedPin(xPercent, yPercent);
+            }, MARKER_CLICK_DELAY);
         });
 
-        async function saveMarker() {
+
+                async function saveMarker() {
             if (markerState.xPercent === null || markerState.yPercent === null) {
                 alert("Please click on layout image first.");
                 return;
@@ -788,40 +1051,126 @@
             const saveBtn = document.getElementById("markerSaveBtn");
             saveBtn.disabled = true;
             saveBtn.innerText = "Saving...";
+                    if (
+            markerState.xPercent < 0 || markerState.xPercent > 1 ||
+            markerState.yPercent < 0 || markerState.yPercent > 1
+        ) {
+            alert("Invalid marker position. Please click inside the layout image again.");
+            saveBtn.disabled = false;
+            saveBtn.innerText = "Save Marker";
+            return;
+        }
+                  const payload = {
+            SurveyJobId: markerState.jobId,
+            IhmAreaId: markerState.areaId,
+            IhmCheckpointId: markerState.checkpointId,
+            ImagePath: markerState.imagePath,
+            XPercent: Number(markerState.xPercent.toFixed(6)),
+            YPercent: Number(markerState.yPercent.toFixed(6))
+        };
+        
+
+            console.log("IHM marker save payload", payload);
 
             try {
                 const response = await fetch("/SurveyJobs/SaveIhmMarker", {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        surveyJobId: markerState.jobId,
-                        ihmAreaId: markerState.areaId,
-                        ihmCheckpointId: markerState.checkpointId,
-                        imagePath: markerState.imagePath,
-                        xPercent: markerState.xPercent,
-                        yPercent: markerState.yPercent
-                    })
+                            headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            surveyJobId: payload.SurveyJobId,
+            ihmAreaId: payload.IhmAreaId,
+            ihmCheckpointId: payload.IhmCheckpointId,
+            imagePath: payload.ImagePath,
+            xPercent: payload.XPercent,
+            yPercent: payload.YPercent,
+            SurveyJobId: payload.SurveyJobId,
+            IhmAreaId: payload.IhmAreaId,
+            IhmCheckpointId: payload.IhmCheckpointId,
+            ImagePath: payload.ImagePath,
+            XPercent: payload.XPercent,
+            YPercent: payload.YPercent
+        })
                 });
 
+                const bodyText = await response.text();
+
                 if (!response.ok) {
-                    const text = await response.text();
-                    throw new Error(text || "Failed to save marker.");
+                    throw new Error(bodyText || "Failed to save marker.");
+                }
+
+                const savedMarker = bodyText ? JSON.parse(bodyText) : null;
+                console.log("IHM marker save API response", savedMarker);
+
+                if (savedMarker) {
+                    const normalizedSaved = normalizeMarkerForState(savedMarker);
+
+                    loadedMarkers = loadedMarkers.filter(marker =>
+                        !(
+                            Number(markerValue(marker, "ihmCheckpointId", "IhmCheckpointId")) === markerState.checkpointId &&
+                            samePath(markerValue(marker, "imagePath", "ImagePath"), markerState.imagePath)
+                        )
+                    );
+
+                    loadedMarkers.unshift(normalizedSaved);
+                    markerState.xPercent = null;
+                    markerState.yPercent = null;
+                    renderMarkers();
                 }
 
                 document.getElementById("markerHint").innerText = "Marker saved.";
                 saveBtn.innerText = "Saved";
-                markerState.xPercent = null;
-                markerState.yPercent = null;
+
                 await loadExistingMarkers();
-                setTimeout(closeMarkerModal, 700);
             } catch (error) {
                 alert(error.message || "Failed to save marker.");
                 saveBtn.disabled = false;
                 saveBtn.innerText = "Save Marker";
             }
         }
+
+             async function deleteMarker(markerId, askConfirm = true) {
+        if (!markerId) return;
+
+        if (askConfirm && !confirm("Are you sure you want to remove this marker?")) {
+            return;
+        }
+
+        console.log("Deleting IHM marker", { markerId });
+
+            try {
+                const response = await fetch(`/SurveyJobs/DeleteIhmMarker?markerId=${markerId}`, {
+                    method: "POST"
+                });
+
+                const bodyText = await response.text();
+                console.log("IHM marker delete API response", {
+                    markerId,
+                    ok: response.ok,
+                    status: response.status,
+                    body: bodyText
+                });
+
+                if (!response.ok) {
+                    throw new Error(bodyText || "Failed to delete marker.");
+                }
+
+                markerState.xPercent = null;
+                markerState.yPercent = null;
+                document.getElementById("markerSaveBtn").disabled = true;
+                document.getElementById("markerSaveBtn").innerText = "Save Marker";
+                document.getElementById("markerHint").innerText = "Marker removed.";
+
+                await loadExistingMarkers();
+            } catch (error) {
+                alert(error.message || "Failed to delete marker.");
+            }
+        }
+                window.addEventListener("resize", function () {
+            syncMarkerOverlaySize();
+            renderMarkers();
+        });
     </script>
 </body>
 </html>

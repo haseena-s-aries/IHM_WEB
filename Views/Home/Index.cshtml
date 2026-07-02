@@ -153,7 +153,7 @@
 
     .module-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(2, 1fr);
         gap: 14px;
         margin-top: 22px;
     }
@@ -368,7 +368,7 @@
 
     <section class="hero">
         <div class="hero-small">Marine Operations</div>
-        <h1>Welcome, Administrator</h1>
+        <h1>Welcome, @(ViewData["FullName"] ?? "Surveyor")</h1>
         <p>Everything is organized and ready for review.</p>
 
         <div class="status-pill">
@@ -378,14 +378,14 @@
     </section>
 
     <div class="module-grid">
-        <a class="module-card green" href="#" data-bs-toggle="modal" data-bs-target="#createCertificateModal">
+        @* <a class="module-card green" href="#" data-bs-toggle="modal" data-bs-target="#createCertificateModal">
             <div>
                 <div class="module-icon"><i class="fa-solid fa-certificate"></i></div>
                 <div class="module-title">Certificates</div>
                 <div class="module-text">Loadout · Towage<br />Seafastening</div>
             </div>
             <strong>Open <i class="fa-solid fa-arrow-right"></i></strong>
-        </a>
+        </a> *@
 
         <a class="module-card blue" href="@Url.Action("Ihm", "SurveyJobs")">
             <div>
@@ -412,7 +412,7 @@
         <div class="summary-card">
             <div class="summary-icon i-green"><i class="fa-solid fa-clipboard-check"></i></div>
             <div>
-                <div class="summary-number">@Model.TotalCertificates</div>
+                <div class="summary-number">@Model.TotalSurveyJobs</div>
                 <div class="summary-label">Survey Jobs</div>
             </div>
         </div>
@@ -420,7 +420,7 @@
         <div class="summary-card">
             <div class="summary-icon i-blue"><i class="fa-solid fa-box-archive"></i></div>
             <div>
-                <div class="summary-number">5</div>
+                <div class="summary-number">@Model.IhmSurveyJobs</div>
                 <div class="summary-label">IHM Survey</div>
             </div>
         </div>
@@ -428,7 +428,7 @@
         <div class="summary-card">
             <div class="summary-icon i-red"><i class="fa-solid fa-route"></i></div>
             <div>
-                <div class="summary-number">0</div>
+                <div class="summary-number">@Model.ExSurveyJobs</div>
                 <div class="summary-label">Ex-Survey</div>
             </div>
         </div>
@@ -436,7 +436,7 @@
         <div class="summary-card">
             <div class="summary-icon i-cyan"><i class="fa-solid fa-cloud-arrow-up"></i></div>
             <div>
-                <div class="summary-number">0</div>
+                <div class="summary-number">@Model.SubmittedSurveyJobs</div>
                 <div class="summary-label">Submitted</div>
             </div>
         </div>
