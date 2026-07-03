@@ -329,6 +329,11 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
+            overflow: hidden;
+            contain: layout paint;
+            overflow: hidden;
+            contain: layout paint;
+            pointer-events: none;
         }
         .marker-pin {
             position: absolute;
@@ -348,6 +353,7 @@
             transform: scale(var(--pin-scale, 1));
             transform-origin: 50% 0;
             filter: drop-shadow(0 2px 3px rgba(0,0,0,.35));
+            white-space: nowrap;
         }
         .marker-pin.active { color: #1e90ff; --pin-color: #1e90ff; }
         .pin-label {
@@ -617,6 +623,9 @@
                 <button id="markerSaveBtn" class="layout-action" type="button" onclick="saveMarker()" disabled hidden>
                     <i class="fa-solid fa-floppy-disk"></i> Save Marker
                 </button>
+                <button id="autoMapMarkersBtn" class="layout-action" type="button" onclick="autoMapExistingMarkers()">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Auto Map Existing Markers
+                </button>
                 <div class="layout-stage">
                     @if (string.IsNullOrWhiteSpace(layoutPath))
                     {
@@ -795,7 +804,7 @@
                 dragStartY = event.clientY;
                 startScrollLeft = stage.scrollLeft;
                 startScrollTop = stage.scrollTop;
-                stage.classList.add("dragging");
+                
                 stage.setPointerCapture(event.pointerId);
             });
 
@@ -805,13 +814,16 @@
                 const dx = event.clientX - dragStartX;
                 const dy = event.clientY - dragStartY;
 
-            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-                moved = true;
-                window.layoutDragMoved = true;
-            }
+                   if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+            moved = true;
+            window.layoutDragMoved = true;
+            stage.classList.add("dragging");
+        }
 
-                stage.scrollLeft = startScrollLeft - dx;
-                stage.scrollTop = startScrollTop - dy;
+                       if (moved) {
+            stage.scrollLeft = startScrollLeft - dx;
+            stage.scrollTop = startScrollTop - dy;
+        }
             });
 
                     stage.addEventListener("pointerup", event => {
@@ -869,7 +881,48 @@
         wrap.style.transform = `scale(${mapView.scale})`;
             wrap.style.setProperty("--pin-scale", 1 / mapView.scale);
         }
+                async function autoMapExistingMarkers() {
+            const button = document.getElementById("autoMapMarkersBtn");
+            if (!button) return;
 
+            button.disabled = true;
+            button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Auto mapping...';
+
+            try {
+                const response = await fetch("/SurveyJobs/AutoMapLayoutMarkers", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        jobId: checkpointContext.jobId,
+                        areaId: checkpointContext.areaId,
+                        imagePath: normalizePathForSave(currentImagePath)
+                    })
+                });
+
+                const text = await response.text();
+                const result = text ? JSON.parse(text) : {};
+
+                console.log("Auto map existing markers response", result);
+
+                if (!response.ok) {
+                    throw new Error(result.message || text || "Auto mapping failed.");
+                }
+
+                document.getElementById("markerHint").innerHTML =
+                    `<i class="fa-solid fa-circle-check"></i>Mapped ${result.mapped || 0} marker(s).`;
+
+                await loadMarkers();
+
+                if (result.needsReview) {
+                    alert("Auto mapping completed, but detected marker count does not match sample count. Please review marker positions.");
+                }
+            } catch (error) {
+                alert(error.message || "Auto mapping failed.");
+            } finally {
+                button.disabled = false;
+                button.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Auto Map Existing Markers';
+            }
+        }
         async function loadMarkers() {
             const response = await fetch(`/SurveyJobs/GetIhmMarkers?jobId=${checkpointContext.jobId}`);
             if (!response.ok) return;
@@ -1057,7 +1110,6 @@
                 document.getElementById("markerHint").innerHTML =
                     '<i class="fa-solid fa-spinner fa-spin"></i>Saving marker...';
 
-                renderMarkers();
                 saveMarker();
             }, 260);
         }

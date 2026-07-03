@@ -291,6 +291,46 @@ namespace Survery_Certification_App_Consume.Controllers
                 return RedirectToAction("SurveyAreas", new { jobId });
             }
         }
+        [HttpPost]
+        public async Task<IActionResult> AutoMapLayoutMarkers([FromBody] AutoMapLayoutMarkersRequest request)
+        {
+            try
+            {
+                var client = CreateApiClient();
+                var userId = HttpContext.Session.GetInt32("UserId") ?? 0;
+
+                var payload = new
+                {
+                    areaId = request.AreaId,
+                    imagePath = request.ImagePath,
+                    userId
+                };
+
+                var response = await client.PostAsync(
+                    $"ihm-survey/jobs/{request.JobId}/layouts/auto-map-markers",
+                    new StringContent(
+                        JsonConvert.SerializeObject(payload),
+                        Encoding.UTF8,
+                        "application/json"
+                    )
+                );
+
+                var body = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Response.StatusCode = (int)response.StatusCode;
+                    return Content(body, "application/json");
+                }
+
+                return Content(body, "application/json");
+            }
+            catch (Exception ex)
+            {
+                Response.StatusCode = 500;
+                return Json(new { message = ex.Message });
+            }
+        }
         [HttpGet]
         public async Task<IActionResult> GetIhmMarkers(int jobId)
         {
@@ -992,7 +1032,12 @@ namespace Survery_Certification_App_Consume.Controllers
             };
         }
     }
-
+    public class AutoMapLayoutMarkersRequest
+    {
+        public int JobId { get; set; }
+        public int AreaId { get; set; }
+        public string ImagePath { get; set; } = string.Empty;
+    }
     public class SurveyJobCreateRequest
     {
         public string SurveyType { get; set; } = "IHM Survey";
