@@ -22,6 +22,9 @@
         public decimal YPercent { get; set; }
         public string? MarkerLabel { get; set; }
         public string? Notes { get; set; }
+        public string? Source { get; set; }
+        public bool SuppressRender { get; set; }
+        public bool IsManualForExistingImage { get; set; }
     }
 
     public class SaveIhmMarkerRequest
@@ -33,6 +36,9 @@
         public decimal XPercent { get; set; }
         public decimal YPercent { get; set; }
         public string? Notes { get; set; }
+        public string? Source { get; set; }
+        public bool SuppressRender { get; set; }
+        public bool IsManualForExistingImage { get; set; }
     }
     public class IhmLayoutAttachmentDto
     {

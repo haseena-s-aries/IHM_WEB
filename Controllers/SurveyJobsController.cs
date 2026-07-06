@@ -392,6 +392,9 @@ namespace Survery_Certification_App_Consume.Controllers
                     xPercent = request.XPercent,
                     yPercent = request.YPercent,
                     notes = request.Notes,
+                    source = request.Source,
+                    suppressRender = request.SuppressRender,
+                    isManualForExistingImage = request.IsManualForExistingImage,
                     createdByUserId = userId
                 };
 
@@ -461,14 +464,19 @@ namespace Survery_Certification_App_Consume.Controllers
                     .Replace("/api/", "/")
                     .Replace("/api", "")
                     .TrimEnd('/');
-                ViewBag.CheckpointLabels = area.Checkpoints
-                    .Where(x => x.Id > 0)
-                    .ToDictionary(
-                        x => x.Id,
-                        x => string.IsNullOrWhiteSpace(x.SampleNo)
-                            ? x.Location ?? x.Id.ToString()
-                            : x.SampleNo
-                    );
+                ViewBag.CheckpointLabels = areas
+    .SelectMany(x => x.Checkpoints ?? new List<IhmCheckpointOptionDto>())
+    .Where(x => x.Id > 0)
+    .Where(x => x.SurveyJobId == jobId)
+    .Where(x => !string.IsNullOrWhiteSpace(x.SampleNo))
+    .Where(x => string.Equals(
+        (x.CheckResult ?? "").Trim(),
+        "YES",
+        StringComparison.OrdinalIgnoreCase))
+    .ToDictionary(
+        x => x.Id,
+        x => x.SampleNo!.Trim()
+    );
                 ViewBag.Layouts = attachments
                     .Where(x =>
                         string.Equals(x.Target, "common", StringComparison.OrdinalIgnoreCase) ||
@@ -502,9 +510,9 @@ namespace Survery_Certification_App_Consume.Controllers
                     component = request.Component,
                     materialCategory = request.MaterialCategory,
                     hazardousMaterial = request.HazardousMaterial,
-                    quantityUnitKg = ToNullableDecimal(request.QuantityUnitKg),
-                    quantityNo = ToNullableDecimal(request.QuantityNo),
-                    quantityTotalKg = ToNullableDecimal(request.QuantityTotalKg),
+                    quantityUnitKg = CleanTextValue(request.QuantityUnitKg),
+                    quantityNo = CleanTextValue(request.QuantityNo),
+                    quantityTotalKg = CleanTextValue(request.QuantityTotalKg),
                     manufacturerBrandName = request.ManufacturerBrandName,
                     documentAnalysisResult = request.DocumentAnalysisResult,
                     samplingCheck = request.SamplingCheck,
@@ -1012,6 +1020,13 @@ namespace Survery_Certification_App_Consume.Controllers
 
             var json = await response.Content.ReadAsStringAsync();
             return JsonConvert.DeserializeObject<T>(json);
+        }
+        private static string? CleanTextValue(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Trim() == "-")
+                return null;
+
+            return value.Trim();
         }
         private static decimal? ToNullableDecimal(string? value)
         {

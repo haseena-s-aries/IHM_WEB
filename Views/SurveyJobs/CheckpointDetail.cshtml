@@ -240,6 +240,89 @@
         }
         .switch input:checked + .slider { background: rgba(0, 212, 170, .22); border-color: #00d4aa; }
         .switch input:checked + .slider:before { transform: translateX(20px); background: #00d4aa; }
+
+        .auto-map-summary {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .auto-map-column {
+            background: #fff;
+            border: 1px solid #d8e3ee;
+            border-radius: 8px;
+            padding: 10px;
+            min-width: 0;
+        }
+
+            .auto-map-column h4 {
+                margin: 0 0 8px;
+                font-size: 13px;
+                font-weight: 800;
+                color: #102033;
+            }
+
+        .sample-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+            .sample-list.muted {
+                color: #607d9a;
+            }
+
+        .sample-pill {
+            border: 1px solid #cfe0ef;
+            border-radius: 999px;
+            padding: 4px 8px;
+            background: #f7fbff;
+            font-weight: 700;
+        }
+
+            .sample-pill.mapped {
+                border-color: #7bcf9b;
+                background: #effaf3;
+                color: #247044;
+            }
+
+            .sample-pill.pending {
+                border-color: #ffc46b;
+                background: #fff7e8;
+                color: #8a5a00;
+            }
+
+        .pending-map-row {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+            .pending-map-row button {
+                border: 1px solid #d8e3ee;
+                background: #fff;
+                color: #102033;
+                border-radius: 7px;
+                padding: 2px 6px;
+                font-size: 10px;
+                font-weight: 800;
+            }
+
+                .pending-map-row button:hover {
+                    border-color: #1e90ff;
+                    color: #1e90ff;
+                }
+
+        @@media (max-width: 800px) {
+            .auto-map-summary
+
+        {
+            grid-template-columns: 1fr;
+        }
+
+        }
         .layout-shell {
             min-height: calc(100vh - 170px);
             position: relative;
@@ -355,7 +438,23 @@
             filter: drop-shadow(0 2px 3px rgba(0,0,0,.35));
             white-space: nowrap;
         }
-        .marker-pin.active { color: #1e90ff; --pin-color: #1e90ff; }
+
+        .marker-pin.active {
+            color: #1e90ff;
+            --pin-color: #1e90ff;
+        }
+
+            .marker-pin.ocr-existing,
+            .marker-pin.active.ocr-existing {
+                color: #14a06f;
+                --pin-color: #14a06f;
+            }
+
+                .marker-pin.ocr-existing .pin-label::after {
+                  
+                    font-size: 9px;
+                    font-weight: 800;
+                }
         .pin-label {
             display: block;
             min-width: 34px;
@@ -626,6 +725,20 @@
                 <button id="autoMapMarkersBtn" class="layout-action" type="button" onclick="autoMapExistingMarkers()">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Auto Map Existing Markers
                 </button>
+                <div class="auto-map-summary">
+                    <div class="auto-map-column">
+                        <h4>Expected Samples</h4>
+                        <div id="expectedSamplesList" class="sample-list"></div>
+                    </div>
+                    <div class="auto-map-column">
+                        <h4>Mapped Samples</h4>
+                        <div id="mappedSamplesList" class="sample-list muted">Click Auto Map</div>
+                    </div>
+                    <div class="auto-map-column">
+                        <h4>Pending Samples</h4>
+                        <div id="pendingSamplesList" class="sample-list muted">Click Auto Map</div>
+                    </div>
+                </div>
                 <div class="layout-stage">
                     @if (string.IsNullOrWhiteSpace(layoutPath))
                     {
@@ -668,11 +781,22 @@
             initialLayoutPath: @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(layoutPath))
         };
         const layoutOptions = @Html.Raw(layoutOptionsJson);
+
         const checkpointLabels = @Html.Raw(checkpointLabelsJson);
+             const expectedSamples = Object.entries(checkpointLabels || {})
+        .map(([checkpointId, label]) => ({
+            checkpointId: Number(checkpointId),
+            label: String(label || "").trim()
+        }))
+        .filter(x => x.checkpointId > 0 && x.label && x.label !== "-")
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: "base" }));
         const apiRoot = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(apiRoot));
         let currentImagePath = checkpointContext.initialLayoutPath || (layoutOptions[0]?.filePath ?? "");
         let loadedMarkers = [];
         let selectedPoint = null;
+                let manualMapMode = "new";
+        let manualMapCheckpointId = checkpointContext.checkpointId;
+        let manualMapSampleNo = checkpointContext.sampleNo;
         const mapView = {
             scale: 1,
             x: 0,
@@ -761,6 +885,75 @@
                 "checkpointCode", "CheckpointCode"
             ]) || checkpointLabels[checkpointId] || "";
         }
+              function renderSampleList(elementId, samples, className) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+
+            if (!samples.length) {
+                element.className = "sample-list muted";
+                element.textContent = "None";
+                return;
+            }
+
+            element.className = "sample-list";
+
+            if (elementId === "pendingSamplesList") {
+                element.innerHTML = samples
+                    .map(sample => `
+                        <span class="sample-pill pending pending-map-row">
+                            <strong>${escapeHtml(sample.label || sample)}</strong>
+                            <button type="button" onclick="selectExistingMapSample(${Number(sample.checkpointId)}, '${escapeJs(sample.label)}')">Existing</button>
+                        </span>
+                    `)
+                    .join("");
+                return;
+            }
+
+            element.innerHTML = samples
+                .map(sample => `<span class="sample-pill ${className || ""}">${escapeHtml(sample.label || sample)}</span>`)
+                .join("");
+        }
+
+        function refreshAutoMapLists(result) {
+            const mappedLabels = new Set(
+                loadedMarkers
+                    .filter(marker => samePath(getValue(marker, "imagePath", "ImagePath"), normalizePathForSave(currentImagePath)))
+                    .map(marker => String(getMarkerLabel(marker, Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId"))) || "").trim().toUpperCase())
+                    .filter(Boolean)
+            );
+
+            const mapped = expectedSamples.filter(x => mappedLabels.has(x.label.toUpperCase()));
+            const pending = expectedSamples.filter(x => !mappedLabels.has(x.label.toUpperCase()));
+
+            renderSampleList("expectedSamplesList", expectedSamples, "");
+            renderSampleList("mappedSamplesList", mapped, "mapped");
+            renderSampleList("pendingSamplesList", pending, "pending");
+        }
+                function escapeJs(value) {
+            return String(value || "")
+                .replace(/\\/g, "\\\\")
+                .replace(/'/g, "\\'")
+                .replace(/\n/g, "\\n")
+                .replace(/\r/g, "");
+        }
+
+        function selectExistingMapSample(checkpointId, sampleNo) {
+            manualMapCheckpointId = Number(checkpointId);
+            manualMapSampleNo = sampleNo;
+            manualMapMode = "existing";
+
+            selectedPoint = null;
+            renderMarkers();
+
+            document.getElementById("markerHint").innerHTML =
+                `<i class="fa-solid fa-crosshairs"></i>${escapeHtml(sampleNo)}: click existing sample label/text box.`;
+        }
+
+        function resetManualMapMode() {
+            manualMapMode = "new";
+            manualMapCheckpointId = checkpointContext.checkpointId;
+            manualMapSampleNo = checkpointContext.sampleNo;
+        }
         function escapeHtml(value) {
             const div = document.createElement("div");
             div.textContent = value ?? "";
@@ -778,6 +971,7 @@
          
             initializeMapZoom();
             loadMarkers();
+            renderSampleList("expectedSamplesList", expectedSamples, "");
         }
 
                  function initializeMapZoom() {
@@ -912,6 +1106,7 @@
                     `<i class="fa-solid fa-circle-check"></i>Mapped ${result.mapped || 0} marker(s).`;
 
                 await loadMarkers();
+                refreshAutoMapLists(result);
 
                 if (result.needsReview) {
                     alert("Auto mapping completed, but detected marker count does not match sample count. Please review marker positions.");
@@ -928,6 +1123,7 @@
             if (!response.ok) return;
             loadedMarkers = await response.json();
             renderMarkers();
+            refreshAutoMapLists();
         }
 
         function renderMarkers() {
@@ -966,25 +1162,34 @@
             return;
         }
 
-        addPin(
+                   addPin(
             x,
             y,
             getMarkerLabel(marker, checkpointId),
             checkpointId === checkpointContext.checkpointId,
-            markerId
+            markerId,
+            isExistingImageMarker(marker)
         );
+     
                 });
-        if (selectedPoint) {
-            addPin(selectedPoint.x * 100, selectedPoint.y * 100, checkpointContext.sampleNo, true);
+               if (selectedPoint) {
+            addPin(
+                selectedPoint.x * 100,
+                selectedPoint.y * 100,
+                manualMapSampleNo || checkpointContext.sampleNo,
+                true,
+                0,
+                manualMapMode === "existing"
+            );
         }
         }
 
-               function addPin(x, y, label, active, markerId) {
+            function addPin(x, y, label, active, markerId, isOcrExisting = false) {
                            if (!Number.isFinite(x) || !Number.isFinite(y)) return;
         x = Math.max(0, Math.min(100, x));
         y = Math.max(0, Math.min(100, y));
             const pin = document.createElement("div");
-            pin.className = `marker-pin${active ? " active" : ""}`;
+            pin.className = `marker-pin${active ? " active" : ""}${isOcrExisting ? " ocr-existing" : ""}`;
             pin.style.left = `${x}%`;
             pin.style.top = `${y}%`;
             pin.dataset.markerId = markerId || "";
@@ -1023,13 +1228,13 @@
         let lastLayoutTapTime = 0;
 
         function validateMarkerSelection() {
-            if (!checkpointContext.checkpointId || Number(checkpointContext.checkpointId) <= 0) {
+            if (!manualMapCheckpointId || Number(manualMapCheckpointId) <= 0) {
                 document.getElementById("markerHint").innerHTML =
                     '<i class="fa-solid fa-circle-exclamation"></i>Select checkpoint/sample before placing marker.';
                 return false;
             }
 
-            if (!checkpointContext.sampleNo) {
+           if (!manualMapSampleNo) {
                 document.getElementById("markerHint").innerHTML =
                     '<i class="fa-solid fa-circle-exclamation"></i>Marker code is missing for this checkpoint.';
                 return false;
@@ -1060,7 +1265,12 @@
                 y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height))
             };
         }
+                 function isExistingImageMarker(marker) {
+            const notes = String(firstValue(marker, ["notes", "Notes"]) || "").trim().toLowerCase();
+            const source = String(firstValue(marker, ["source", "Source"]) || "").trim().toLowerCase();
 
+            return notes.includes("ocr-existing-label") || source === "existing-image";
+        }
         function getCurrentCheckpointMarker() {
             return loadedMarkers.find(marker =>
                 Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId")) === Number(checkpointContext.checkpointId) &&
@@ -1139,22 +1349,27 @@
             button.disabled = true;
             button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving';
             try {
-         
+                
                 const response = await fetch("/SurveyJobs/SaveIhmMarker", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        surveyJobId: checkpointContext.jobId,
-                        ihmAreaId: checkpointContext.areaId,
-                        ihmCheckpointId: checkpointContext.checkpointId,
-                        imagePath: normalizePathForSave(currentImagePath),
-                        xPercent: selectedPoint.x,
-                        yPercent: selectedPoint.y
+        surveyJobId: checkpointContext.jobId,
+        ihmAreaId: checkpointContext.areaId,
+        ihmCheckpointId: manualMapCheckpointId,
+        imagePath: normalizePathForSave(currentImagePath),
+        xPercent: selectedPoint.x,
+        yPercent: selectedPoint.y,
+        notes: manualMapMode === "existing" ? "manual-for-existing-image" : null,
+        source: manualMapMode === "existing" ? "existing-image" : "manual",
+        isManualForExistingImage: manualMapMode === "existing",
+        suppressRender: false
                     })
                 });
                 if (!response.ok) throw new Error(await response.text() || "Failed to save marker.");
-                selectedPoint = null;
-                document.getElementById("markerHint").innerHTML = '<i class="fa-solid fa-circle-check"></i>Marker saved.';
+                        selectedPoint = null;
+                        resetManualMapMode();
+                        document.getElementById("markerHint").innerHTML = '<i class="fa-solid fa-circle-check"></i>Marker saved.';
                 await loadMarkers();
             } catch (error) {
                 alert(error.message || "Failed to save marker.");
