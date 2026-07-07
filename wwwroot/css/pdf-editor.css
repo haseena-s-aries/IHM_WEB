@@ -179,10 +179,23 @@ button {
             font-size: 13px;
             line-height: 1.45;
         }
+.field-list-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+    align-items: center;
+    margin: 4px 0;
+}
 
+.field-remove-button {
+    padding: 7px 9px;
+    color: #b42318;
+    border-color: #f0aaa5;
+    background: #fff7f6;
+}
 #fieldList button {
     width: 100%;
-    margin: 4px 0;
+    margin: 0;
     overflow: hidden;
     text-align: left;
     text-overflow: ellipsis;

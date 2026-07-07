@@ -51,17 +51,29 @@ def create_overlay(page_width, page_height, fields):
 
         pdf.setFillColorRGB(0, 0, 0)
         pdf.setFont(font_name, font_size)
-        text_object = pdf.beginText(x + 2, y + height - font_size)
-        text_object.setLeading(font_size * 1.2)
+        leading = font_size * 1.2
         lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
         if bool(value(field, "AutoBullet", False)):
             lines = [
                 line if not line.strip() else f"\u2022 {line.strip()}"
                 for line in lines
             ]
+
+        alignment = str(value(field, "Alignment", "left") or "left").lower()
+        text_y = y + height - font_size
+
         for line in lines:
-            text_object.textLine(line)
-        pdf.drawText(text_object)
+            if alignment == "center":
+                text_width = pdf.stringWidth(line, font_name, font_size)
+                text_x = x + max(2, (width - text_width) / 2)
+            elif alignment == "right":
+                text_width = pdf.stringWidth(line, font_name, font_size)
+                text_x = x + max(2, width - text_width - 2)
+            else:
+                text_x = x + 2
+
+            pdf.drawString(text_x, text_y, line)
+            text_y -= leading
  
     pdf.save()
     packet.seek(0)

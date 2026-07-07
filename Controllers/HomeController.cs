@@ -455,6 +455,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
             public string? Content { get; set; }
             public float FontSize { get; set; } = 12;
             public string FontWeight { get; set; } = "regular";
+            public string Alignment { get; set; } = "left";
             public bool AutoBullet { get; set; }
             public bool CoverOriginal { get; set; } = true;
         }
@@ -500,6 +501,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
                     CoverOriginal = x.CoverOriginal,
                     EditType = x.EditType,
                     FontWeight = x.FontWeight,
+                    Alignment = string.IsNullOrWhiteSpace(x.Alignment) ? "left" : x.Alignment,
                     AutoBullet = x.AutoBullet
                 }).ToList()
             };
@@ -547,7 +549,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
                     tableDataJson = "{}",
                     fontSize = Math.Clamp(field.FontSize, 6, 72),
                     fontWeight = field.FontWeight,
-                    alignment = "left",
+                    alignment = string.IsNullOrWhiteSpace(field.Alignment) ? "left" : field.Alignment,
                     autoBullet = field.AutoBullet,
                     coverOriginal = field.CoverOriginal
                 };

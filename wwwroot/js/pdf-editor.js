@@ -15,7 +15,7 @@ let selectedId = null;
 let selectedPdfText = null;
 let currentPage = 1;
 let tool = "select";
-
+let generatedPreviewMode = false;
 const pageViews = new Map();
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 function newId() {
@@ -238,6 +238,7 @@ function fieldFromSelectedText(text) {
         text,
         fontSize: Number(document.getElementById("fontSize").value) || 12,
         fontWeight: document.getElementById("fontWeight").value,
+        alignment: document.getElementById("textAlignment").value,
         autoBullet: document.getElementById("autoBullet").checked,
         coverOriginal: true
     };
@@ -250,7 +251,7 @@ function editSelectedPdfText() {
     const field = fieldFromSelectedText(originalText);
 
     if (!field) return;
-
+    generatedPreviewMode = false;
     fields.push(field);
     selectedId = field.id;
 
@@ -281,6 +282,7 @@ function editSelectedPdfText() {
 
 function deleteSelected() {
     if (selectedId) {
+        generatedPreviewMode = false;
         const field = fields.find(x => x.id === selectedId);
         fields = fields.filter(x => x.id !== selectedId);
         selectedId = null;
@@ -302,6 +304,7 @@ function deleteSelected() {
 }
 
 function addField() {
+    generatedPreviewMode = false;
     const field = {
         id: newId(),
         editType: "text",
@@ -313,6 +316,7 @@ function addField() {
         text: "Enter text",
         fontSize: Number(document.getElementById("fontSize").value) || 12,
         fontWeight: document.getElementById("fontWeight").value,
+        alignment: document.getElementById("textAlignment").value,
         autoBullet: document.getElementById("autoBullet").checked,
         coverOriginal: document.getElementById("coverOriginal").checked
     };
@@ -332,6 +336,7 @@ function renderFieldsForPage(pageNumber) {
 
     fields
         .filter(x => x.page === pageNumber && x.editType !== "remove_page")
+        .filter(x => !generatedPreviewMode || x.id === selectedId)
         .forEach(field => renderField(view, field));
 }
 
@@ -350,6 +355,7 @@ function renderField(view, field) {
         field.fontWeight === "bold" ? "bold" : "normal";
     element.style.fontStyle =
         field.fontWeight === "italic" ? "italic" : "normal";
+    element.style.textAlign = field.alignment || "left";
 
     const content = document.createElement("div");
     content.className = "field-content";
@@ -378,6 +384,7 @@ function renderField(view, field) {
 
     content.addEventListener("input", () => {
         field.text = content.textContent || "";
+        renderFieldList();
     });
 
     content.addEventListener("blur", () => {
@@ -474,6 +481,8 @@ function updateToolbar(field) {
         Boolean(field.autoBullet);
     document.getElementById("coverOriginal").checked =
         Boolean(field.coverOriginal);
+    document.getElementById("textAlignment").value =
+        field.alignment || "left";
     document.getElementById("pageNumber").textContent = field.page;
 }
 
@@ -530,11 +539,31 @@ function renderFieldList() {
     list.replaceChildren();
 
     for (const field of fields) {
+        const item = document.createElement("div");
+        item.className = "field-list-item";
+
         const button = document.createElement("button");
 
         button.textContent = field.editType === "remove_page"
             ? `Page ${field.page}: Remove page`
             : `Page ${field.page}: ${field.text || "Empty field"}`;
+
+        const removeButton = document.createElement("button");
+        removeButton.type = "button";
+        removeButton.className = "field-remove-button";
+        removeButton.textContent = "Remove";
+        removeButton.onclick = event => {
+            event.stopPropagation();
+            fields = fields.filter(x => x.id !== field.id);
+
+            if (selectedId === field.id) {
+                selectedId = null;
+            }
+
+            renderFieldsForPage(field.page);
+            updateRemovedPageStyle(field.page);
+            renderFieldList();
+        };
 
         button.onclick = () => {
             currentPage = field.page;
@@ -546,13 +575,18 @@ function renderFieldList() {
             });
 
             updateCurrentPage();
-            renderFieldsForPage(field.page);
+            renderAllVisibleFields();
         };
 
-        list.appendChild(button);
+        item.append(button, removeButton);
+        list.appendChild(item);
     }
 }
-
+function renderAllVisibleFields() {
+    for (const pageNumber of pageViews.keys()) {
+        renderFieldsForPage(pageNumber);
+    }
+}
 function updateCurrentPage() {
     const stageRect = stage.getBoundingClientRect();
     let closestPage = currentPage;
@@ -661,25 +695,16 @@ async function generate() {
         status.textContent = "Opening edited PDF...";
         const generatedBlob = await response.blob();
         const generatedBytes = await generatedBlob.arrayBuffer();
-        const downloadUrl = URL.createObjectURL(generatedBlob);
-        const downloadLink = document.createElement("a");
-        downloadLink.href = downloadUrl;
-        downloadLink.download =
-            `${config.type}-report-${config.id}-edited.pdf`;
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        downloadLink.remove();
 
-        fields = [];
         selectedId = null;
         selectedPdfText = null;
-        currentPage = 1;
+        generatedPreviewMode = true;
 
         await loadPdf(generatedBytes);
         await renderAllPages();
         renderFieldList();
         updateCurrentPage();
-        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+        renderAllVisibleFields();
 
         status.textContent = "PDF updated";
         alert("PDF generated successfully.");
@@ -726,6 +751,7 @@ document.getElementById("fontSize").onchange = event => {
     renderFieldsForPage(field.page);
 };
 
+
 document.getElementById("fontWeight").onchange = event => {
     const field = fields.find(x => x.id === selectedId);
     if (!field) return;
@@ -733,7 +759,13 @@ document.getElementById("fontWeight").onchange = event => {
     field.fontWeight = event.target.value;
     renderFieldsForPage(field.page);
 };
+document.getElementById("textAlignment").onchange = event => {
+    const field = fields.find(x => x.id === selectedId);
+    if (!field) return;
 
+    field.alignment = event.target.value;
+    renderFieldsForPage(field.page);
+};
 document.getElementById("autoBullet").onchange = event => {
     const field = fields.find(x => x.id === selectedId);
     if (field) field.autoBullet = event.target.checked;
