@@ -180,9 +180,24 @@ button {
             line-height: 1.45;
         }
 
+.field-list-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+    align-items: center;
+    margin: 4px 0;
+}
+
+.field-remove-button {
+    padding: 7px 9px;
+    color: #b42318;
+    border-color: #f0aaa5;
+    background: #fff7f6;
+}
+
 #fieldList button {
     width: 100%;
-    margin: 4px 0;
+    margin: 0;
     overflow: hidden;
     text-align: left;
     text-overflow: ellipsis;
@@ -373,6 +388,7 @@ button {
     opacity: 0.6;
     cursor: not-allowed;
 }
+
 .pdf-load-error {
     display: flex;
     flex-direction: column;
@@ -387,11 +403,11 @@ button {
     box-shadow: 0 12px 35px rgba(153, 27, 27, 0.08);
 }
 
-.pdf-load-error strong {
-    font-size: 18px;
-}
+    .pdf-load-error strong {
+        font-size: 18px;
+    }
 
-.pdf-load-error span {
-    color: #7f1d1d;
-    line-height: 1.5;
-}
+    .pdf-load-error span {
+        color: #7f1d1d;
+        line-height: 1.5;
+    }

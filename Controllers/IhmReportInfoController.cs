@@ -425,18 +425,29 @@ namespace Survery_Certification_App_Consume.Controllers
         {
             try
             {
-                var response = await CreateApiClient().GetAsync($"ihm-report-info/jobs/{jobId}");
+                var client = CreateApiClient();
+                var response = await client.GetAsync($"ihm-report-info/jobs/{jobId}");
                 if (!response.IsSuccessStatusCode)
-                    return null;
+                {
+                    var error = await ReadError(response, "Unable to load IHM report information.");
+                    _logger.LogWarning(
+                        "IHM report-info API failed for job {JobId}. Status: {StatusCode}. Error: {Error}",
+                        jobId,
+                        response.StatusCode,
+                        error);
+                    return await LoadStarterModel(jobId);
+                }
 
                 var data = JsonConvert.DeserializeObject<IhmReportApiResponse>(
                     await response.Content.ReadAsStringAsync());
                 if (data == null)
-                    return null;
+                    return await LoadStarterModel(jobId);
 
                 var report = data.ReportInfo ?? new IhmReportInfoData();
                 var vessel = data.Vessel ?? new IhmVesselViewModel();
                 var job = data.Job ?? new IhmJobViewModel();
+                var necessaryInformationPoints = data.NecessaryInformationPoints ?? new();
+                var appendixFiveInformationPoints = data.AppendixFiveInformationPoints ?? new();
 
                 var model = new IhmReportInfoViewModel
                 {
@@ -513,27 +524,113 @@ namespace Survery_Certification_App_Consume.Controllers
                     OhsApprovedBySignPath = report.OhsApprovedBySignPath,
                     OhsApprovedDate = report.OhsApprovedDate,
                     NecessaryInformationText = string.Join(Environment.NewLine,
-                        data.NecessaryInformationPoints.Select(x => x.Description).Where(x => !string.IsNullOrWhiteSpace(x))),
+                        necessaryInformationPoints.Select(x => x.Description).Where(x => !string.IsNullOrWhiteSpace(x))),
                     AppendixFiveInformationText = string.Join(Environment.NewLine,
-                        data.AppendixFiveInformationPoints.Select(x => x.Description).Where(x => !string.IsNullOrWhiteSpace(x))),
-                    Revisions = data.Revisions,
-                    PaintAndCoatingSystems = data.PaintAndCoatingSystems,
-                    EquipmentAndMachinery = data.EquipmentAndMachinery,
-                    StructureAndHull = data.StructureAndHull,
-                    OhsPeople = data.OhsPeople,
-                    OhsRiskAssessmentRows = data.OhsRiskAssessmentRows,
-                    AppendixOneResultPoints = data.AppendixOneResultPoints,
-                    AppendixTwoAttachments = data.AppendixTwoAttachments,
-                    AppendixFiveAttachments = data.AppendixFiveAttachments,
-                    AppendixSevenAttachments = data.AppendixSevenAttachments,
-                    CustomAppendices = data.CustomAppendices
+                        appendixFiveInformationPoints.Select(x => x.Description).Where(x => !string.IsNullOrWhiteSpace(x))),
+                    Revisions = data.Revisions ?? new(),
+                    PaintAndCoatingSystems = data.PaintAndCoatingSystems ?? new(),
+                    EquipmentAndMachinery = data.EquipmentAndMachinery ?? new(),
+                    StructureAndHull = data.StructureAndHull ?? new(),
+                    OhsPeople = data.OhsPeople ?? new(),
+                    OhsRiskAssessmentRows = data.OhsRiskAssessmentRows ?? new(),
+                    AppendixOneResultPoints = data.AppendixOneResultPoints ?? new(),
+                    AppendixTwoAttachments = data.AppendixTwoAttachments ?? new(),
+                    AppendixFiveAttachments = data.AppendixFiveAttachments ?? new(),
+                    AppendixSevenAttachments = data.AppendixSevenAttachments ?? new(),
+                    CustomAppendices = data.CustomAppendices ?? new()
                 };
 
                 EnsureStarterRows(model);
                 return model;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Unable to load IHM report model for job {JobId}. Loading starter model.", jobId);
+                return await LoadStarterModel(jobId);
+            }
+        }
+
+        private async Task<IhmReportInfoViewModel?> LoadStarterModel(int jobId)
+        {
+            try
+            {
+                var client = CreateApiClient();
+                var jobResponse = await client.GetAsync($"survey/jobs/{jobId}");
+                if (!jobResponse.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning(
+                        "Unable to load starter IHM report because survey job {JobId} was not found. Status: {StatusCode}. Error: {Error}",
+                        jobId,
+                        jobResponse.StatusCode,
+                        await ReadError(jobResponse, "Survey job not found."));
+                    return null;
+                }
+
+                var job = JsonConvert.DeserializeObject<SurveyJobDto>(
+                    await jobResponse.Content.ReadAsStringAsync());
+                if (job == null)
+                    return null;
+
+                VesselDto? vessel = null;
+                if (job.VesselId.HasValue && job.VesselId.Value > 0)
+                {
+                    var vesselResponse = await client.GetAsync($"vessels/{job.VesselId.Value}");
+                    if (vesselResponse.IsSuccessStatusCode)
+                    {
+                        vessel = JsonConvert.DeserializeObject<VesselDto>(
+                            await vesselResponse.Content.ReadAsStringAsync());
+                    }
+                }
+
+                var model = new IhmReportInfoViewModel
+                {
+                    JobId = jobId,
+                    VesselId = job.VesselId,
+                    VesselName = vessel?.VesselName ?? job.VesselName,
+                    ImoNumber = vessel?.ImoNumber ?? job.ImoNumber,
+                    OfficialNumber = vessel?.OfficialNumber,
+                    VesselType = vessel?.VesselType,
+                    Flag = vessel?.Flag,
+                    PortOfRegistry = vessel?.PortOfRegistry,
+                    ClassSociety = vessel?.ClassSociety,
+                    CallSign = vessel?.CallSign,
+                    Builder = vessel?.Builder,
+                    DateOfBuild = vessel?.DateOfBuild,
+                    LengthOverall = vessel?.LengthOverall,
+                    LengthBetweenPerpendiculars = vessel?.LengthBetweenPerpendiculars,
+                    Breadth = vessel?.Breadth,
+                    Depth = vessel?.Depth,
+                    DraughtMoulded = vessel?.DraughtMoulded,
+                    GrossTonnage = vessel?.GrossTonnage,
+                    NetTonnage = vessel?.NetTonnage,
+                    Deadweight = vessel?.Deadweight,
+                    YearBuilt = vessel?.YearBuilt,
+                    OwnerName = vessel?.OwnerName,
+                    ShipManager = vessel?.ManagerName,
+                    JobNumber = job.JobNumber,
+                    ProjectName = job.ProjectName,
+                    SiteOfCheck = job.AuditPort,
+                    DateOfSurvey = job.StartDate,
+                    ClientName = job.ClientName,
+                    OhsJobDetail = job.ProjectName,
+                    OhsClient = job.ClientName,
+                    OhsJobLocation = job.SiteName,
+                    OhsJobNo = job.JobNumber,
+                    SamplingMethodology =
+                        "Wet the sampling location prior to cutting and allow it to harden after cutting to prevent scatter.\nAppropriate safety procedures are followed during onboard survey.",
+                    SamplingOfFragmentsOfPaints =
+                        "Paint suspected to contain Lead & Lead Compounds is collected and analyzed from deck areas.",
+                    Laboratory = "CHEM VI LABORATORY SDN BHD.",
+                    ChemicalAnalysisMethod = "Refer Appendix 2",
+                    LocationOfVisualSamplingCheck = "Refer to lists for visual / sampling check"
+                };
+
+                EnsureStarterRows(model);
+                return model;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unable to build starter IHM report model for job {JobId}.", jobId);
                 return null;
             }
         }

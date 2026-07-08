@@ -51,6 +51,7 @@
         .toolbar { gap: 12px; }
         .state-row td { padding: 42px !important; color: #748198; }
         .role-badge { background: #edf3ff; color: #285fc6; border-radius: 999px; padding: 6px 11px; font-weight: 650; }
+        .role-badge.pending { background: #fff4de; color: #a15c00; }
         .action-button { border-radius: 8px; min-width: 72px; }
 
         @@media (max-width: 768px) {
@@ -226,7 +227,8 @@
             let filtered = allUsers.filter(user =>
                 (user.fullName || "").toLowerCase().includes(input) ||
                 (user.email || "").toLowerCase().includes(input) ||
-                (user.role || "").toLowerCase().includes(input)
+                (user.role || "").toLowerCase().includes(input) ||
+                (user.requestedRole || "").toLowerCase().includes(input)
             );
             renderFilteredTable(filtered);
             renderFilteredPagination(filtered);
@@ -265,10 +267,13 @@
                 return;
             }
             users.forEach(user => {
+                const isPending = user.isApproved === false && user.requestedRole;
+                const roleText = isPending ? `Pending: ${user.requestedRole}` : user.role;
+                const roleClass = isPending ? "role-badge pending" : "role-badge";
                 let row = `<tr>
                     <td class="fw-semibold">${escapeHtml(user.fullName)}</td>
                     <td>${escapeHtml(user.email)}</td>
-                    <td><span class="role-badge">${escapeHtml(user.role)}</span></td>
+                    <td><span class="${roleClass}">${escapeHtml(roleText)}</span></td>
                     <td>
                         <button class="btn btn-outline-primary btn-sm action-button" onclick="editUser(${user.id})">Edit</button>
                         <button class="btn btn-outline-danger btn-sm action-button" onclick="deleteUser(${user.id})">Delete</button>

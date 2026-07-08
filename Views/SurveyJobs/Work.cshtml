@@ -15,7 +15,10 @@
 
     var total = (int)(ViewBag.Total ?? 0);
     var pending = Math.Max(total - audited, 0);
-    var percent = total > 0 ? (audited * 100 / total) : 0;
+    var progressPercent = total > 0 ? Math.Round((double)audited * 100 / total, 2) : 0;
+    var percentText = progressPercent % 1 == 0
+        ? progressPercent.ToString("0")
+        : progressPercent.ToString("0.##");
 
     string Val(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
     string DateVal(DateTime? value) => value.HasValue ? value.Value.ToLocalTime().ToString("dd/MM/yyyy") : "-";
@@ -232,7 +235,6 @@
 
         .progress-fill {
             height: 100%;
-            width: @percent %;
             background: #20b889;
             border-radius: 20px;
         }
@@ -476,7 +478,7 @@
                 </div>
 
                 <div class="audit-box">
-                    <div class="circle-progress">@percent%</div>
+                    <div class="circle-progress">@percentText%</div>
                     <div class="big-number green-text">@audited</div>
                     <div class="audit-label">Audited</div>
                     <div class="audit-sub">Completed</div>
@@ -490,7 +492,7 @@
             </div>
 
             <div class="progress-line">
-                <div class="progress-fill"></div>
+                <div class="progress-fill" style="width:@progressPercent%;"></div>
             </div>
 
             <div class="audit-footer">

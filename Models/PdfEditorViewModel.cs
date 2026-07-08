@@ -29,6 +29,7 @@ namespace Survery_Certification_App_Consume.Models
         public float FontSize { get; set; } = 12;
         public bool CoverOriginal { get; set; } = true;
         public string FontWeight { get; set; } = "regular";
+        public string Alignment { get; set; } = "left";
         public bool AutoBullet { get; set; }
         public string EditType { get; set; } = "text";
     }

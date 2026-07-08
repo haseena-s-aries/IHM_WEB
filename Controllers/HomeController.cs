@@ -249,6 +249,43 @@ namespace Health_Matrix_Consuming_Side.Controllers
                     reportsResponse.StatusCode);
             }
 
+            List<ASCENT.Models.VesselSummaryDto> fleetSummary = new();
+            string? fleetErrorMessage = null;
+            var vesselResponse = await client.GetAsync("vessels");
+            var vesselBody = await vesselResponse.Content.ReadAsStringAsync();
+
+            if (vesselResponse.IsSuccessStatusCode)
+            {
+                var vessels = JsonConvert.DeserializeObject<List<VesselDto>>(vesselBody)
+                    ?? new List<VesselDto>();
+
+                fleetSummary = vessels
+                    .OrderByDescending(vessel => vessel.Id)
+                    .Take(4)
+                    .Select(vessel => new ASCENT.Models.VesselSummaryDto
+                    {
+                        Id = vessel.Id,
+                        Name = vessel.VesselName,
+                        Location = !string.IsNullOrWhiteSpace(vessel.PortOfRegistry)
+                            ? vessel.PortOfRegistry
+                            : !string.IsNullOrWhiteSpace(vessel.Flag)
+                                ? vessel.Flag
+                                : vessel.VesselType,
+                        Status = string.IsNullOrWhiteSpace(vessel.Status) ? "Active" : vessel.Status
+                    })
+                    .ToList();
+            }
+            else
+            {
+                fleetErrorMessage = string.IsNullOrWhiteSpace(vesselBody)
+                    ? $"Unable to load vessels ({(int)vesselResponse.StatusCode})."
+                    : vesselBody;
+                _logger.LogWarning(
+                    "Vessel API returned {StatusCode} for dashboard fleet: {Body}",
+                    vesselResponse.StatusCode,
+                    vesselBody);
+            }
+
             // Build ViewModel
             var viewModel = new AdminDashboardViewModel
             {
@@ -257,7 +294,9 @@ namespace Health_Matrix_Consuming_Side.Controllers
                 SavedReports = savedReports,
                 CertificateCounts = certificateCounts,
                 SurveySummary = surveySummary,
-                TotalUsers = totalUsers
+                TotalUsers = totalUsers,
+                FleetSummary = fleetSummary,
+                FleetErrorMessage = fleetErrorMessage
             };
 
             return View(viewModel);
@@ -455,6 +494,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
             public string? Content { get; set; }
             public float FontSize { get; set; } = 12;
             public string FontWeight { get; set; } = "regular";
+            public string Alignment { get; set; } = "left";
             public bool AutoBullet { get; set; }
             public bool CoverOriginal { get; set; } = true;
         }
@@ -500,6 +540,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
                     CoverOriginal = x.CoverOriginal,
                     EditType = x.EditType,
                     FontWeight = x.FontWeight,
+                    Alignment = string.IsNullOrWhiteSpace(x.Alignment) ? "left" : x.Alignment,
                     AutoBullet = x.AutoBullet
                 }).ToList()
             };
@@ -547,7 +588,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
                     tableDataJson = "{}",
                     fontSize = Math.Clamp(field.FontSize, 6, 72),
                     fontWeight = field.FontWeight,
-                    alignment = "left",
+                    alignment = string.IsNullOrWhiteSpace(field.Alignment) ? "left" : field.Alignment,
                     autoBullet = field.AutoBullet,
                     coverOriginal = field.CoverOriginal
                 };
