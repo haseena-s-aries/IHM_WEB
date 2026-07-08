@@ -1026,10 +1026,40 @@ namespace Survery_Certification_App_Consume.Controllers
             var body = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
+            {
+                var message = ExtractUploadErrorMessage(body);
                 throw new InvalidOperationException(
-                    string.IsNullOrWhiteSpace(body)
+                    string.IsNullOrWhiteSpace(message)
                         ? "Upload failed. Please check the Excel format."
-                        : body);
+                        : message);
+            }
+
+            return body;
+        }
+
+        private static string ExtractUploadErrorMessage(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body))
+                return string.Empty;
+
+            try
+            {
+                var token = Newtonsoft.Json.Linq.JToken.Parse(body);
+                var message = token["message"]?.ToString()
+                    ?? token["Message"]?.ToString();
+                var inner = token["innerException"]?.ToString()
+                    ?? token["InnerException"]?.ToString();
+
+                if (!string.IsNullOrWhiteSpace(inner) &&
+                    !string.Equals(message, inner, StringComparison.OrdinalIgnoreCase))
+                    return $"{message} {inner}".Trim();
+
+                if (!string.IsNullOrWhiteSpace(message))
+                    return message;
+            }
+            catch
+            {
+            }
 
             return body;
         }

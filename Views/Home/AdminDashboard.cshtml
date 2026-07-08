@@ -5,13 +5,63 @@
 
     var counts = Model.CertificateCounts;
     var surveys = Model.SurveySummary;
+    var trend = surveys.CompletionTrend ?? new List<SurveyCompletionTrendPointDto>();
+    var maxTrend = trend.Any() ? Math.Max(1, trend.Max(x => x.Count)) : 1;
+    var sparkPoints = trend.Any()
+        ? string.Join(" ", trend.Select((x, i) =>
+        {
+            var xPos = trend.Count == 1 ? 110 : i * (220.0 / (trend.Count - 1));
+            var yPos = 36 - ((double)x.Count / maxTrend * 30);
+            return $"{xPos:0},{yPos:0}";
+        }))
+        : "0,36 220,36";
     var pendingCount = Model.PendingUsers.Count;
-    var displayName = Context.Session.GetString("UserEmail") ?? "Administrator";
+    var displayName = Context.Session.GetString("UserEmail") ?? "admin@local.com";
     string Initial(string? value) => string.IsNullOrWhiteSpace(value) ? "?" : value.Trim()[..1].ToUpperInvariant();
-    var today = DateTime.Now;
     var userRole = Context.Session.GetString("UserRole") ?? "";
     var isAdmin = string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase);
-}   
+    var profileTitle = isAdmin ? "Administrator" : "Manager";
+    var ihmJobs = surveys.IhmSurveyJobs > 0 ? surveys.IhmSurveyJobs : counts.IhmSurveyJobs;
+    var exJobs = surveys.ExSurveyJobs > 0 ? surveys.ExSurveyJobs : counts.ExSurveyJobs;
+    var submittedJobs = surveys.SubmittedJobs > 0 ? surveys.SubmittedJobs : counts.SubmittedSurveyJobs;
+    var attentionJobs = surveys.AttentionJobs;
+    var recentActivity = new List<(string Title, string Meta, string Tone)>();
+
+    foreach (var pending in Model.PendingUsers.Take(2))
+    {
+        recentActivity.Add((
+            $"{pending.FullName} requested {pending.RequestedRole} approval",
+            pending.Email,
+            "warning"
+        ));
+    }
+
+    foreach (var report in Model.SavedReports
+        .OrderByDescending(x => x.SavedAt ?? (x.SavedDate.HasValue ? x.SavedDate.Value.ToDateTime(TimeOnly.MinValue) : DateTime.MinValue))
+        .Take(3))
+    {
+        var typeLabel = report.ReportType == "ihm" ? "IHM" :
+            report.ReportType == "seafastening" ? "Sea Fastening" :
+            System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(report.ReportType ?? "report");
+        var vesselName = string.IsNullOrWhiteSpace(report.VesselName) ? "Vessel" : report.VesselName;
+        var savedAt = report.SavedAt?.ToString("MMM d, yyyy")
+     ?? report.SavedDate?.ToString("MMM d, yyyy")
+     ?? "Recently";
+        recentActivity.Add(($"{typeLabel} report saved for {vesselName}", savedAt, "success"));
+    }
+
+    if (!recentActivity.Any() && Model.FleetSummary.Any())
+    {
+        foreach (var vessel in Model.FleetSummary.Take(3))
+        {
+            recentActivity.Add((
+                $"{(string.IsNullOrWhiteSpace(vessel.Name) ? "Unnamed vessel" : vessel.Name)} added to fleet",
+                string.IsNullOrWhiteSpace(vessel.Location) ? "Vessel master" : vessel.Location,
+                "success"
+            ));
+        }
+    }
+}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -29,7 +79,7 @@
     <div class="admin-shell">
         <aside class="admin-sidebar" id="adminSidebar">
             <div class="brand">
-                <span class="brand-mark"><i class="fa-solid fa-compass"></i></span>
+                <span class="brand-mark"><i class="fa-solid fa-shield-halved"></i></span>
                 <span><strong>AURAS</strong><small>Administration</small></span>
                 <button class="sidebar-close" id="sidebarClose" type="button" aria-label="Close menu"><i class="fa-solid fa-xmark"></i></button>
             </div>
@@ -38,61 +88,36 @@
                 <a class="active" href="#overview"><i class="fa-solid fa-table-columns"></i><span>Overview</span></a>
                 @if (isAdmin)
                 {
-                    <a href="#approvals"><i class="fa-solid fa-user-check"></i><span>Approvals</span><b>@pendingCount</b></a>
+                    <a href="@Url.Action("PendingUsers", "Auth")"><i class="fa-solid fa-user-check"></i><span>Approvals</span><b>@pendingCount</b></a>
                 }
                 <a href="@Url.Action("Index", "UserManager")"><i class="fa-solid fa-users"></i><span>Users</span></a>
                 @if (isAdmin)
                 {
-                    <a href="@Url.Action("UsageAnalytics", "Home")"><i class="fa-solid fa-chart-line"></i> Usage analytics</a>
+                    <a href="@Url.Action("UsageAnalytics", "Home")"><i class="fa-solid fa-chart-line"></i> Usage Analytics</a>
                 }
-                <a href="@Url.Action("Ihm", "SurveyJobs")"><i class="fa-solid fa-flask-vial"></i><span>IHM Surveys</span></a>
-                <a href="@Url.Action("Ex", "SurveyJobs")"><i class="fa-solid fa-shield-halved"></i><span>Ex Surveys</span></a>
+                <a href="@Url.Action("SavedReports", "Home")"><i class="fa-solid fa-file-lines"></i><span>Reports</span></a>
                 <a href="@Url.Action("Index", "Vessel")"><i class="fa-solid fa-ship"></i><span>Vessels</span></a>
-                <a href="@Url.Action("Index", "TaskManager")"><i class="fa-solid fa-list-check"></i><span>Tasks</span></a>
-                
+
             </nav>
 
-            <section class="saved-reports-side saved-reports-preview" id="savedReports">
-                <a class="saved-library-link" href="@Url.Action("SavedReports", "Home")">
-                    <span class="saved-library-icon"><i class="fa-regular fa-folder-open"></i></span>
-                    <span class="saved-library-copy">
-                        <strong>Saved reports</strong>
-                        <small>@(Model.SavedReports.Any() ? $"{Model.SavedReports.Count} reports ready to view" : "Open your report library")</small>
-                    </span>
-                    <b>@Model.SavedReports.Count</b>
-                    <i class="fa-solid fa-chevron-right"></i>
-                </a>
-            </section>
 
             <div class="side-actions">
-                <span>Quick actions</span>
-                <button type="button" data-bs-toggle="modal" data-bs-target="#createCertificateModal"><i class="fa-solid fa-plus"></i> New certificate</button>
-                <a href="@Url.Action("Index", "UserManager")"><i class="fa-solid fa-user-plus"></i> Manage users</a>
-                <a class="logout" href="@Url.Action("Logout", "Home")"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sign out</a>
+                <div class="sidebar-profile">
+                    <span class="avatar">@Initial(displayName)</span>
+                    <span><strong>@profileTitle</strong><small>@displayName</small></span>
+                </div>
+                <a class="logout" href="@Url.Action("Logout", "Home")"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out</a>
             </div>
         </aside>
+
 
         <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
         <main class="admin-main">
             <header class="topbar">
                 <button class="menu-toggle" id="menuToggle" type="button" aria-label="Open menu"><i class="fa-solid fa-bars"></i></button>
-                <div class="global-search">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input id="globalSearch" type="search" placeholder="Search vessels, users, certificates..." autocomplete="off" />
-                    <kbd>Ctrl K</kbd>
-                </div>
-                <a class="notification-button" href="#approvals" aria-label="@pendingCount pending approvals">
-                    <i class="fa-regular fa-bell"></i>
-                    @if (pendingCount > 0)
-                    {
-                        <span>@pendingCount</span>
-                    }
-                </a>
-                <div class="admin-profile">
-                    <span class="avatar">@Initial(displayName)</span>
-                    <span><strong>@(isAdmin ? "Administrator" : "Manager")</strong><small>@displayName</small></span>
-                </div>
+                <div class="topbar-spacer"></div>
+
             </header>
 
             <div class="dashboard-content">
@@ -105,47 +130,14 @@
                     <div class="status-banner error"><i class="fa-solid fa-triangle-exclamation"></i>@TempData["Error"]</div>
                 }
 
-                <section class="hero-row" id="overview">
-                    <article class="hero-banner">
-                        <span class="hero-date"><i class="fa-regular fa-calendar"></i>@today.ToString("dddd, MMMM d")</span>
-                        <h1>Welcome back, @(isAdmin ? "Admin" : "Manager")</h1>
-                        <p>
-                            @surveys.TotalSurveyJobs surveys in progress, @counts.TotalCertificates certificate@(counts.TotalCertificates == 1 ? "" : "s") on record, and the fleet is sailing smoothly today.
-                        </p>
-                        <div class="hero-actions">
-                            <a class="btn-hero-primary" href="@Url.Action("Ihm", "SurveyJobs")">Start new survey <i class="fa-solid fa-arrow-right"></i></a>
-                            <a class="btn-hero-ghost" href="@Url.Action("SavedReports", "Home")">View reports</a>
-                        </div>
-                        <svg class="hero-waves" viewBox="0 0 360 90" preserveAspectRatio="none" aria-hidden="true">
-                            <path d="M0 45 Q 30 25, 60 45 T 120 45 T 180 45 T 240 45 T 300 45 T 360 45" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="3" />
-                            <path d="M0 65 Q 30 45, 60 65 T 120 65 T 180 65 T 240 65 T 300 65 T 360 65" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3" />
-                        </svg>
-                    </article>
-
-                    <!-- PLACEHOLDER DATA: "This week" trend card has no backing API field yet.
-                         Swap data-trend-value / data-trend-points once a weekly completion
-                         endpoint exists (e.g. survey/weekly-summary). -->
-                    <article class="hero-week-card" data-placeholder="true">
-                        <div class="hero-week-top">
-                            <span>This week</span>
-                            <i class="fa-solid fa-anchor"></i>
-                        </div>
-                        <strong class="hero-week-value">31</strong>
-                        <span class="hero-week-sub">surveys completed &middot; +18% vs last week</span>
-                        <svg class="hero-week-spark" viewBox="0 0 220 40" preserveAspectRatio="none" aria-hidden="true">
-                            <polyline points="0,30 30,28 60,32 90,18 120,22 150,10 180,14 220,6" fill="none" stroke="#f5b942" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                    </article>
-                </section>
-
-                <section class="metric-grid" aria-label="Operational summary">
+                <section class="metric-grid" id="overview" aria-label="Operational summary">
                     <article class="metric-card blue">
                         <span class="metric-icon"><i class="fa-solid fa-clipboard-check"></i></span>
-                        <div><small>Survey jobs</small><strong>@surveys.TotalSurveyJobs</strong><span>@surveys.SubmittedJobs submitted</span></div>
+                        <div><small>IHM Survey jobs</small><strong>@ihmJobs</strong><span>@submittedJobs submitted</span></div>
                     </article>
                     <article class="metric-card green">
                         <span class="metric-icon"><i class="fa-solid fa-certificate"></i></span>
-                        <div><small>Certificates</small><strong>@counts.TotalCertificates</strong><span>@counts.TowageCount towage</span></div>
+                        <div><small>AURAS Certificates</small><strong>@counts.TotalCertificates</strong><span>@counts.TowageCount towage</span></div>
                     </article>
                     <article class="metric-card violet">
                         <span class="metric-icon"><i class="fa-solid fa-users"></i></span>
@@ -153,143 +145,160 @@
                     </article>
                     <article class="metric-card amber">
                         <span class="metric-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
-                        <div><small>Attention</small><strong>@pendingCount</strong><span>Pending</span></div>
+                        <div><small>Attention</small><strong>@attentionJobs</strong><span>Assigned, not started</span></div>
                     </article>
                 </section>
 
+                <section class="applications-section" aria-labelledby="applicationsTitle">
+                    <div class="section-heading">
+                        <div>
+                        </div>
+                    </div>
+                    <span>Survey Platform</span>
+                    <h1 id="applicationsTitle">Applications</h1>
+                    @*     </div>
+                        <a href="@Url.Action("UsageAnalytics", "Home")">Manage apps <i class="fa-solid fa-arrow-right"></i></a>
+                    </div> *@
+
+                    <div class="app-grid">
+                        <article class="app-card primary">
+                            <div class="app-card-top">
+                                <span class="app-icon green"><i class="fa-solid fa-shield-halved"></i></span>
+                                <b class="status-pill active">Active</b>
+                            </div>
+                            <h2>Auras SurveyApp</h2>
+                            <p>Certifcicates Creation For Towage,Seafastening,and Loadout</p>
+                            <div class="app-meta">
+                                <span><strong>@counts.TotalCertificates</strong> certificates</span>
+                                <span><strong>@Model.TotalUsers</strong> users</span>
+                            </div>
+                            <button type="button" class="app-action dark" data-bs-toggle="modal" data-bs-target="#createCertificateModal">
+                                Open workspace <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </article>
+
+                        <article class="app-card">
+                            <div class="app-card-top">
+                                <span class="app-icon blue"><i class="fa-solid fa-puzzle-piece"></i></span>
+                                <b class="status-pill beta">Beta</b>
+                            </div>
+                            <h2>IHM App</h2>
+                            <p>Inventory of Hazardous Materials surveys, sampling records and IHM certificate tracking.</p>
+                            <div class="app-meta">
+                                <span><strong>@ihmJobs</strong> job@(ihmJobs == 1 ? "" : "s")</span>
+                                <span><strong>@submittedJobs</strong> submitted</span>
+                            </div>
+                            <a class="app-action light" href="@Url.Action("Ihm", "SurveyJobs")">
+                                Open workspace <i class="fa-solid fa-arrow-right"></i>
+                            </a>
+                        </article>
+
+                        <article class="app-card muted">
+                            <div class="app-card-top">
+                                <span class="app-icon coral"><i class="fa-regular fa-square"></i></span>
+                                <b class="status-pill soon">Coming soon</b>
+                            </div>
+                            <h2>EX-Survey App</h2>
+                            @* <p>Sea fastening and lashing survey module, built for towage and heavy-lift exports.</p> *@
+                            <div class="app-meta">
+                                <span>Early access</span>
+                                <span>@exJobs job@(exJobs == 1 ? "" : "s")</span>
+                            </div>
+                            <button type="button" class="app-action disabled" disabled>Notify me</button>
+                        </article>
+                    </div>
+                </section>
 
                 <section class="lower-grid">
-                    <article class="panel fleet-panel" data-placeholder="true">
+                    <article class="panel fleet-panel">
                         <div class="panel-heading">
                             <div><h2>Fleet at a glance</h2></div>
-                            <a class="panel-link" href="@Url.Action("Index", "Vessel")">All vessels <i class="fa-solid fa-arrow-right"></i></a>
+                            <a class="panel-link" href="@Url.Action("Index", "Vessel")">
+                                All vessels <i class="fa-solid fa-arrow-right"></i>
+                            </a>
                         </div>
-                        <div class="fleet-grid">
-                            <div class="fleet-item">
-                                <span class="fleet-icon"><i class="fa-solid fa-ship"></i></span>
-                                <div><strong>MV Aurora Star</strong><small><i class="fa-solid fa-location-dot"></i>Rotterdam</small></div>
-                                <span class="fleet-status on-survey">On survey</span>
-                            </div>
-                            <div class="fleet-item">
-                                <span class="fleet-icon"><i class="fa-solid fa-ship"></i></span>
-                                <div><strong>MT Northern Light</strong><small><i class="fa-solid fa-location-dot"></i>Singapore</small></div>
-                                <span class="fleet-status certified">Certified</span>
-                            </div>
-                            <div class="fleet-item">
-                                <span class="fleet-icon"><i class="fa-solid fa-ship"></i></span>
-                                <div><strong>MV Pacific Dawn</strong><small><i class="fa-solid fa-location-dot"></i>Busan</small></div>
-                                <span class="fleet-status towage">Towage</span>
-                            </div>
-                            <div class="fleet-item">
-                                <span class="fleet-icon"><i class="fa-solid fa-ship"></i></span>
-                                <div><strong>MV Coral Bay</strong><small><i class="fa-solid fa-location-dot"></i>Dubai</small></div>
-                                <span class="fleet-status issued">Issued</span>
-                            </div>
-                        </div>
-                    </article>
 
-                    <article class="panel module-panel">
-                        <div class="panel-heading"><div><span class="eyebrow">Workspaces</span><h2>Survey modules</h2></div></div>
-                        <div class="module-list">
-                            <a href="@Url.Action("Ihm", "SurveyJobs")"><span class="module-icon blue"><i class="fa-solid fa-flask-vial"></i></span><span><strong>IHM Survey</strong><small>@surveys.IhmSurveyJobs jobs</small></span><i class="fa-solid fa-arrow-right"></i></a>
-                            <a href="@Url.Action("Ex", "SurveyJobs")"><span class="module-icon red"><i class="fa-solid fa-shield-halved"></i></span><span><strong>Ex Survey</strong><small>@surveys.ExSurveyJobs jobs</small></span><i class="fa-solid fa-arrow-right"></i></a>
-                            <a href="@Url.Action("Index", "Vessel")"><span class="module-icon cyan"><i class="fa-solid fa-ship"></i></span><span><strong>Vessel master</strong><small>Fleet records</small></span><i class="fa-solid fa-arrow-right"></i></a>
-                        </div>
-                    </article>
-                </section>
-
- 
-                <section class="panel approvals-panel" id="approvals">
-                    <div class="panel-heading">
-                        <div>
-                            <span class="eyebrow">Access control</span>
-                            <h2>User approvals</h2>
-                        </div>
-                        <a class="panel-link" href="@Url.Action("PendingUsers", "Auth")">Full approval page <i class="fa-solid fa-arrow-right"></i></a>
-                    </div>
-
-                    @if (!Model.PendingUsers.Any())
-                    {
-                        <div class="saved-side-empty">
-                            <i class="fa-solid fa-user-check"></i>
-                            <span>No pending users to approve</span>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="table-responsive">
-                            <table class="table align-middle">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>Requested role</th>
-                                        <th class="text-end">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var user in Model.PendingUsers)
-                                    {
-                                        <tr>
-                                            <td><strong>@user.FullName</strong></td>
-                                            <td>@user.Email</td>
-                                            <td><span class="status-chip pending">@user.RequestedRole</span></td>
-                                            <td class="text-end">
-                                                <form class="d-inline" method="post" action="@Url.Action("ApproveUser", "Auth")">
-                                                    <input type="hidden" name="id" value="@user.Id" />
-                                                    <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString#approvals" />
-                                                    <button type="submit" class="btn btn-sm btn-success">
-                                                        <i class="fa-solid fa-check"></i> Approve
-                                                    </button>
-                                                </form>
-                                                <form class="d-inline" method="post" action="@Url.Action("RejectUser", "Auth")" onsubmit="return confirm('Reject @user.FullName?');">
-                                                    <input type="hidden" name="id" value="@user.Id" />
-                                                    <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString#approvals" />
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                        <i class="fa-solid fa-xmark"></i> Reject
-                                                    </button>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    }
-                </section>
-
-                <section class="panel saved-reports-panel">
-                    <div class="panel-heading">
-                        <div><span class="eyebrow">Library</span><h2>Saved reports</h2></div>
-                        <a class="panel-link" href="@Url.Action("SavedReports", "Home")">Open library <i class="fa-solid fa-arrow-right"></i></a>
-                    </div>
-                    <div class="saved-side-list saved-reports-grid">
-                        @if (!Model.SavedReports.Any())
+                        @if (!string.IsNullOrWhiteSpace(Model.FleetErrorMessage))
                         {
-                            <div class="saved-side-empty"><i class="fa-regular fa-folder-open"></i><span>No saved reports yet</span></div>
+                            <div class="saved-side-empty fleet-empty-state">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                <span>@Model.FleetErrorMessage</span>
+                            </div>
+                        }
+                        else if (Model.FleetSummary == null || !Model.FleetSummary.Any())
+                        {
+                            <div class="saved-side-empty fleet-empty-state">
+                                <i class="fa-solid fa-ship"></i>
+                                <span>No vessels available</span>
+                            </div>
                         }
                         else
                         {
-                            @foreach (var report in Model.SavedReports.Take(6))
-                            {
-                                var typeLabel = report.ReportType == "ihm" ? "IHM" :
-                                report.ReportType == "seafastening" ? "Sea Fastening" :
-                                System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(report.ReportType);
-                                <article class="saved-side-item">
-                                    <span class="saved-report-icon"><i class="fa-regular fa-file-pdf"></i></span>
-                                    <div>
-                                        <strong>@(string.IsNullOrWhiteSpace(report.VesselName) ? "Vessel not specified" : report.VesselName)</strong>
-                                        <small>@(string.IsNullOrWhiteSpace(report.Title) ? typeLabel + " Report" : report.Title)</small>
-                                        <em>@typeLabel @(string.IsNullOrWhiteSpace(report.Reference) ? "" : $"· {report.Reference}")</em>
+                            <div class="fleet-grid">
+                                @foreach (var vessel in Model.FleetSummary)
+                                {
+                                    var statusText = string.IsNullOrWhiteSpace(vessel.Status)
+                                    ? "Available"
+                                    : vessel.Status;
+
+                                    var statusClass = statusText.ToLowerInvariant() switch
+                                    {
+                                        "on survey" => "on-survey",
+                                        "certified" => "certified",
+                                        "towage" => "towage",
+                                        "issued" => "issued",
+                                        _ => "on-survey"
+                                    };
+
+                                    <div class="fleet-item">
+                                        <span class="fleet-icon">
+                                            <i class="fa-solid fa-ship"></i>
+                                        </span>
+
+                                        <div class="fleet-copy">
+                                            <strong>@(string.IsNullOrWhiteSpace(vessel.Name) ? "Unnamed vessel" : vessel.Name)</strong>
+                                            <small>
+                                                <i class="fa-solid fa-location-dot"></i>
+                                                @(string.IsNullOrWhiteSpace(vessel.Location) ? "Location unknown" : vessel.Location)
+                                            </small>
+                                        </div>
+
+                                        <span class="fleet-status @statusClass">@statusText</span>
                                     </div>
-                                    <div class="saved-report-actions">
-                                        <a target="_blank" href="@Url.Action("SavedReportFile", "Home", new { type = report.ReportType, id = report.Id })" title="View PDF"><i class="fa-regular fa-eye"></i></a>
-                                        <a href="@Url.Action("SavedReportFile", "Home", new { type = report.ReportType, id = report.Id, download = true })" title="Download PDF"><i class="fa-solid fa-download"></i></a>
-                                    </div>
-                                </article>
-                            }
+                                }
+                            </div>
                         }
-                    </div>
+                    </article>
+
+                    <article class="panel activity-panel">
+                        <div class="panel-heading">
+                            <div><h2>Recent activity</h2></div>
+                            <a class="panel-link" href="@Url.Action("SavedReports", "Home")">View all</a>
+                        </div>
+
+                        @if (!recentActivity.Any())
+                        {
+                            <div class="saved-side-empty fleet-empty-state">
+                                <i class="fa-regular fa-clock"></i>
+                                <span>No recent activity available</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="activity-list">
+                                @foreach (var item in recentActivity.Take(5))
+                                {
+                                    <div class="activity-item">
+                                        <span class="activity-dot @item.Tone"></span>
+                                        <div>
+                                            <strong>@item.Title</strong>
+                                            <small>@item.Meta</small>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </article>
                 </section>
             </div>
         </main>
