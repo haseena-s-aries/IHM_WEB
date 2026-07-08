@@ -164,7 +164,8 @@ namespace Survery_Certification_App_Consume.Controllers
                 {
                     Content = new StringContent("{}", Encoding.UTF8, "application/json")
                 };
-                using var response = await client.SendAsync(request);
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(15));
+                using var response = await client.SendAsync(request, timeoutCts.Token);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -184,7 +185,7 @@ namespace Survery_Certification_App_Consume.Controllers
             catch (TaskCanceledException ex)
             {
                 _logger.LogError(ex, "IHM PDF API timed out for job {JobId}.", model.JobId);
-                TempData["ErrorMessage"] = "The PDF API timed out. Confirm the API and Python generator are running.";
+                TempData["ErrorMessage"] = "Report generation is taking too long. Please try again after reducing large images/layouts";
             }
             catch (HttpRequestException ex)
             {
@@ -474,7 +475,9 @@ namespace Survery_Certification_App_Consume.Controllers
                     CompanyWebsite = report.CompanyWebsite,
                     CompanyEmail = report.CompanyEmail,
                     CompanyLogoPath = report.CompanyLogoPath,
-                    ClientName = report.ClientName ?? job.ClientName,
+                    ClientName = !string.IsNullOrWhiteSpace(report.ClientName)
+                        ? report.ClientName
+                        : job.ClientName,
                     ClientLogoPath = report.ClientLogoPath,
                     PreparedBy = report.PreparedBy,
                     CheckedBy = report.CheckedBy,
@@ -498,7 +501,9 @@ namespace Survery_Certification_App_Consume.Controllers
                     LocationOfVisualSamplingCheck = report.LocationOfVisualSamplingCheck ??
                         "Refer to lists for visual / sampling check",
                     OhsJobDetail = report.OhsJobDetail ?? job.ProjectName,
-                    OhsClient = report.OhsClient ?? job.ClientName,
+                    OhsClient = !string.IsNullOrWhiteSpace(report.OhsClient)
+                        ? report.OhsClient
+                        : job.ClientName,
                     OhsJobLocation = report.OhsJobLocation ?? job.SiteName,
                     OhsJobNo = report.OhsJobNo ?? job.JobNumber,
                     OhsProjectInCharge = report.OhsProjectInCharge ?? report.HazmatExpert,

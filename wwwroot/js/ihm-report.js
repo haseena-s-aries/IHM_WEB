@@ -1114,10 +1114,10 @@
             if (!response.ok) throw new Error();
 
             const items = await response.json();
+            const filteredItems = items.filter(item => String(item.jobId) !== String(config.currentJobId));
+            results.innerHTML = filteredItems.length
 
-            results.innerHTML = items.length
-
-                ? items.map(item => `
+                ? filteredItems.map(item => `
 <button class="report-result template-option"
 
                                     type="button"
@@ -1344,7 +1344,8 @@
 
             "SiteOfCheck",
 
-            "DateOfSurvey"
+            "DateOfSurvey",
+            "HazardousMaterialNoFindings",
 
         ]);
 
@@ -1373,6 +1374,20 @@
             "CustomAppendices"
 
         ]);
+        const forcedTemplateFields = {
+          
+            ClientName: getProperty(source, "clientName"),
+            OhsClient: getProperty(source, "ohsClient")
+        };
+
+        Object.entries(forcedTemplateFields).forEach(([fieldName, value]) => {
+            const field = form.elements.namedItem(fieldName);
+            if (field && !(field instanceof RadioNodeList)) {
+                field.value = value ?? "";
+                field.dispatchEvent(new Event("input", { bubbles: true }));
+                field.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+        });
 
         Object.entries(source).forEach(([jsonName, value]) => {
 

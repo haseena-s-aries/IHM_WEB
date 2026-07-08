@@ -1,4 +1,5 @@
-﻿@model SurveyJobsPageViewModel
+﻿@using System.Text.Json
+@model SurveyJobsPageViewModel
 @{
     Layout = null;
     var isIhm = Model.SurveyType == "IHM Survey";
@@ -103,6 +104,63 @@
                 white-space: nowrap;
             }
 
+        .page-busy {
+            cursor: wait;
+        }
+
+            .page-busy::after {
+                content: "";
+                position: fixed;
+                inset: 0;
+                z-index: 9998;
+                background: rgba(255, 255, 255, 0.45);
+                cursor: wait;
+            }
+
+        .page-loading-indicator {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: #0d6efd;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 8px 24px rgba(13, 110, 253, .25);
+        }
+
+        .page-busy .page-loading-indicator {
+            display: flex;
+        }
+
+        .loading-dot {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,.45);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin .75s linear infinite;
+        }
+
+        @@keyframes spin {
+            to{
+            transform: rotate(360deg);
+        }
+
+        }
+
+            .page-busy a,
+            .page-busy button,
+            .page-busy label {
+                pointer-events: none;
+                opacity: .75;
+            }
+
         .survey-date-box { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:12px 0; padding:9px 10px; border-radius:8px; background:#1976d20f; color:#1976d2; font-size:12px; font-weight:800; }
         .survey-date-box input { border:1px solid #b8d8f7; border-radius:7px; padding:5px 7px; color:#1a2333; background:#fff; }
         .survey-date-box button { border:0; border-radius:7px; background:#1976d2; color:#fff; padding:6px 10px; font-size:12px; font-weight:800; }
@@ -123,6 +181,10 @@
 </head>
 
 <body>
+    <div class="page-loading-indicator">
+        <span class="loading-dot"></span>
+        <span>Please wait...</span>
+    </div>
     <header class="header">
         <div class="header-row">
             <a class="back-btn" href="@backUrl"><i class="fa-solid fa-chevron-left"></i></a>
@@ -329,7 +391,7 @@
 
                             <form method="post" enctype="multipart/form-data" action="/SurveyJobs/UploadIhmExcel" class="d-inline">
     <input type="hidden" name="jobId" value="@job.Id" />
-    <input type="file" name="file" accept=".xlsx,.xls" hidden onchange="this.form.submit()" id="excel-@job.Id" />
+                                <input type="file" name="file" accept=".xlsx" hidden onchange="showPageLoading('Uploading...'); this.form.submit();" id="excel-@job.Id" />
     <label class="action-btn green" for="excel-@job.Id">
         <i class="fa-regular fa-file-excel"></i>
         @(hasExcelData ? "Reupload Excel" : "Upload Excel")
@@ -574,12 +636,6 @@
             });
         });
 
-        document.querySelectorAll(".job-card[data-card-href]").forEach(card => {
-            card.addEventListener("click", event => {
-                if (event.target.closest("a, button, input, select, textarea, label, form")) return;
-                window.location.href = card.dataset.cardHref;
-            });
-        });
 
         document.querySelectorAll(".area-layout-select").forEach(select => {
             select.addEventListener("change", function () {
@@ -654,22 +710,106 @@
 
     </script>
 
-@if (TempData["SuccessMessage"] != null)
-{
-    <script>
-        window.addEventListener("DOMContentLoaded", function () {
-            alert("@TempData["SuccessMessage"]");
-        });
-    </script>
-}
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <script>
+            window.addEventListener("DOMContentLoaded", function () {
+                const message = @Html.Raw(JsonSerializer.Serialize(TempData["SuccessMessage"]));
+                const key = "survey-alert-success-" + message;
+                if (!sessionStorage.getItem(key)) {
+                    sessionStorage.setItem(key, "1");
+                    alert(message);
+                }
+                if (window.history.replaceState) {
+                    window.history.replaceState(null, "", window.location.href);
+                }
+            });
+        </script>
+    }
 
-@if (TempData["ErrorMessage"] != null)
-{
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <script>
+            window.addEventListener("DOMContentLoaded", function () {
+                const message = @Html.Raw(JsonSerializer.Serialize(TempData["ErrorMessage"]));
+                const key = "survey-alert-error-" + message;
+                if (!sessionStorage.getItem(key)) {
+                    sessionStorage.setItem(key, "1");
+                    alert(message);
+                }
+                if (window.history.replaceState) {
+                    window.history.replaceState(null, "", window.location.href);
+                }
+            });
+                        document.querySelectorAll("form").forEach(form => {
+                form.addEventListener("submit", function () {
+                    document.body.classList.add("page-busy");
+
+                    form.querySelectorAll("button, input, select, textarea").forEach(x => {
+                        if (x.type !== "hidden") x.disabled = true;
+                    });
+
+                    const submitButton = form.querySelector('button[type="submit"]');
+                    if (submitButton) {
+                        submitButton.dataset.originalText = submitButton.innerHTML;
+                        submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Please wait...';
+                    }
+                });
+            });
+
+            
+
+            document.querySelectorAll("form").forEach(form => {
+                form.addEventListener("submit", function () {
+                    const submitButton = form.querySelector('button[type="submit"]');
+
+                    startPageLoading("Processing...");
+
+                    if (submitButton) {
+                        submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Please wait...';
+                        submitButton.disabled = true;
+                    }
+                });
+            });
+
+
+            
+        </script>
+    }
     <script>
-        window.addEventListener("DOMContentLoaded", function () {
-            alert("@TempData["ErrorMessage"]");
+        function showPageLoading(text) {
+            const indicatorText = document.querySelector(".page-loading-indicator span:last-child");
+            if (indicatorText) indicatorText.textContent = text || "Please wait...";
+
+            document.body.classList.add("page-busy");
+
+            document.querySelectorAll("a, button, input, select, textarea, label").forEach(element => {
+                if (element.type !== "hidden") {
+                    element.style.pointerEvents = "none";
+                }
+            });
+        }
+
+        document.querySelectorAll("form").forEach(form => {
+            form.addEventListener("submit", function () {
+                showPageLoading("Processing...");
+
+                const submitButton = form.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Please wait...';
+                    submitButton.disabled = true;
+                }
+            });
+        });
+
+        document.querySelectorAll(".job-card[data-card-href]").forEach(card => {
+            card.addEventListener("click", event => {
+                if (event.target.closest("a, button, input, select, textarea, label, form")) return;
+
+                showPageLoading("Loading...");
+                window.location.href = card.dataset.cardHref;
+            });
         });
     </script>
-}
 </body>
 </html>

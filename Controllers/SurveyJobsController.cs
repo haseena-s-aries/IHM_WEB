@@ -9,10 +9,14 @@ namespace Survery_Certification_App_Consume.Controllers
     public class SurveyJobsController : Controller
     {
         private readonly IHttpClientFactory _clientFactory;
+        private readonly ILogger<SurveyJobsController> _logger;
 
-        public SurveyJobsController(IHttpClientFactory clientFactory)
+        public SurveyJobsController(
+            IHttpClientFactory clientFactory,
+            ILogger<SurveyJobsController> logger)
         {
             _clientFactory = clientFactory;
+            _logger = logger;
         }
 
         private async Task<SurveyJobsPageViewModel> BuildSurveyJobsModel(string surveyType)
@@ -39,14 +43,32 @@ namespace Survery_Certification_App_Consume.Controllers
 
                 if (surveyType == "IHM Survey")
                 {
-                    foreach (var job in model.Jobs)
+                    var ihmLoadTasks = model.Jobs.Select(async job =>
                     {
-                        model.AreasByJob[job.Id] =
-                            await GetAsync<List<IhmAreaOptionDto>>(
-                                client, $"ihm-survey/jobs/{job.Id}/areas-with-checkpoints") ?? new();
-                        var attachments = await GetAsync<List<IhmLayoutAttachmentDto>>(
-                            client, $"ihm-survey/jobs/{job.Id}/layout-attachments") ?? new();
-                        model.LayoutAttachmentsByJob[job.Id] = attachments
+                        var areasTask = GetAsync<List<IhmAreaOptionDto>>(
+                            client,
+                            $"ihm-survey/jobs/{job.Id}/areas-with-checkpoints");
+
+                        var attachmentsTask = GetAsync<List<IhmLayoutAttachmentDto>>(
+                            client,
+                            $"ihm-survey/jobs/{job.Id}/layout-attachments");
+
+                        await Task.WhenAll(areasTask, attachmentsTask);
+
+                        return new
+                        {
+                            JobId = job.Id,
+                            Areas = areasTask.Result ?? new List<IhmAreaOptionDto>(),
+                            Attachments = attachmentsTask.Result ?? new List<IhmLayoutAttachmentDto>()
+                        };
+                    });
+
+                    var ihmLoadResults = await Task.WhenAll(ihmLoadTasks);
+
+                    foreach (var result in ihmLoadResults)
+                    {
+                        model.AreasByJob[result.JobId] = result.Areas;
+                        model.LayoutAttachmentsByJob[result.JobId] = result.Attachments
                             .GroupBy(x => x.Target)
                             .ToDictionary(x => x.Key, x => x.First());
                     }
@@ -842,9 +864,19 @@ namespace Survery_Certification_App_Consume.Controllers
                     return RedirectToAction("Ihm");
                 }
 
+                var client = CreateApiClient();
+
+                var existingAreas = await GetAsync<List<IhmAreaOptionDto>>(
+                    client,
+                    $"ihm-survey/jobs/{jobId}/areas-with-checkpoints");
+
+                var isReupload = existingAreas != null && existingAreas.Any();
+
                 var message = await UploadFile(jobId, file, $"ihm-survey/jobs/{jobId}/import-excel", "file");
 
-                TempData["SuccessMessage"] = "Excel checklist uploaded successfully. Previous Excel data was replaced.";
+                TempData["SuccessMessage"] = isReupload
+                    ? "Excel checklist uploaded successfully. Previous Excel data was replaced."
+                    : "Excel checklist uploaded successfully.";
                 return RedirectToAction("Ihm");
             }
             catch (Exception ex)
