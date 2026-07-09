@@ -61,6 +61,14 @@ namespace Health_Matrix_Consuming_Side.Controllers
 
             if (claims.TryGetValue("role", out var role))
                 HttpContext.Session.SetString("UserRole", role);
+            if (claims.TryGetValue("projectId", out var projectId))
+                HttpContext.Session.SetString("ProjectId", projectId);
+
+            if (claims.TryGetValue("projectName", out var projectName))
+                HttpContext.Session.SetString("ProjectName", projectName);
+
+            if (claims.TryGetValue("roleName", out var roleName))
+                HttpContext.Session.SetString("RoleName", roleName);
             // Decide where to go after login
             if (string.IsNullOrEmpty(returnUrl))
             {
@@ -104,6 +112,9 @@ namespace Health_Matrix_Consuming_Side.Controllers
             }
 
             var role = HttpContext.Session.GetString("UserRole") ?? "";
+            ViewBag.ProjectId = HttpContext.Session.GetString("ProjectId") ?? "";
+            ViewBag.ProjectName = HttpContext.Session.GetString("ProjectName") ?? "";
+            ViewBag.RoleName = HttpContext.Session.GetString("RoleName") ?? role;
             var userId = HttpContext.Session.GetInt32("UserId") ?? 0;
             var isSurveyor = role.Equals("Surveyor", StringComparison.OrdinalIgnoreCase);
 
@@ -164,6 +175,8 @@ namespace Health_Matrix_Consuming_Side.Controllers
                 return RedirectToAction("Login", "Auth");
             }
             var sessionRole = HttpContext.Session.GetString("UserRole") ?? "";
+            if (string.Equals(sessionRole, "Client", StringComparison.OrdinalIgnoreCase))
+                return RedirectToAction(nameof(SavedReports));
             var isAdmin = string.Equals(sessionRole, "Admin", StringComparison.OrdinalIgnoreCase);
 
             // Create client and attach JWT
@@ -836,6 +849,23 @@ namespace Health_Matrix_Consuming_Side.Controllers
         public IActionResult Register()
         {
             return View();
+        }
+        [HttpGet]
+        public async Task<IActionResult> RegisterProjects()
+        {
+            var client = _clientFactory.CreateClient("ApiClient");
+            var response = await client.GetAsync("User/projects");
+            var body = await response.Content.ReadAsStringAsync();
+            return Content(body, "application/json");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> RegisterRoles(int projectId)
+        {
+            var client = _clientFactory.CreateClient("ApiClient");
+            var response = await client.GetAsync($"User/projects/{projectId}/roles");
+            var body = await response.Content.ReadAsStringAsync();
+            return Content(body, "application/json");
         }
 
         [HttpPost]

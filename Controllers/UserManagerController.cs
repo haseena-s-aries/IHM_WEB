@@ -19,6 +19,8 @@ public class UserManagerController : Controller
     public IActionResult Index()
     {
         ViewBag.UserRole = HttpContext.Session.GetString("UserRole") ?? "";
+        ViewBag.ProjectId = HttpContext.Session.GetString("ProjectId") ?? "";
+        ViewBag.ProjectName = HttpContext.Session.GetString("ProjectName") ?? "";
         return View();
     }
 
@@ -26,7 +28,31 @@ public class UserManagerController : Controller
     {
         return string.Equals(HttpContext.Session.GetString("UserRole"), "Admin", StringComparison.OrdinalIgnoreCase);
     }
+    [HttpGet]
+    public async Task<IActionResult> Projects()
+    {
+        var request = CreateApiRequest(HttpMethod.Get, "User/projects");
+        var response = await _httpClient.SendAsync(request);
+        var json = await response.Content.ReadAsStringAsync();
 
+        if (!response.IsSuccessStatusCode)
+            return StatusCode((int)response.StatusCode, json);
+
+        return Content(json, "application/json");
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Roles(int projectId)
+    {
+        var request = CreateApiRequest(HttpMethod.Get, $"AdminDashboard/projects/{projectId}/roles");
+        var response = await _httpClient.SendAsync(request);
+        var json = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+            return StatusCode((int)response.StatusCode, json);
+
+        return Content(json, "application/json");
+    }
     private static bool IsAdminRole(string? role)
     {
         return string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
@@ -100,6 +126,14 @@ public class UserManagerController : Controller
                 success = false,
                 message = "Only Admin can manage Admin users."
             });
+        }
+        if (!IsAdmin())
+        {
+            var projectIdText = HttpContext.Session.GetString("ProjectId");
+            if (int.TryParse(projectIdText, out var projectId))
+                user.ProjectId = projectId;
+
+            user.ProjectName = HttpContext.Session.GetString("ProjectName");
         }
         var jsonContent = new StringContent(JsonConvert.SerializeObject(user), Encoding.UTF8, "application/json");
         HttpResponseMessage response;

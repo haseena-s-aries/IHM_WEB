@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using Org.BouncyCastle.Asn1.Cmp;
 using Survery_Certification_App_Consume.Models;
 using System.Net.Http.Headers;
 using System.Text;
@@ -91,6 +92,9 @@ namespace Survery_Certification_App_Consume.Controllers
                         "IHM PDF generation for job {JobId} stopped because saving failed: {Error}",
                         model.JobId,
                         error);
+                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                        return BadRequest(error);
+
                     TempData["ErrorMessage"] = error;
                     return RedirectToAction(nameof(Index), new { jobId = model.JobId });
                 }
@@ -179,8 +183,20 @@ namespace Survery_Certification_App_Consume.Controllers
                     return RedirectToAction(nameof(Index), new { jobId = model.JobId });
                 }
 
-                _logger.LogInformation("IHM PDF generated successfully for job {JobId}.", model.JobId);
-                return RedirectToAction(nameof(ViewPdf), new { jobId = model.JobId });
+                _logger.LogInformation("IHM PDF generation started for job {JobId}.", model.JobId);
+
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new
+                    {
+                        status = "processing",
+                        statusUrl = Url.Action(nameof(PdfStatus), new { jobId = model.JobId }),
+                        pdfUrl = Url.Action(nameof(ViewPdf), new { jobId = model.JobId })
+                    });
+                }
+
+                TempData["SuccessMessage"] = "PDF generation started. Please wait and refresh PDF status.";
+                return RedirectToAction(nameof(Index), new { jobId = model.JobId });
             }
             catch (TaskCanceledException ex)
             {
@@ -229,7 +245,25 @@ namespace Survery_Certification_App_Consume.Controllers
 
             return Json(model);
         }
+        [HttpGet]
+        public async Task<IActionResult> PdfStatus(int jobId)
+        {
+            var response = await CreateApiClient()
+                .GetAsync($"ihm-survey/jobs/{jobId}/pdf-status");
 
+            if (!response.IsSuccessStatusCode)
+            {
+                return StatusCode(
+                    (int)response.StatusCode,
+                    await response.Content.ReadAsStringAsync()
+                );
+            }
+
+            return Content(
+                await response.Content.ReadAsStringAsync(),
+                "application/json"
+            );
+        }
         public IActionResult ViewPdf(int jobId)
         {
             ViewBag.JobId = jobId;

@@ -91,6 +91,7 @@
                 <tr>
                     <th>Name</th>
                     <th>Email</th>
+                        <th>Project</th>
                     <th>
                         Role
      
@@ -99,7 +100,7 @@
                 </tr>
             </thead>
             <tbody id="userTableBody">
-                <tr class="state-row"><td colspan="4">Loading users...</td></tr>
+                    <tr class="state-row"><td colspan="5">Loading users...</td></tr>
             </tbody>
         </table>
         </div>
@@ -137,6 +138,12 @@
                         </div>
 
                         <div class="mb-3">
+                            <label class="form-label">Project:</label>
+                            <select id="userProjectId" name="ProjectId" class="form-control mb-2">
+                                <option value="">-- Select Project --</option>
+                            </select>
+                            <input type="text" id="userProjectDisplay" class="form-control mb-2" readonly style="display:none;" />
+                            <input type="hidden" id="userProjectName" name="ProjectName" />
                             <label class="form-label">Role:</label>
                             <select id="userRole" name="Role" class="form-control">
                                 @if (string.Equals(Context.Session.GetString("UserRole"), "Admin", StringComparison.OrdinalIgnoreCase))
@@ -181,24 +188,27 @@
         const usersPerPage = 10;
         const currentUserRole = "@currentRole";
         const isCurrentUserAdmin = currentUserRole.toLowerCase() === "admin";
-
+                const currentProjectId = "@(ViewBag.ProjectId ?? "")";
+        const currentProjectName = "@(ViewBag.ProjectName ?? "")";
+                console.log("USER MANAGER DEBUG", {
+            currentUserRole,
+            isCurrentUserAdmin,
+            currentProjectId,
+            currentProjectName
+        });
         // Load users on page ready
         $(document).ready(function () {
             loadUsers();
         });
 
         // Go Back Logic
-        function goBack() {
-            if (document.referrer) {
-                window.location.href = document.referrer;
-            } else {
-                window.history.back();
-            }
+                function goBack() {
+            window.location.href = "/Home/AdminDashboard";
         }
 
         // Load Users
         function loadUsers() {
-            $("#userTableBody").html('<tr class="state-row"><td colspan="4">Loading users...</td></tr>');
+            $("#userTableBody").html('<tr class="state-row"><td colspan="5">Loading users...</td></tr>');
             $.ajax({
                 url: "/UserManager/GetAll",
                 type: "GET",
@@ -263,7 +273,7 @@
             let tableBody = $("#userTableBody");
             tableBody.empty();
             if (!users.length) {
-                tableBody.html('<tr class="state-row"><td colspan="4">No users found.</td></tr>');
+                tableBody.html('<tr class="state-row"><td colspan="5">No users found.</td></tr>');
                 return;
             }
             users.forEach(user => {
@@ -272,8 +282,9 @@
                 const roleClass = isPending ? "role-badge pending" : "role-badge";
                 let row = `<tr>
                     <td class="fw-semibold">${escapeHtml(user.fullName)}</td>
-                    <td>${escapeHtml(user.email)}</td>
-                    <td><span class="${roleClass}">${escapeHtml(roleText)}</span></td>
+                            <td>${escapeHtml(user.email)}</td>
+        <td>${escapeHtml(user.projectName || "-")}</td>
+        <td><span class="${roleClass}">${escapeHtml(roleText)}</span></td>
                     <td>
                         <button class="btn btn-outline-primary btn-sm action-button" onclick="editUser(${user.id})">Edit</button>
                         <button class="btn btn-outline-danger btn-sm action-button" onclick="deleteUser(${user.id})">Delete</button>
@@ -322,7 +333,12 @@
             $("#userId").val("");
             $("#userName").val("");
             $("#userEmail").val("");
-            $("#userRole").val("User");
+                   loadProjects(null).then(() => {
+            const defaultRole = isCurrentUserAdmin ? "User" : "Surveyor";
+            if ($("#userRole option[value='" + defaultRole + "']").length) {
+                $("#userRole").val(defaultRole);
+            }
+        });
          if (!isCurrentUserAdmin) {
             $("#userRole option[value='Admin']").remove();
         }
@@ -332,11 +348,12 @@
         }
 
         // Edit User
+               // Edit User
         function editUser(id) {
             $.ajax({
                 url: `/UserManager/GetById/${id}`,
                 type: "GET",
-                success: function (user) {
+                success: async function (user) {
                     $("#userId").val(user.id);
                     $("#userName").val(user.fullName);
                     $("#userEmail").val(user.email);
@@ -349,7 +366,11 @@
             $("#userRole option[value='Admin']").remove();
         }
 
-        $("#userRole").val(user.role);
+                            const editProjectId = user.projectId || currentProjectId;
+        const editRole = user.role || user.roleName || user.requestedRole;
+
+        await loadProjects(editProjectId);
+        await loadRoles(editProjectId, editRole);
                     $("#userPassword").val("").prop("disabled", true).parent().hide();
                     $("#confirmPassword").val("").prop("disabled", true).parent().hide();
                     $("#userModal").modal("show");
@@ -359,7 +380,93 @@
                 }
             });
         }
+              async function loadProjects(selectedProjectId) {
+            const select = $("#userProjectId");
+            const display = $("#userProjectDisplay");
 
+            select.html('<option value="">-- Select Project --</option>');
+
+            if (!isCurrentUserAdmin) {
+                select.hide().prop("disabled", true);
+
+                $("#userProjectId").html(`<option value="${currentProjectId}">${currentProjectName}</option>`);
+                $("#userProjectId").val(currentProjectId);
+
+                display.val(currentProjectName || "Current Project").show();
+
+                $("#userProjectName").val(currentProjectName);
+
+                await loadRoles(currentProjectId, null);
+                return;
+            }
+
+            display.hide();
+            select.show().prop("disabled", false);
+
+                    const projectResponse = await $.getJSON("/UserManager/Projects");
+        const projects = Array.isArray(projectResponse) ? projectResponse : [];
+
+        projects.forEach(project => {
+                const id = project.id ?? project.Id;
+                const name = project.name ?? project.Name;
+
+                if (!id || !name) return;
+
+                select.append(`<option value="${id}">${escapeHtml(name)}</option>`);
+            });
+
+            if (selectedProjectId) {
+                select.val(selectedProjectId);
+                const projectName = $("#userProjectId option:selected").text();
+                $("#userProjectName").val(projectName);
+                await loadRoles(selectedProjectId, null);
+            }
+        }
+
+                async function loadRoles(projectId, selectedRole) {
+            const roleSelect = $("#userRole");
+            roleSelect.html('<option value="">-- Select Role --</option>');
+                    if (isCurrentUserAdmin) {
+            roleSelect.append('<option value="Admin" data-role-id="">Admin</option>');
+        }
+            if (!projectId) return;
+
+                    const roleResponse = await $.getJSON(`/UserManager/Roles?projectId=${projectId}`);
+        const roles = Array.isArray(roleResponse) ? roleResponse : [];
+
+        roles.forEach(role => {
+                const roleName = role.roleName ?? role.RoleName;
+
+                if (!roleName) return;
+
+                if (!isCurrentUserAdmin && roleName.toLowerCase() === "admin")
+                    return;
+
+                        const roleId = role.id ?? role.Id;
+        roleSelect.append(`<option value="${escapeHtml(roleName)}" data-role-id="${roleId || ""}">${escapeHtml(roleName)}</option>`);
+            });
+
+            if (selectedRole)
+                roleSelect.val(selectedRole);
+        }
+                $("#userRole").on("change", function () {
+            const selectedRole = ($(this).val() || "").toLowerCase();
+
+            if (isCurrentUserAdmin && selectedRole === "admin") {
+                $("#userProjectId").val("").prop("disabled", true);
+                $("#userProjectName").val("All Projects");
+            } else if (isCurrentUserAdmin) {
+                $("#userProjectId").prop("disabled", false);
+            }
+        });
+                 $("#userProjectId").on("change", async function () {
+            if (!isCurrentUserAdmin) return;
+
+            const projectName = $("#userProjectId option:selected").text();
+            $("#userProjectName").val(projectName);
+
+            await loadRoles($(this).val(), null);
+        });
         // Save User
         function saveUser() {
             let id = parseInt($("#userId").val()) || 0;
@@ -386,6 +493,15 @@
                 FullName: $("#userName").val(),
                 Email: $("#userEmail").val(),
                 Role: $("#userRole").val(),
+                     ProjectId: ($("#userRole").val() || "").toLowerCase() === "admin"
+            ? null
+            : Number((isCurrentUserAdmin ? $("#userProjectId").val() : currentProjectId) || 0),
+
+        ProjectName: ($("#userRole").val() || "").toLowerCase() === "admin"
+            ? "All Projects"
+            : (isCurrentUserAdmin ? $("#userProjectName").val() : currentProjectName),
+        RoleName: $("#userRole").val(),
+        RoleId: Number($("#userRole option:selected").data("role-id") || 0),
                 IsApproved: true,
                 RequestedRole: null,
                 Password: isNew ? password : null

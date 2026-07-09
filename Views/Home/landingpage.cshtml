@@ -106,14 +106,16 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label" asp-for="Role">Select Role</label>
-                        <select class="form-control" id="Role" name="Role" required>
-                            <option value="">-- Select Role --</option>
-                            <option value="User">User</option>
-                            <option value="Admin">Admin</option>
-                            <option value="Manager">Manager</option>
-                            <option value="Surveyor">Surveyor</option>
+                        <label class="form-label">Select Project</label>
+                        <select class="form-control" id="ProjectId" name="ProjectId" required>
+                            <option value="">-- Select Project --</option>
                         </select>
+
+                        <label class="form-label mt-2">Select Role</label>
+                        <select class="form-control" id="RoleId" name="RoleId" required disabled>
+                            <option value="">-- Select Role --</option>
+                        </select>
+                        <input type="hidden" id="Role" name="Role" />
                     </div>
 
                     <button type="button" id="registerBtn" class="btn btn-primary w-100" disabled>Register</button>
@@ -153,12 +155,64 @@
             let otpInput = document.getElementById("OtpCode");
             let otpSection = document.querySelector(".otp-section");
             let passwordSection = document.getElementById("password-section");
+            let projectSelect = document.getElementById("ProjectId");
+        let roleSelect = document.getElementById("RoleId");
+        let roleHidden = document.getElementById("Role");
 
             passwordSection.style.display = "none"; // Initially hide password fields
             resendOtpBtn.style.display = "none";
             registerBtn.disabled = true;
 
-                                        async function sendOtp(isResend = false) {
+
+                async function loadProjects() {
+            try {
+                let response = await fetch("/Home/RegisterProjects");
+                let projects = await response.json();
+
+                projectSelect.innerHTML = '<option value="">-- Select Project --</option>';
+
+                projects.forEach(project => {
+                    let option = document.createElement("option");
+                    option.value = project.id;
+                    option.textContent = project.name;
+                    projectSelect.appendChild(option);
+                });
+            } catch {
+                alert("Unable to load projects.");
+            }
+        }
+
+        projectSelect.addEventListener("change", async function () {
+            roleSelect.innerHTML = '<option value="">-- Select Role --</option>';
+            roleSelect.disabled = true;
+            roleHidden.value = "";
+
+            if (!projectSelect.value) return;
+
+            try {
+                let response = await fetch(`/Home/RegisterRoles?projectId=${projectSelect.value}`);
+                let roles = await response.json();
+
+                roles.forEach(role => {
+                    let option = document.createElement("option");
+                    option.value = role.id;
+                    option.textContent = role.roleName;
+                    roleSelect.appendChild(option);
+                });
+
+                roleSelect.disabled = false;
+            } catch {
+                alert("Unable to load roles.");
+            }
+        });
+
+        roleSelect.addEventListener("change", function () {
+            roleHidden.value = roleSelect.selectedOptions[0]?.textContent || "";
+        });
+
+        loadProjects();
+
+        async function sendOtp(isResend = false) {
             let email = emailInput.value.trim().toLowerCase();
             let fullName = document.getElementById("FullName").value.trim();
 
@@ -280,8 +334,9 @@
             let password = document.getElementById("Password").value;
             let confirmPassword = document.getElementById("ConfirmPassword").value;
             let role = document.getElementById("Role").value;
-
-            if (!fullName || !email || !password || !confirmPassword || !role) {
+            let projectId = parseInt(document.getElementById("ProjectId").value || "0");
+        let roleId = parseInt(document.getElementById("RoleId").value || "0");
+            if (!fullName || !email || !password || !confirmPassword || !role || !projectId || !roleId) {
                 alert("Please fill all the required fields.");
                 return;
             }
@@ -294,13 +349,15 @@
                 return;
             }
 
-            let userData = {
-                fullName,
-                email,
-                password,
-                confirmPassword,
-                role
-            };
+          let userData = {
+            fullName,
+            email,
+            password,
+            confirmPassword,
+            role,
+            projectId,
+            roleId
+        };
 
             try {
                 let response = await fetch("/Home/Register", {

@@ -247,11 +247,24 @@ namespace YourMvcApp.Controllers
                 string role = userResponse.user.role;
                 string token = userResponse.token ?? "";
 
+                string projectId = userResponse.user.projectId != null ? Convert.ToString(userResponse.user.projectId) : "";
+                string projectName = userResponse.user.projectName != null ? Convert.ToString(userResponse.user.projectName) : "";
+                string roleName = userResponse.user.roleName != null ? Convert.ToString(userResponse.user.roleName) : role;
+
                 HttpContext.Session.SetInt32("UserId", userId);
                 HttpContext.Session.SetString("UserFullName", fullName);
                 HttpContext.Session.SetString("UserEmail", email);
                 HttpContext.Session.SetString("UserRole", role);
                 HttpContext.Session.SetString("JWT", token);
+
+                if (!string.IsNullOrWhiteSpace(projectId))
+                    HttpContext.Session.SetString("ProjectId", projectId);
+
+                if (!string.IsNullOrWhiteSpace(projectName))
+                    HttpContext.Session.SetString("ProjectName", projectName);
+
+                if (!string.IsNullOrWhiteSpace(roleName))
+                    HttpContext.Session.SetString("RoleName", roleName);
 
                 if (string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase))

@@ -553,14 +553,16 @@
                             <label class="form-label">Audit Address</label>
                             <input class="form-control" name="AuditAddress" />
                         </div>
-
+                        <input type="hidden" name="ProjectId" value="@(isIhm ? 1 : 2)" />
                         <div class="col-md-12">
                             <label class="form-label">Select Vessel *</label>
                             <select class="form-select" name="VesselId" id="VesselId" required>
                                 <option value="">Select vessel</option>
                                 @foreach (var vessel in Model.Vessels)
                                 {
-                                    <option value="@vessel.Id" data-client-name="@vessel.ClientName">
+                                    <option value="@vessel.Id"
+                                            data-client-name="@vessel.ClientName"
+                                            data-project-id="@vessel.ProjectId">
                                         @vessel.VesselName @(string.IsNullOrWhiteSpace(vessel.ImoNumber) ? "" : $" - IMO {vessel.ImoNumber}")
                                     </option>
                                 }
@@ -618,10 +620,19 @@
     <script>
                 document.addEventListener("DOMContentLoaded", function () {
             const vesselSelect = document.getElementById("VesselId");
+            const currentProjectId = @(isIhm ? 1 : 2);
             const clientNameInput = document.getElementById("ClientName");
 
             if (!vesselSelect || !clientNameInput) return;
+                    Array.from(vesselSelect.options).forEach(option => {
+            if (!option.value) return;
 
+            const vesselProjectId = Number(option.getAttribute("data-project-id") || 0);
+
+            if (vesselProjectId && vesselProjectId !== currentProjectId) {
+                option.remove();
+            }
+        });
             vesselSelect.addEventListener("change", function () {
                 const selectedOption = vesselSelect.options[vesselSelect.selectedIndex];
                 const clientName = selectedOption.getAttribute("data-client-name") || "";

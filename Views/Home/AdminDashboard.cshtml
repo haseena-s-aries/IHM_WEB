@@ -20,10 +20,20 @@
     string Initial(string? value) => string.IsNullOrWhiteSpace(value) ? "?" : value.Trim()[..1].ToUpperInvariant();
     var userRole = Context.Session.GetString("UserRole") ?? "";
     var isAdmin = string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase);
+    var projectName = Context.Session.GetString("ProjectName") ?? "";
+    var isClient = string.Equals(userRole, "Client", StringComparison.OrdinalIgnoreCase);
+    var isIhmProject = string.Equals(projectName, "IHM", StringComparison.OrdinalIgnoreCase);
+    var isExProject = string.Equals(projectName, "EX Survey", StringComparison.OrdinalIgnoreCase);
+    var isAurasProject = string.Equals(projectName, "AURAS", StringComparison.OrdinalIgnoreCase);
+
+    var canSeeIhm = isAdmin || isIhmProject;
+    var canSeeEx = isAdmin || isExProject;
+    var canSeeAuras = isAdmin || isAurasProject;
+    var canSeeUsers = !isClient;
     var profileTitle = isAdmin ? "Administrator" : "Manager";
-    var ihmJobs = surveys.IhmSurveyJobs > 0 ? surveys.IhmSurveyJobs : counts.IhmSurveyJobs;
-    var exJobs = surveys.ExSurveyJobs > 0 ? surveys.ExSurveyJobs : counts.ExSurveyJobs;
-    var submittedJobs = surveys.SubmittedJobs > 0 ? surveys.SubmittedJobs : counts.SubmittedSurveyJobs;
+    var ihmJobs = canSeeIhm ? surveys.IhmSurveyJobs : 0;
+    var exJobs = canSeeEx ? surveys.ExSurveyJobs : 0;
+    var submittedJobs = surveys.SubmittedJobs;
     var attentionJobs = surveys.AttentionJobs;
     var recentActivity = new List<(string Title, string Meta, string Tone)>();
 
@@ -90,13 +100,19 @@
                 {
                     <a href="@Url.Action("PendingUsers", "Auth")"><i class="fa-solid fa-user-check"></i><span>Approvals</span><b>@pendingCount</b></a>
                 }
-                <a href="@Url.Action("Index", "UserManager")"><i class="fa-solid fa-users"></i><span>Users</span></a>
+                @if (canSeeUsers)
+                {
+                    <a href="@Url.Action("Index", "UserManager")"><i class="fa-solid fa-users"></i><span>Users</span></a>
+                }
                 @if (isAdmin)
                 {
                     <a href="@Url.Action("UsageAnalytics", "Home")"><i class="fa-solid fa-chart-line"></i> Usage Analytics</a>
                 }
                 <a href="@Url.Action("SavedReports", "Home")"><i class="fa-solid fa-file-lines"></i><span>Reports</span></a>
-                <a href="@Url.Action("Index", "Vessel")"><i class="fa-solid fa-ship"></i><span>Vessels</span></a>
+                @if (!isClient)
+                {
+                    <a href="@Url.Action("Index", "Vessel")"><i class="fa-solid fa-ship"></i><span>Vessels</span></a>
+                }
 
             </nav>
 
@@ -131,22 +147,37 @@
                 }
 
                 <section class="metric-grid" id="overview" aria-label="Operational summary">
-                    <article class="metric-card blue">
-                        <span class="metric-icon"><i class="fa-solid fa-clipboard-check"></i></span>
-                        <div><small>IHM Survey jobs</small><strong>@ihmJobs</strong><span>@submittedJobs submitted</span></div>
-                    </article>
-                    <article class="metric-card green">
-                        <span class="metric-icon"><i class="fa-solid fa-certificate"></i></span>
-                        <div><small>AURAS Certificates</small><strong>@counts.TotalCertificates</strong><span>@counts.TowageCount towage</span></div>
-                    </article>
-                    <article class="metric-card violet">
-                        <span class="metric-icon"><i class="fa-solid fa-users"></i></span>
-                        <div><small>Active users</small><strong>@Model.TotalUsers</strong><span>All roles</span></div>
-                    </article>
-                    <article class="metric-card amber">
-                        <span class="metric-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
-                        <div><small>Attention</small><strong>@attentionJobs</strong><span>Assigned, not started</span></div>
-                    </article>
+                    @if (canSeeIhm)
+                    {
+                        <article class="metric-card blue">
+                            <span class="metric-icon"><i class="fa-solid fa-clipboard-check"></i></span>
+                            <div><small>IHM Survey jobs</small><strong>@ihmJobs</strong><span>@submittedJobs submitted</span></div>
+                        </article>
+                    }
+
+                    @if (canSeeAuras)
+                    {
+                        <article class="metric-card green">
+                            <span class="metric-icon"><i class="fa-solid fa-certificate"></i></span>
+                            <div><small>AURAS Certificates</small><strong>@counts.TotalCertificates</strong><span>@counts.TowageCount towage</span></div>
+                        </article>
+                    }
+
+                    @if (canSeeUsers)
+                    {
+                        <article class="metric-card violet">
+                            <span class="metric-icon"><i class="fa-solid fa-users"></i></span>
+                            <div><small>Active users</small><strong>@Model.TotalUsers</strong><span>@projectName roles</span></div>
+                        </article>
+                    }
+
+                    @if (!isClient)
+                    {
+                        <article class="metric-card amber">
+                            <span class="metric-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
+                            <div><small>Attention</small><strong>@attentionJobs</strong><span>Assigned, not started</span></div>
+                        </article>
+                    }
                 </section>
 
                 <section class="applications-section" aria-labelledby="applicationsTitle">
@@ -161,6 +192,8 @@
                     </div> *@
 
                     <div class="app-grid">
+                        @if (canSeeAuras)
+                        {
                         <article class="app-card primary">
                             <div class="app-card-top">
                                 <span class="app-icon green"><i class="fa-solid fa-shield-halved"></i></span>
@@ -176,7 +209,9 @@
                                 Open workspace <i class="fa-solid fa-arrow-right"></i>
                             </button>
                         </article>
-
+                        }
+                        @if (canSeeIhm)
+                        {
                         <article class="app-card">
                             <div class="app-card-top">
                                 <span class="app-icon blue"><i class="fa-solid fa-puzzle-piece"></i></span>
@@ -192,7 +227,9 @@
                                 Open workspace <i class="fa-solid fa-arrow-right"></i>
                             </a>
                         </article>
-
+                        }
+                        @if (canSeeEx)
+                        {
                         <article class="app-card muted">
                             <div class="app-card-top">
                                 <span class="app-icon coral"><i class="fa-regular fa-square"></i></span>
@@ -206,10 +243,13 @@
                             </div>
                             <button type="button" class="app-action disabled" disabled>Notify me</button>
                         </article>
+                        }
                     </div>
                 </section>
 
                 <section class="lower-grid">
+                    @if (!isClient)
+{
                     <article class="panel fleet-panel">
                         <div class="panel-heading">
                             <div><h2>Fleet at a glance</h2></div>
@@ -269,7 +309,7 @@
                             </div>
                         }
                     </article>
-
+}
                     <article class="panel activity-panel">
                         <div class="panel-heading">
                             <div><h2>Recent activity</h2></div>

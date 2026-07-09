@@ -26,7 +26,14 @@ namespace Survery_Certification_App_Consume.Models
 
         [Required]
         public string Role { get; set; }
+        [Required]
+        public int ProjectId { get; set; }
 
+        [Required]
+        public int RoleId { get; set; }
+
+        public string? ProjectName { get; set; }
+        public string? RoleName { get; set; }
 
 
     }

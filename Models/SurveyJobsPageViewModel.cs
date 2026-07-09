@@ -174,6 +174,8 @@
         public decimal? LengthBetweenPerpendiculars { get; set; }
         public decimal? DraughtMoulded { get; set; }
         public string Status { get; set; } = "Active";
+        public int? ProjectId { get; set; }
+        public string? ProjectName { get; set; }
     }
 
     public class VesselMasterViewModel

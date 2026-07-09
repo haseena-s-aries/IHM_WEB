@@ -388,7 +388,11 @@
             <strong>Open <i class="fa-solid fa-arrow-right"></i></strong>
         </a> *@
 
-        <a class="module-card blue" href="@Url.Action("Ihm", "SurveyJobs")">
+        @if ((Context.Session.GetString("UserRole") ?? "") != "Client" &&
+     ((Context.Session.GetString("ProjectName") ?? "") == "IHM" ||
+      (Context.Session.GetString("UserRole") ?? "") == "Admin"))
+{
+    <a class="module-card blue" href="@Url.Action("Ihm", "SurveyJobs")">
             <div>
                 <div class="module-icon"><i class="fa-solid fa-box-archive"></i></div>
                 <div class="module-title">IHM Survey</div>
@@ -396,7 +400,11 @@
             </div>
             <strong>Open <i class="fa-solid fa-arrow-right"></i></strong>
         </a>
-
+        }
+        @if ((Context.Session.GetString("UserRole") ?? "") != "Client" &&
+        ((Context.Session.GetString("ProjectName") ?? "") == "EX Survey" ||
+      (Context.Session.GetString("UserRole") ?? "") == "Admin"))
+{
         <a class="module-card orange" href="@Url.Action("Ex", "SurveyJobs")">
             <div>
                 <div class="module-icon"><i class="fa-solid fa-route"></i></div>
@@ -405,6 +413,8 @@
             </div>
             <strong>Open <i class="fa-solid fa-arrow-right"></i></strong>
         </a>
+
+}
     </div>
 
     <div class="section-title">Survey Summary</div>
@@ -446,8 +456,13 @@
     <div class="section-title">Quick Actions</div>
 
     <div class="quick-list">
-        <a class="quick-item" href="@Url.Action("Ihm", "SurveyJobs")">
-            <div class="quick-left">
+        @if ((Context.Session.GetString("UserRole") ?? "") != "Client" &&
+       ((Context.Session.GetString("ProjectName") ?? "") == "IHM" ||
+        (Context.Session.GetString("UserRole") ?? "") == "Admin"))
+        {
+            <a class="quick-item" href="@Url.Action("Ihm", "SurveyJobs")
+            ">
+                <div class="quick-left">
                 <div class="summary-icon i-blue"><i class="fa-solid fa-box-archive"></i></div>
                 <div>
                     <div class="quick-title">IHM Survey Jobs</div>
@@ -456,9 +471,14 @@
             </div>
             <div class="arrow"><i class="fa-solid fa-chevron-right"></i></div>
         </a>
-
-        <a class="quick-item" href="@Url.Action("Ex", "SurveyJobs")">
-            <div class="quick-left">
+        }
+        @if ((Context.Session.GetString("UserRole") ?? "") != "Client" &&
+       ((Context.Session.GetString("ProjectName") ?? "") == "EX Survey" ||
+        (Context.Session.GetString("UserRole") ?? "") == "Admin"))
+        {
+            <a class="quick-item" href="@Url.Action("Ex", "SurveyJobs")
+            ">
+                <div class="quick-left">
                 <div class="summary-icon i-blue"><i class="fa-solid fa-route"></i></div>
                 <div>
                     <div class="quick-title">Ex-Survey Jobs</div>
@@ -467,6 +487,7 @@
             </div>
             <div class="arrow"><i class="fa-solid fa-chevron-right"></i></div>
         </a>
+        }
     </div>
 
 </div>

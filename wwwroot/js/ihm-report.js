@@ -981,6 +981,10 @@
     `;
 
         document.body.appendChild(overlay);
+        const existingOverlay = document.getElementById("pdfOverlay");
+        if (existingOverlay) {
+            existingOverlay.hidden = false;
+        }
 
         // Prevent keyboard input and pointer interaction.
 
@@ -1026,38 +1030,103 @@
 
     updateCompletion();
 
-    document.getElementById("generatePdfButton")?.addEventListener("click", event => {
+    document.getElementById("generatePdfButton")?.addEventListener("click", async event => {
 
         event.preventDefault();
 
         if (!form || pdfGenerationStarted) return;
 
         const generateUrl =
-
             config.generatePdfUrl ||
-
             event.currentTarget.dataset.generateUrl;
 
         if (!generateUrl) {
-
             alert("The PDF generation route is unavailable. Refresh the page and try again.");
-
             return;
-
         }
 
         Object.keys(collections).forEach(reindexCollection);
-
         reindexPeople();
 
         if (!lockPageForPdfGeneration()) return;
 
-        form.action = generateUrl;
-        form.removeAttribute("target");
+        const stageLabel = document.getElementById("pdfStageLabel");
+        const progressFill = document.getElementById("pdfProgressFill");
+        const pct = document.getElementById("pdfPct");
 
-        setTimeout(() => {
-            form.requestSubmit();
-        }, 300);
+        const setProgress = (label, percent) => {
+            if (stageLabel) stageLabel.textContent = label;
+            if (progressFill) progressFill.style.width = `${percent}%`;
+            if (pct) pct.textContent = `${percent}%`;
+        };
+
+        try {
+            setProgress("Saving report and starting PDF generation...", 20);
+
+            const data = new FormData(form);
+
+            const response = await fetch(generateUrl, {
+                method: "POST",
+                body: data,
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(await response.text() || "Unable to start PDF generation.");
+            }
+
+            const startResult = await response.json();
+
+            const statusUrl = startResult.statusUrl || config.pdfStatusUrl;
+            const pdfUrl = startResult.pdfUrl || config.viewPdfUrl;
+
+            if (!statusUrl || !pdfUrl) {
+                throw new Error("PDF status route is unavailable.");
+            }
+
+            setProgress("PDF generation is running in background...", 45);
+
+            let attempts = 0;
+
+            const poll = async () => {
+                attempts += 1;
+
+                const statusResponse = await fetch(statusUrl, {
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest"
+                    }
+                });
+
+                if (!statusResponse.ok) {
+                    throw new Error(await statusResponse.text() || "Unable to check PDF status.");
+                }
+
+                const statusResult = await statusResponse.json();
+                const status = (statusResult.status || "").toLowerCase();
+
+                if (status === "completed") {
+                    setProgress("PDF completed. Opening report...", 100);
+                    window.location.href = pdfUrl;
+                    return;
+                }
+
+                if (status === "failed") {
+                    throw new Error(statusResult.error || "PDF generation failed.");
+                }
+
+                const progress = Math.min(90, 45 + attempts * 3);
+                setProgress("PDF generation is still processing...", progress);
+
+                setTimeout(poll, 3000);
+            };
+
+            setTimeout(poll, 3000);
+        } catch (error) {
+            alert(error.message || "PDF generation failed.");
+            window.location.reload();
+        }
 
     });
 

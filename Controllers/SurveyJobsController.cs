@@ -727,6 +727,7 @@ namespace Survery_Certification_App_Consume.Controllers
             var payload = new
             {
                 moduleType = request.SurveyType == "IHM Survey" ? 2 : 1,
+                projectId = request.ProjectId,
                 jobNumber = request.JobNumber.Trim(),
                 clientName = request.ClientName?.Trim(),
                 projectName = request.ProjectName?.Trim(),
@@ -1118,6 +1119,7 @@ namespace Survery_Certification_App_Consume.Controllers
     public class SurveyJobCreateRequest
     {
         public string SurveyType { get; set; } = "IHM Survey";
+        public int? ProjectId { get; set; }
         public string JobNumber { get; set; } = "";
         public string? ClientName { get; set; }
         public string? ProjectName { get; set; }

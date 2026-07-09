@@ -677,6 +677,8 @@
             templateFromJobUrl: '@Url.Action("TemplateFromJob", "IhmReportInfo")',
             copyAppendicesUrl: '@Url.Action("CopyFromJob", "IhmReportInfo")',
             generatePdfUrl: '@Url.Action("GeneratePdf", "IhmReportInfo")',
+            pdfStatusUrl: '@Url.Action("PdfStatus", "IhmReportInfo", new { jobId = Model.JobId })',
+            viewPdfUrl: '@Url.Action("ViewPdf", "IhmReportInfo", new { jobId = Model.JobId })',
             saveUrl: '@Url.Action("Save", "IhmReportInfo")',
             currentJobId: @Model.JobId
         };
