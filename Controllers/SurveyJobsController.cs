@@ -3,9 +3,10 @@ using Newtonsoft.Json;
 using Survery_Certification_App_Consume.Models;
 using System.Net.Http.Headers;
 using System.Text;
-
+using Survery_Certification_App_Consume.Filters;
 namespace Survery_Certification_App_Consume.Controllers
 {
+    [BlockClientAccess]
     public class SurveyJobsController : Controller
     {
         private readonly IHttpClientFactory _clientFactory;
@@ -365,6 +366,30 @@ namespace Survery_Certification_App_Consume.Controllers
                 ) ?? new List<IhmImageMarkerDto>();
 
                 return Json(markers);
+            }
+            catch (Exception ex)
+            {
+                Response.StatusCode = 500;
+                return Json(new { message = ex.Message });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetMarkedImageStatus(int jobId)
+        {
+            try
+            {
+                var client = CreateApiClient();
+                var response = await client.GetAsync($"ihm-survey/jobs/{jobId}/marked-images/status");
+                var body = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Response.StatusCode = (int)response.StatusCode;
+                    return Content(body, "application/json");
+                }
+
+                return Content(body, "application/json");
             }
             catch (Exception ex)
             {

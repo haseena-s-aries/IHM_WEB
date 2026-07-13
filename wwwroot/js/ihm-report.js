@@ -1002,6 +1002,44 @@
 
     }
 
+    function unlockPageForPdfGeneration() {
+
+        pdfGenerationStarted = false;
+
+        document.getElementById("pdfGenerationOverlay")?.remove();
+
+        const existingOverlay = document.getElementById("pdfOverlay");
+        if (existingOverlay) {
+            existingOverlay.hidden = true;
+        }
+
+        form?.querySelectorAll("input, textarea, select, button")
+
+            .forEach(element => {
+
+                element.readOnly = false;
+
+                element.removeAttribute("tabindex");
+
+            });
+
+    }
+
+    async function readFetchError(response, fallback) {
+
+        const text = await response.text();
+
+        if (!text) return fallback;
+
+        try {
+            const json = JSON.parse(text);
+            return json.message || json.error || fallback;
+        } catch {
+            return text;
+        }
+
+    }
+
     function updateCompletion() {
 
         const fields = [...document.querySelectorAll(".core-field")];
@@ -1060,6 +1098,12 @@
             if (pct) pct.textContent = `${percent}%`;
         };
 
+        const handlePdfError = (error) => {
+            setProgress("PDF generation failed.", 100);
+            unlockPageForPdfGeneration();
+            alert(error.message || "PDF generation failed.");
+        };
+
         try {
             setProgress("Saving report and starting PDF generation...", 20);
 
@@ -1074,7 +1118,7 @@
             });
 
             if (!response.ok) {
-                throw new Error(await response.text() || "Unable to start PDF generation.");
+                throw new Error(await readFetchError(response, "Unable to start PDF generation."));
             }
 
             const startResult = await response.json();
@@ -1100,7 +1144,7 @@
                 });
 
                 if (!statusResponse.ok) {
-                    throw new Error(await statusResponse.text() || "Unable to check PDF status.");
+                    throw new Error(await readFetchError(statusResponse, "Unable to check PDF status."));
                 }
 
                 const statusResult = await statusResponse.json();
@@ -1119,13 +1163,12 @@
                 const progress = Math.min(90, 45 + attempts * 3);
                 setProgress("PDF generation is still processing...", progress);
 
-                setTimeout(poll, 3000);
+                setTimeout(() => poll().catch(handlePdfError), 3000);
             };
 
-            setTimeout(poll, 3000);
+            setTimeout(() => poll().catch(handlePdfError), 3000);
         } catch (error) {
-            alert(error.message || "PDF generation failed.");
-            window.location.reload();
+            handlePdfError(error);
         }
 
     });
@@ -1444,7 +1487,7 @@
 
         ]);
         const forcedTemplateFields = {
-          
+
             ClientName: getProperty(source, "clientName"),
             OhsClient: getProperty(source, "ohsClient")
         };

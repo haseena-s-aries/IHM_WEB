@@ -31,11 +31,54 @@
         .content { padding:16px; }
         .job-card { background:white; border:1px solid #e0e4ec; border-radius:14px; padding:18px; margin-bottom:12px; box-shadow:0 3px 10px #0000000a; cursor:pointer; transition:.16s; }
         .job-card:hover { transform:translateY(-1px); box-shadow:0 8px 22px #00000012; }
-        .job-head { display:flex; align-items:center; gap:12px; }
+
+        .job-head {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
         .job-icon { width:46px; height:46px; border-radius:12px; background:linear-gradient(135deg,#0b1d33,#1e3a5f); color:white; display:flex; align-items:center; justify-content:center; }
         .job-title { font-size:16px; font-weight:800; margin:0; }
         .client { color:#607080; font-size:12px; margin:2px 0 0; }
         .status { padding:5px 10px; border-radius:20px; font-size:11px; font-weight:800; background:#1976d21a; color:#1976d2; }
+
+        .marked-image-status {
+            position: absolute;
+            left: 50%;
+            top: 4px;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            max-width: 55%;
+            padding: 7px 11px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 800;
+            background: #eef4ff;
+            color: #315a9b;
+            border: 1px solid #d9e6ff;
+            white-space: nowrap;
+        }
+
+            .marked-image-status.ready {
+                background: #edf8f1;
+                color: #247044;
+                border-color: #cbead6;
+            }
+
+            .marked-image-status.processing {
+                background: #fff8e8;
+                color: #9a6500;
+                border-color: #ffe4a8;
+            }
+
+            .marked-image-status.failed {
+                background: #fff0f0;
+                color: #b42318;
+                border-color: #ffd0d0;
+            }
         .line { border-top:1px solid #e0e4ec; margin:14px 0 12px; }
         .info-row { display:flex; gap:8px; align-items:center; color:#607080; font-size:13px; margin-bottom:6px; }
         .info-row strong { width:58px; color:#607080; }
@@ -135,7 +178,7 @@
         }
 
         .page-busy .page-loading-indicator {
-            display: flex;
+            display: none;
         }
 
         .loading-dot {
@@ -252,7 +295,15 @@
                                 <p class="client">@job.ClientName</p>
                             }
                         </div>
-
+                        @if (isIhm)
+                        {
+                            <div class="marked-image-status"
+                                 data-marked-status
+                                 data-job-id="@job.Id">
+                                <i class="fa-solid fa-spinner fa-spin"></i>
+                                <span>Checking image status...</span>
+                            </div>
+                        }
                         <span class="status">@job.Status</span>
                     </div>
 
@@ -400,7 +451,7 @@
 
                             <a class="action-btn purple" href="/IhmReportInfo/Index?jobId=@job.Id">
                                 <i class="fa-regular fa-file-pdf"></i> IHM Report
-</a>
+                            </a>
 
                             <button class="action-btn amber" type="button" data-bs-toggle="modal" data-bs-target="#layoutModal-@job.Id">
                                 <i class="fa-regular fa-map"></i> Upload Layouts
@@ -812,7 +863,56 @@
                 }
             });
         });
+          
+        function setMarkedStatus(element, state, message, iconClass) {
+            element.classList.remove("ready", "processing", "failed");
+            element.classList.add(state);
 
+            element.innerHTML = `
+                <i class="fa-solid ${iconClass}"></i>
+                <span>${message}</span>
+            `;
+        }
+
+        async function refreshMarkedImageStatus(element) {
+            const jobId = element.dataset.jobId;
+            if (!jobId) return;
+
+            try {
+                const response = await fetch(`/SurveyJobs/GetMarkedImageStatus?jobId=${jobId}`);
+                if (!response.ok) {
+                    setMarkedStatus(element, "failed", "Unable to check image status", "fa-triangle-exclamation");
+                    return;
+                }
+
+                const result = await response.json();
+                const items = result.items || result.Items || [];
+
+                const appendix4 = items.find(x => Number(x.sectionType ?? x.SectionType) === 2);
+                const hazardous = items.find(x => Number(x.sectionType ?? x.SectionType) === 1);
+
+                const appendixStatus = Number(appendix4?.status ?? appendix4?.Status ?? 0);
+                const hazardousStatus = Number(hazardous?.status ?? hazardous?.Status ?? 0);
+
+                if (appendixStatus === 3 && hazardousStatus === 3) {
+                    setMarkedStatus(element, "ready", "Appendix 4 and I-2 images ready", "fa-circle-check");
+                    return;
+                }
+
+                if (appendixStatus === 2 || hazardousStatus === 2) {
+                    setMarkedStatus(element, "processing", "Image generation running...", "fa-spinner fa-spin");
+                    setTimeout(() => refreshMarkedImageStatus(element), 5000);
+                    return;
+                }
+
+                setMarkedStatus(element, "processing", "Images not generated yet", "fa-clock");
+            } catch {
+                setMarkedStatus(element, "failed", "Unable to check image status", "fa-triangle-exclamation");
+            }
+        }
+
+        document.querySelectorAll("[data-marked-status]").forEach(refreshMarkedImageStatus);
+    
         document.querySelectorAll(".job-card[data-card-href]").forEach(card => {
             card.addEventListener("click", event => {
                 if (event.target.closest("a, button, input, select, textarea, label, form")) return;

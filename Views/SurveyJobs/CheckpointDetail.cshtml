@@ -624,7 +624,7 @@
                     <div class="info-row"><div class="info-label"><i class="fa-solid fa-gear"></i>Equipment</div><div class="info-value">@Val(Model.EquipmentName)</div></div>
                     <div class="info-row"><div class="info-label"><i class="fa-solid fa-shapes"></i>Component</div><div class="info-value">@Val(Model.Component)</div></div>
                     <div class="info-row"><div class="info-label"><i class="fa-solid fa-magnifying-glass"></i>Object To Check</div><div class="info-value">@Val(Model.Description)</div></div>
-                    <div class="info-row"><div class="info-label"><i class="fa-solid fa-triangle-exclamation"></i>Hazmat</div><div class="info-value hazmat">@Val(Model.HazardousMaterial)</div></div>
+                    <div class="info-row"><div class="info-label"><i class="fa-solid fa-triangle-exclamation"></i>Hazardous material</div><div class="info-value hazmat">@Val(Model.HazardousMaterial)</div></div>
                 </div>
 
                 <h3 class="section-label">Audit Results</h3>
@@ -739,6 +739,7 @@
                         <div id="pendingSamplesList" class="sample-list muted">Click Auto Map</div>
                     </div>
                 </div>
+                
                 <div class="layout-stage">
                     @if (string.IsNullOrWhiteSpace(layoutPath))
                     {
@@ -914,16 +915,34 @@
                 .join("");
         }
 
-        function refreshAutoMapLists(result) {
+
+      
+
+                function refreshAutoMapLists(result) {
+            const mappedCheckpointIds = new Set(
+                loadedMarkers
+                    .map(marker => Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId")))
+                    .filter(id => id > 0)
+            );
+
             const mappedLabels = new Set(
                 loadedMarkers
-                    .filter(marker => samePath(getValue(marker, "imagePath", "ImagePath"), normalizePathForSave(currentImagePath)))
-                    .map(marker => String(getMarkerLabel(marker, Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId"))) || "").trim().toUpperCase())
+                    .map(marker => String(getMarkerLabel(
+                        marker,
+                        Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId"))
+                    ) || "").trim().toUpperCase())
                     .filter(Boolean)
             );
 
-            const mapped = expectedSamples.filter(x => mappedLabels.has(x.label.toUpperCase()));
-            const pending = expectedSamples.filter(x => !mappedLabels.has(x.label.toUpperCase()));
+            const mapped = expectedSamples.filter(sample =>
+                mappedCheckpointIds.has(sample.checkpointId) ||
+                mappedLabels.has(sample.label.toUpperCase())
+            );
+
+            const pending = expectedSamples.filter(sample =>
+                !mappedCheckpointIds.has(sample.checkpointId) &&
+                !mappedLabels.has(sample.label.toUpperCase())
+            );
 
             renderSampleList("expectedSamplesList", expectedSamples, "");
             renderSampleList("mappedSamplesList", mapped, "mapped");
@@ -1075,6 +1094,50 @@
         wrap.style.transform = `scale(${mapView.scale})`;
             wrap.style.setProperty("--pin-scale", 1 / mapView.scale);
         }
+
+        function setMarkerHint(message, icon = "fa-circle-info") {
+            const hint = document.getElementById("markerHint");
+            if (!hint) return;
+            hint.innerHTML = `<i class="fa-solid ${icon}"></i>${message}`;
+        }
+
+        async function pollMarkedImageStatus() {
+            setMarkerHint("Appendix 4 and I-2 images are generating...", "fa-spinner fa-spin");
+
+            for (let attempt = 0; attempt < 30; attempt += 1) {
+                const response = await fetch(`/SurveyJobs/GetMarkedImageStatus?jobId=${checkpointContext.jobId}`);
+
+                if (!response.ok) {
+                    setMarkerHint("Unable to check marked image generation status.", "fa-triangle-exclamation");
+                    return;
+                }
+
+                const result = await response.json();
+                const items = result.items || result.Items || [];
+                const appendix4 = items.find(item => Number(item.sectionType ?? item.SectionType) === 2);
+                const hazardous = items.find(item => Number(item.sectionType ?? item.SectionType) === 1);
+
+                const failed = [appendix4, hazardous].find(item => Number(item?.status ?? item?.Status) === 4);
+                if (failed) {
+                    const error = failed.errorMessage || failed.ErrorMessage || "Marked image generation failed.";
+                    setMarkerHint(escapeHtml(error), "fa-triangle-exclamation");
+                    return;
+                }
+
+                const appendixReady = Number(appendix4?.status ?? appendix4?.Status) === 3;
+                const hazardousReady = Number(hazardous?.status ?? hazardous?.Status) === 3;
+
+                if (appendixReady && hazardousReady) {
+                    setMarkerHint("Appendix 4 and I-2 images are ready for PDF generation.", "fa-circle-check");
+                    return;
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+
+            setMarkerHint("Marked images are still generating. You can continue after a moment.", "fa-clock");
+        }
+
                 async function autoMapExistingMarkers() {
             const button = document.getElementById("autoMapMarkersBtn");
             if (!button) return;
@@ -1102,11 +1165,11 @@
                     throw new Error(result.message || text || "Auto mapping failed.");
                 }
 
-                document.getElementById("markerHint").innerHTML =
-                    `<i class="fa-solid fa-circle-check"></i>Mapped ${result.mapped || 0} marker(s).`;
+                setMarkerHint(`Mapped ${result.mapped || 0} marker(s). Updating generated images...`, "fa-circle-check");
 
                 await loadMarkers();
                 refreshAutoMapLists(result);
+                pollMarkedImageStatus();
 
                 if (result.needsReview) {
                     alert("Auto mapping completed, but detected marker count does not match sample count. Please review marker positions.");
