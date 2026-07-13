@@ -1,11 +1,13 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using Survery_Certification_App_Consume.Filters;
 using Survery_Certification_App_Consume.Models;
 using Survey_Certification_App.Models;
 using System.Net.Http;
 using System.Threading.Tasks;
 
 
+[BlockClientAccess]
 public class TaskManagerController : Controller
 {
     private readonly HttpClient _httpClient;

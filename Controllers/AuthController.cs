@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using Survery_Certification_App_Consume.Filters;
 using Survery_Certification_App_Consume.Models;
 using Survey_Certification_App.DTOS;
 using System.Text;
@@ -23,6 +24,7 @@ namespace YourMvcApp.Controllers
         }
 
         [HttpGet]
+        [BlockClientAccess]
         public async Task<IActionResult> GetNotificationCount()
         {
             var response = await _httpClient.GetAsync("User/pending-users");
@@ -38,14 +40,20 @@ namespace YourMvcApp.Controllers
 
 
         [HttpGet]
+        [BlockClientAccess]
         public async Task<IActionResult> PendingUsers()
         {
             var response = await _httpClient.GetAsync("User/pending-users");
+            var projectsResponse = await _httpClient.GetAsync("User/projects");
+            var projects = projectsResponse.IsSuccessStatusCode
+                ? await projectsResponse.Content.ReadFromJsonAsync<List<ProjectOption>>() ?? new List<ProjectOption>()
+                : new List<ProjectOption>();
 
 
             if (!response.IsSuccessStatusCode)
             {
                 ViewBag.PendingCount = 0;
+                ViewBag.Projects = projects;
                 return View(new List<PendingUser>());
             }
 
@@ -60,6 +68,7 @@ namespace YourMvcApp.Controllers
                     .ToList();
             }
             ViewBag.PendingCount = users?.Count ?? 0;
+            ViewBag.Projects = projects;
             return View(users);
         }
 
@@ -68,11 +77,20 @@ namespace YourMvcApp.Controllers
         // POST: /Auth/ApproveUser
         // POST: /Auth/ApproveUser
         [HttpPost]
-        public async Task<IActionResult> ApproveUser(int id, string? returnUrl = null)
+        [BlockClientAccess]
+        public async Task<IActionResult> ApproveUser(int id, int? projectId, string? returnUrl = null)
         {
             try
             {
-                var response = await _httpClient.PostAsync($"User/approve-user/{id}", null);
+                if (!projectId.HasValue || projectId.Value <= 0)
+                {
+                    TempData["Error"] = "Please select project before approving user.";
+                    return RedirectAfterApproval(returnUrl);
+                }
+
+                var response = await _httpClient.PostAsJsonAsync(
+                    $"User/approve-user/{id}",
+                    new { projectId = projectId.Value });
                 var responseBody = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
@@ -92,6 +110,7 @@ namespace YourMvcApp.Controllers
 
         // POST: /Auth/RejectUser
         [HttpPost]
+        [BlockClientAccess]
         public async Task<IActionResult> RejectUser(int id, string? returnUrl = null)
         {
             try
@@ -250,11 +269,12 @@ namespace YourMvcApp.Controllers
                 string projectId = userResponse.user.projectId != null ? Convert.ToString(userResponse.user.projectId) : "";
                 string projectName = userResponse.user.projectName != null ? Convert.ToString(userResponse.user.projectName) : "";
                 string roleName = userResponse.user.roleName != null ? Convert.ToString(userResponse.user.roleName) : role;
+                string effectiveRole = !string.IsNullOrWhiteSpace(roleName) ? roleName.Trim() : role.Trim();
 
                 HttpContext.Session.SetInt32("UserId", userId);
                 HttpContext.Session.SetString("UserFullName", fullName);
                 HttpContext.Session.SetString("UserEmail", email);
-                HttpContext.Session.SetString("UserRole", role);
+                HttpContext.Session.SetString("UserRole", effectiveRole);
                 HttpContext.Session.SetString("JWT", token);
 
                 if (!string.IsNullOrWhiteSpace(projectId))
@@ -266,18 +286,23 @@ namespace YourMvcApp.Controllers
                 if (!string.IsNullOrWhiteSpace(roleName))
                     HttpContext.Session.SetString("RoleName", roleName);
 
-                if (string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(effectiveRole, "Client", StringComparison.OrdinalIgnoreCase))
+                {
+                    return RedirectToAction("ClientDashboard", "Home");
+                }
+
+                if (string.Equals(effectiveRole, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(effectiveRole, "Manager", StringComparison.OrdinalIgnoreCase))
                 {
                     return RedirectToAction("AdminDashboard", "Home");
                 }
 
-                if (string.Equals(role, "User", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(effectiveRole, "User", StringComparison.OrdinalIgnoreCase))
                 {
                     return RedirectToAction("Dashboard", "Home");
                 }
 
-                if (string.Equals(role, "Surveyor", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(effectiveRole, "Surveyor", StringComparison.OrdinalIgnoreCase))
                 {
                     return RedirectToAction("Index", "Home");
                 }

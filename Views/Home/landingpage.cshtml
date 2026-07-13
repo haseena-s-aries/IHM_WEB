@@ -229,9 +229,10 @@
             let button = isResend ? resendOtpBtn : sendOtpBtn;
             button.disabled = true;
             button.textContent = isResend ? "Resending..." : "Sending...";
+            let response;
 
             try {
-                let response = await fetch("/Home/SendOtp", {
+                response = await fetch("/Home/SendOtp", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ Email: email })

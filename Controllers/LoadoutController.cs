@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using Survery_Certification_App_Consume.Filters;
 using Survery_Certification_App_Consume.Models;
 using Survey_Certification_App.Models;
 using System.Net.Http;
@@ -8,6 +9,7 @@ using System.Text;
 
 namespace Survery_Certification_App_Consume.Controllers
 {
+    [BlockClientAccess]
     public class LoadoutController : Controller
     {
         private readonly IHttpClientFactory _clientFactory;

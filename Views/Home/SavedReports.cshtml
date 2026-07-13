@@ -1,188 +1,852 @@
 @model List<SavedReportViewModel>
+
+
 @{
     Layout = null;
 
-    string NormalizeType(string? type) => (type ?? string.Empty).Trim().ToLowerInvariant();
-    string TypeLabel(string? type) => NormalizeType(type) switch
-    {
-        "ihm" => "IHM Report",
-        "seafastening" => "Sea Fastening Report",
-        "loadout" => "Loadout Report",
-        "towage" => "Towage Report",
-        _ => "Report"
-    };
+    var reports = Model ?? new List<SavedReportViewModel>();
+
+    var userRole =
+        Context.Session.GetString("UserRole") ?? string.Empty;
+
+    var projectName =
+        Context.Session.GetString("ProjectName") ?? string.Empty;
+
+    var projectIdText =
+        Context.Session.GetString("ProjectId");
+
+    var projectId = int.TryParse(
+        projectIdText,
+        out var parsedProjectId)
+            ? parsedProjectId
+            : 0;
+
+    var isAdmin = string.Equals(
+        userRole,
+        "Admin",
+        StringComparison.OrdinalIgnoreCase);
+    var isManager = string.Equals(
+        userRole,
+        "Manager",
+        StringComparison.OrdinalIgnoreCase);
+    var isClient = string.Equals(
+        userRole,
+        "Client",
+        StringComparison.OrdinalIgnoreCase);
+    var canSendReports = isAdmin || isManager;
+    var canEditReports = !isClient;
+
+    const int AURAS_PROJECT_ID = 3;
+    const int IHM_PROJECT_ID = 1;
+    const int EX_PROJECT_ID = 2;
+
+    var isAurasProject =
+        projectId == AURAS_PROJECT_ID ||
+        string.Equals(
+            projectName.Trim(),
+            "AURAS",
+            StringComparison.OrdinalIgnoreCase);
+
+    var isIhmProject =
+        projectId == IHM_PROJECT_ID ||
+        string.Equals(
+            projectName.Trim(),
+            "IHM",
+            StringComparison.OrdinalIgnoreCase);
+    var isExProject =
+        projectId == EX_PROJECT_ID ||
+        string.Equals(
+            projectName.Trim(),
+            "EX Survey",
+            StringComparison.OrdinalIgnoreCase);
+
+    // Admin sees all reports.
+    // AURAS project users see only AURAS reports.
+    // IHM project users see only IHM reports.
+var showAuras = !isClient && (isAdmin || isAurasProject);
+var showIhm = isClient
+    ? reports.Any(x => NormalizeType(x.ReportType) == "ihm")
+    : isAdmin || isIhmProject;
+var showEx = isClient
+    ? reports.Any(x => NormalizeType(x.ReportType) == "exsurvey")
+    : isAdmin || isExProject;
+
+var visibleCategories =
+    (showAuras ? 1 : 0) +
+    (showIhm ? 1 : 0) +
+    (showEx ? 1 : 0);
+    var dashboardAction = isClient ? "ClientDashboard" : "AdminDashboard";
+
+    string NormalizeType(string? type) =>
+        (type ?? string.Empty)
+            .Trim()
+            .ToLowerInvariant();
+
+    string TypeLabel(string? type) =>
+        NormalizeType(type) switch
+        {
+            "ihm" => "IHM Report",
+            "exsurvey" => "EX-Survey Report",
+            "seafastening" => "Sea Fastening Report",
+            "loadout" => "Loadout Report",
+            "towage" => "Towage Report",
+            _ => "Report"
+        };
+
     string DateLabel(SavedReportViewModel report) =>
-        report.SavedAt?.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+        report.SavedAt?
+            .ToLocalTime()
+            .ToString("dd MMM yyyy, hh:mm tt")
         ?? report.SavedDate?.ToString("dd MMM yyyy")
         ?? "Date unavailable";
 
-    var aurasReports = Model
-        .Where(x => NormalizeType(x.ReportType) is "towage" or "seafastening" or "loadout")
-        .ToList();
-    var ihmReports = Model
-        .Where(x => NormalizeType(x.ReportType) == "ihm")
-        .ToList();
+    var aurasReports = showAuras
+        ? reports
+            .Where(x =>
+                NormalizeType(x.ReportType) is
+                    "towage" or "seafastening" or "loadout")
+            .ToList()
+        : new List<SavedReportViewModel>();
+
+    var ihmReports = showIhm
+        ? reports
+            .Where(x =>
+                NormalizeType(x.ReportType) == "ihm")
+            .ToList()
+        : new List<SavedReportViewModel>();
+
+    var exReports = showEx
+        ? reports
+            .Where(x =>
+                NormalizeType(x.ReportType) == "exsurvey")
+            .ToList()
+        : new List<SavedReportViewModel>();
+
+    var visibleReportCount =
+        aurasReports.Count + ihmReports.Count + exReports.Count;
 }
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
     <title>Reports</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    <link rel="stylesheet" href="~/css/saved-reports.css" asp-append-version="true" />
+
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <link rel="stylesheet"
+          href="~/css/saved-reports.css"
+          asp-append-version="true" />
 </head>
+
 <body>
     <header class="reports-topbar">
-        <a class="back-link" href="@Url.Action("AdminDashboard", "Home")"><i class="fa-solid fa-arrow-left"></i><span>Dashboard</span></a>
-    
+        @if (!isClient)
+        {
+            <a class="back-link"
+               href="@Url.Action(dashboardAction, "Home")">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span>Dashboard</span>
+            </a>
+        }
+        else
+        {
+            <span class="back-link">
+                <i class="fa-solid fa-file-shield"></i>
+                <span>Assigned Reports</span>
+            </span>
+        }
+        <a class="back-link" href="@Url.Action("Logout", "Home")">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            <span>Sign Out</span>
+        </a>
     </header>
 
     <main class="reports-page">
+
         <section class="reports-hero">
-            <div><span class="eyebrow">Document centre</span><h1>Reports</h1><p>Browse saved Auras certificate reports and IHM survey/job reports with secure role-based access.</p></div>
-            <div class="hero-stat"><i class="fa-solid fa-file-shield"></i><span><strong>@Model.Count</strong> documents available</span></div>
+            <div>
+                <span class="eyebrow">Document centre</span>
+                <h1>Reports</h1>
+
+                @if (isClient)
+                {
+                    <p>
+                        View and download reports assigned to your Client account.
+                    </p>
+                }
+                else if (isAdmin)
+                {
+                    <p>
+                        Browse saved Auras certificate reports and IHM survey/job
+                        reports with secure role-based access.
+                    </p>
+                }
+                else if (showAuras)
+                {
+                    <p>
+                        Browse saved Towage, Sea Fastening and Loadout reports.
+                    </p>
+                }
+                else if (showIhm)
+                {
+                    <p>
+                        Browse saved IHM survey and job reports.
+                    </p>
+                }
+            </div>
+
+            <div class="hero-stat">
+                <i class="fa-solid fa-file-shield"></i>
+                <span>
+                    <strong>@visibleReportCount</strong>
+                    documents available
+                </span>
+            </div>
         </section>
 
         @if (ViewBag.LoadError != null)
         {
-            <div class="load-error"><i class="fa-solid fa-triangle-exclamation"></i>@ViewBag.LoadError</div>
+            <div class="load-error">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                @ViewBag.LoadError
+            </div>
         }
 
-        <section class="report-categories" aria-label="Report categories">
-            <button class="category-card active" type="button" data-category="auras">
-                <span><i class="fa-solid fa-certificate"></i></span>
-                <strong>Auras Reports</strong>
-                <small>Towage, Sea Fastening and Loadout</small>
-                <b>@aurasReports.Count</b>
-            </button>
-            <button class="category-card" type="button" data-category="ihm">
-                <span><i class="fa-solid fa-flask-vial"></i></span>
-                <strong>IHM Reports</strong>
-                <small>IHM survey and job reports only</small>
-                <b>@ihmReports.Count</b>
-            </button>
-        </section>
+        @if (!showAuras && !showIhm && !showEx)
+        {
+            <div class="reports-empty show">
+                <span>
+                    <i class="fa-solid fa-lock"></i>
+                </span>
 
-        <section class="report-toolbar">
-            <label class="report-search"><i class="fa-solid fa-magnifying-glass"></i><input id="reportSearch" type="search" placeholder="Search vessel, job, report type, created by or date..." autocomplete="off" /></label>
-            <div class="type-filters">
-                <button class="active" type="button" data-type="">All</button>
-                <button type="button" data-type="towage">Towage</button>
-                <button type="button" data-type="seafastening">Sea Fastening</button>
-                <button type="button" data-type="loadout">Loadout</button>
-                <button type="button" data-type="ihm">IHM</button>
-            </div>
-        </section>
+                <h2>Report access unavailable</h2>
 
-        <section class="reports-section active" data-panel="auras">
-            <div class="section-heading">
-                <div><span class="eyebrow">Auras Reports</span><h2>Towage, Sea Fastening and Loadout Reports</h2></div>
+                <p>
+                    No reports have been assigned to you.
+                </p>
             </div>
-            <div class="report-table-wrap">
-                <table class="report-table">
-                    <thead>
-                        <tr>
-                            <th>Status</th>
-                            <th>Vessel / Job</th>
-                            <th>Report Type</th>
-                            <th>Created By</th>
-                            <th>Created Date</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var report in aurasReports)
-                        {
-                            var type = NormalizeType(report.ReportType);
-                            var typeLabel = TypeLabel(report.ReportType);
-                            var vessel = string.IsNullOrWhiteSpace(report.VesselName) ? "Vessel not specified" : report.VesselName;
-                            var title = string.IsNullOrWhiteSpace(report.Title) ? $"{typeLabel} Report" : report.Title;
-                            var reference = string.IsNullOrWhiteSpace(report.Reference) ? "No job/reference" : report.Reference;
-                            var status = string.IsNullOrWhiteSpace(report.Status) ? "Saved" : report.Status;
-                            var createdBy = string.IsNullOrWhiteSpace(report.CreatedBy) ? "Not confirmed" : report.CreatedBy;
-                            var date = DateLabel(report);
-                            var searchText = $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}".ToLowerInvariant();
-                            var editUrl = Url.Action("EditSavedPdf", "Home", new { type = report.ReportType, id = report.Id, title });
-                            <tr class="report-row" data-type="@type" data-search="@searchText">
-                                <td><span class="status-pill">@status</span></td>
-                                <td><strong>@vessel</strong><small>@title</small><em>@reference</em></td>
-                                <td><span class="type-badge">@typeLabel</span></td>
-                                <td>@createdBy</td>
-                                <td>@date</td>
-                                <td>
-                                    <div class="report-actions">
-                                        <a class="edit-report" href="@editUrl"><i class="fa-regular fa-pen-to-square"></i>Edit</a>
-                                        <a class="view-report" target="_blank" rel="noopener" href="@Url.Action("SavedReportFile", "Home", new { type = report.ReportType, id = report.Id })"><i class="fa-regular fa-eye"></i>View</a>
-                                        <a class="download-report" href="@Url.Action("SavedReportFile", "Home", new { type = report.ReportType, id = report.Id, download = true })"><i class="fa-solid fa-download"></i>Download</a>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </section>
+        }
+        else
+        {
+           <section class="report-categories @(visibleCategories == 1 ? "single-category" : "")"
+         aria-label="Report categories">
 
-        <section class="reports-section" data-panel="ihm">
-            <div class="section-heading">
-                <div><span class="eyebrow">IHM Reports</span><h2>IHM Survey/Job Reports</h2></div>
-            </div>
-            <div class="report-table-wrap">
-                <table class="report-table">
-                    <thead>
-                        <tr>
-                            <th>Status</th>
-                            <th>Vessel / Job</th>
-                            <th>Report Type</th>
-                            <th>Created By</th>
-                            <th>Created Date</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            @foreach (var report in Model)
-            {
-                if (NormalizeType(report.ReportType) != "ihm")
+                @if (showAuras)
                 {
-                    continue;
+                    <button class="category-card active"
+                            type="button"
+                            data-category="auras">
+
+                        <span>
+                            <i class="fa-solid fa-certificate"></i>
+                        </span>
+
+                        <strong>Auras Reports</strong>
+
+                        <small>
+                            Towage, Sea Fastening and Loadout
+                        </small>
+
+                        <b>@aurasReports.Count</b>
+                    </button>
                 }
 
-                var type = NormalizeType(report.ReportType);
-                var typeLabel = TypeLabel(report.ReportType);
-                var vessel = string.IsNullOrWhiteSpace(report.VesselName) ? "Vessel not specified" : report.VesselName;
-                var title = string.IsNullOrWhiteSpace(report.Title) ? $"{typeLabel} Report" : report.Title;
-                var reference = string.IsNullOrWhiteSpace(report.Reference) ? "No job/reference" : report.Reference;
-                var status = string.IsNullOrWhiteSpace(report.Status) ? "Saved" : report.Status;
-                var createdBy = string.IsNullOrWhiteSpace(report.CreatedBy) ? "Not confirmed" : report.CreatedBy;
-                var date = DateLabel(report);
-                var searchText = $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}".ToLowerInvariant();
-                var editUrl = Url.Action("EditSavedPdf", "Home",
-                    new { type = report.ReportType, id = report.Id, title });
-                <tr class="report-row" data-type="@type" data-search="@searchText">
-                    <td><span class="status-pill">@status</span></td>
-                    <td><strong>@vessel</strong><small>@title</small><em>@reference</em></td>
-                    <td><span class="type-badge">@typeLabel</span></td>
-                    <td>@createdBy</td>
-                    <td>@date</td>
-                    <td>
-                        <div class="report-actions">
-                            <a class="edit-report" href="@editUrl"><i class="fa-regular fa-pen-to-square"></i>Edit</a>
-                            <a class="view-report" target="_blank" rel="noopener" href="@Url.Action("SavedReportFile", "Home", new { type = report.ReportType, id = report.Id })"><i class="fa-regular fa-eye"></i>View</a>
-                            <a class="download-report" href="@Url.Action("SavedReportFile", "Home", new { type = report.ReportType, id = report.Id, download = true })"><i class="fa-solid fa-download"></i>Download</a>
-                        </div>
-                    </td>
-                </tr>
-            }
-                    </tbody>
-                </table>
-            </div>
-        </section>
+                @if (showIhm)
+                {
+                    <button class="category-card @(showAuras ? "" : "active")"
+                            type="button"
+                            data-category="ihm">
 
-        <div class="reports-empty @(Model.Any() ? "" : "show")" id="reportsEmpty">
-            <span><i class="fa-regular fa-folder-open"></i></span><h2>No reports found</h2><p>Saved reports will appear here after a report is generated.</p>
-        </div>
+                        <span>
+                            <i class="fa-solid fa-flask-vial"></i>
+                        </span>
+
+                        <strong>IHM Reports</strong>
+
+                        <small>
+                            IHM survey and job reports only
+                        </small>
+
+                        <b>@ihmReports.Count</b>
+                    </button>
+                }
+
+                @if (showEx)
+                {
+                    <button class="category-card @(!showAuras && !showIhm ? "active" : "")"
+                            type="button"
+                            data-category="exsurvey">
+
+                        <span>
+                            <i class="fa-solid fa-clipboard-check"></i>
+                        </span>
+
+                        <strong>EX-Survey Reports</strong>
+
+                        <small>
+                            Assigned EX-Survey report documents
+                        </small>
+
+                        <b>@exReports.Count</b>
+                    </button>
+                }
+
+            </section>
+
+            <section class="report-toolbar">
+
+                <label class="report-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+
+                    <input id="reportSearch"
+                           type="search"
+                           placeholder="Search vessel, job, report type, created by or date..."
+                           autocomplete="off" />
+                </label>
+
+                <div class="type-filters">
+                    <button class="active"
+                            type="button"
+                            data-type="">
+                        All
+                    </button>
+
+                    @if (showAuras)
+                    {
+                        <button type="button"
+                                data-type="towage">
+                            Towage
+                        </button>
+
+                        <button type="button"
+                                data-type="seafastening">
+                            Sea Fastening
+                        </button>
+
+                        <button type="button"
+                                data-type="loadout">
+                            Loadout
+                        </button>
+                    }
+
+                    @if (showIhm)
+                    {
+                        <button type="button"
+                                data-type="ihm">
+                            IHM
+                        </button>
+                    }
+
+                    @if (showEx)
+                    {
+                        <button type="button"
+                                data-type="exsurvey">
+                            EX-Survey
+                        </button>
+                    }
+                </div>
+
+            </section>
+
+            @if (showAuras)
+            {
+                <section class="reports-section active"
+                         data-panel="auras">
+
+                    <div class="section-heading">
+                        <div>
+                            <span class="eyebrow">Auras Reports</span>
+
+                            <h2>
+                                Towage, Sea Fastening and Loadout Reports
+                            </h2>
+                        </div>
+                    </div>
+
+                    <div class="report-table-wrap">
+                        <table class="report-table">
+
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th>Vessel / Job</th>
+                                    <th>Report Type</th>
+                                    <th>Created By</th>
+                                    <th>Created Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach (var report in aurasReports)
+                                {
+                                    var type =
+                                        NormalizeType(report.ReportType);
+
+                                    var typeLabel =
+                                        TypeLabel(report.ReportType);
+
+                                    var vessel =
+                                        string.IsNullOrWhiteSpace(report.VesselName)
+                                            ? "Vessel not specified"
+                                            : report.VesselName;
+
+                                    var title =
+                                        string.IsNullOrWhiteSpace(report.Title)
+                                            ? $"{typeLabel} Report"
+                                            : report.Title;
+
+                                    var reference =
+                                        string.IsNullOrWhiteSpace(report.Reference)
+                                            ? "No job/reference"
+                                            : report.Reference;
+
+                                    var status =
+                                        string.IsNullOrWhiteSpace(report.Status)
+                                            ? "Saved"
+                                            : report.Status;
+
+                                    var createdBy =
+                                        string.IsNullOrWhiteSpace(report.CreatedBy)
+                                            ? "Not confirmed"
+                                            : report.CreatedBy;
+
+                                    var date = DateLabel(report);
+
+                                    var searchText =
+                                        $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}"
+                                            .ToLowerInvariant();
+
+                                    var editUrl = Url.Action(
+                                        "EditSavedPdf",
+                                        "Home",
+                                        new
+                                        {
+                                            type = report.ReportType,
+                                            id = report.Id,
+                                            title
+                                        });
+
+                                    <tr class="report-row"
+                                        data-type="@type"
+                                        data-search="@searchText">
+
+                                        <td>
+                                            <span class="status-pill">
+                                                @status
+                                            </span>
+                                        </td>
+
+                                        <td>
+                                            <strong>@vessel</strong>
+                                            <small>@title</small>
+                                            <em>@reference</em>
+                                        </td>
+
+                                        <td>
+                                            <span class="type-badge">
+                                                @typeLabel
+                                            </span>
+                                        </td>
+
+                                        <td>@createdBy</td>
+
+                                        <td>@date</td>
+
+                                        <td>
+                                            <div class="report-actions">
+
+                                                @if (canEditReports)
+                                                {
+                                                    <a class="edit-report"
+                                                       href="@editUrl">
+                                                        <i class="fa-regular fa-pen-to-square"></i>
+                                                        Edit
+                                                    </a>
+                                                }
+
+                                                <a class="view-report"
+                                                   target="_blank"
+                                                   rel="noopener"
+                                                   href="@Url.Action(
+                                                       "SavedReportFile",
+                                                       "Home",
+                                                       new
+                                                       {
+                                                           type = report.ReportType,
+                                                           id = report.Id
+                                                       })">
+
+                                                    <i class="fa-regular fa-eye"></i>
+                                                    View
+                                                </a>
+
+                                                <a class="download-report"
+                                                   href="@Url.Action(
+                                                       "SavedReportFile",
+                                                       "Home",
+                                                       new
+                                                       {
+                                                           type = report.ReportType,
+                                                           id = report.Id,
+                                                           download = true
+                                                       })">
+
+                                                    <i class="fa-solid fa-download"></i>
+                                                    Download
+                                                </a>
+
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+
+                        </table>
+                    </div>
+                </section>
+            }
+
+            @if (showIhm)
+            {
+                <section class="reports-section @(showAuras ? "" : "active")"
+                         data-panel="ihm">
+
+                    <div class="section-heading">
+                        <div>
+                            <span class="eyebrow">IHM Reports</span>
+
+                            <h2>
+                                IHM Survey/Job Reports
+                            </h2>
+                        </div>
+                    </div>
+
+                    <div class="report-table-wrap">
+                        <table class="report-table">
+
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th>Vessel / Job</th>
+                                    <th>Report Type</th>
+                                    <th>Created By</th>
+                                    <th>Created Date</th>
+                                    @if (canSendReports)
+                                    {
+                                        <th>Send Report</th>
+                                    }
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach (var report in ihmReports)
+                                {
+                                    var type =
+                                        NormalizeType(report.ReportType);
+
+                                    var typeLabel =
+                                        TypeLabel(report.ReportType);
+
+                                    var vessel =
+                                        string.IsNullOrWhiteSpace(report.VesselName)
+                                            ? "Vessel not specified"
+                                            : report.VesselName;
+
+                                    var title =
+                                        string.IsNullOrWhiteSpace(report.Title)
+                                            ? $"{typeLabel} Report"
+                                            : report.Title;
+
+                                    var reference =
+                                        string.IsNullOrWhiteSpace(report.Reference)
+                                            ? "No job/reference"
+                                            : report.Reference;
+
+                                    var status =
+                                        string.IsNullOrWhiteSpace(report.Status)
+                                            ? "Saved"
+                                            : report.Status;
+
+                                    var createdBy =
+                                        string.IsNullOrWhiteSpace(report.CreatedBy)
+                                            ? "Not confirmed"
+                                            : report.CreatedBy;
+
+                                    var date = DateLabel(report);
+
+                                    var searchText =
+                                        $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}"
+                                            .ToLowerInvariant();
+
+                                    var editUrl = Url.Action(
+                                        "EditSavedPdf",
+                                        "Home",
+                                        new
+                                        {
+                                            type = report.ReportType,
+                                            id = report.Id,
+                                            title
+                                        });
+
+                                    <tr class="report-row"
+                                        data-type="@type"
+                                        data-search="@searchText">
+
+                                        <td>
+                                            <span class="status-pill">
+                                                @status
+                                            </span>
+                                        </td>
+
+                                        <td>
+                                            <strong>@vessel</strong>
+                                            <small>@title</small>
+                                            <em>@reference</em>
+                                        </td>
+
+                                        <td>
+                                            <span class="type-badge">
+                                                @typeLabel
+                                            </span>
+                                        </td>
+
+                                        <td>@createdBy</td>
+
+                                        <td>@date</td>
+
+                                        @if (canSendReports)
+                                        {
+                                            <td>
+                                                <div class="report-send"
+                                                     data-report-type="@type"
+                                                     data-report-id="@report.Id"
+                                                    data-project-type="ihm">
+                                                    <div class="send-row">
+                                                        <input class="client-search"
+                                                               type="search"
+                                                               placeholder="Search Client name or email" />
+                                                        <select class="client-select">
+                                                            <option value="">Select Client</option>
+                                                        </select>
+                                                        <button type="button" class="send-report-btn">
+                                                            Send
+                                                        </button>
+                                                    </div>
+                                                    <div class="assigned-clients">
+                                                        Loading assigned clients...
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        }
+
+                                        <td>
+                                            <div class="report-actions">
+
+                                                @if (canEditReports)
+                                                {
+                                                    <a class="edit-report"
+                                                       href="@editUrl">
+                                                        <i class="fa-regular fa-pen-to-square"></i>
+                                                        Edit
+                                                    </a>
+                                                }
+
+                                                <a class="view-report"
+                                                   target="_blank"
+                                                   rel="noopener"
+                                                   href="@Url.Action(
+                                                       "SavedReportFile",
+                                                       "Home",
+                                                       new
+                                                       {
+                                                           type = report.ReportType,
+                                                           id = report.Id
+                                                       })">
+
+                                                    <i class="fa-regular fa-eye"></i>
+                                                    View
+                                                </a>
+
+                                                <a class="download-report"
+                                                   href="@Url.Action(
+                                                       "SavedReportFile",
+                                                       "Home",
+                                                       new
+                                                       {
+                                                           type = report.ReportType,
+                                                           id = report.Id,
+                                                           download = true
+                                                       })">
+
+                                                    <i class="fa-solid fa-download"></i>
+                                                    Download
+                                                </a>
+
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+
+                        </table>
+                    </div>
+                </section>
+            }
+
+            @if (showEx)
+            {
+                <section class="reports-section @(!showAuras && !showIhm ? "active" : "")"
+                         data-panel="exsurvey">
+
+                    <div class="section-heading">
+                        <div>
+                            <span class="eyebrow">EX-Survey Reports</span>
+                            <h2>EX-Survey Job Reports</h2>
+                        </div>
+                    </div>
+
+                    <div class="report-table-wrap">
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th>Vessel / Job</th>
+                                    <th>Report Type</th>
+                                    <th>Created By</th>
+                                    <th>Created Date</th>
+                                    @if (canSendReports)
+                                    {
+                                        <th>Send Report</th>
+                                    }
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var report in exReports)
+                                {
+                                    var type = NormalizeType(report.ReportType);
+                                    var typeLabel = TypeLabel(report.ReportType);
+                                    var vessel = string.IsNullOrWhiteSpace(report.VesselName)
+                                        ? "Vessel not specified"
+                                        : report.VesselName;
+                                    var title = string.IsNullOrWhiteSpace(report.Title)
+                                        ? $"{typeLabel} Report"
+                                        : report.Title;
+                                    var reference = string.IsNullOrWhiteSpace(report.Reference)
+                                        ? "No job/reference"
+                                        : report.Reference;
+                                    var status = string.IsNullOrWhiteSpace(report.Status)
+                                        ? "Saved"
+                                        : report.Status;
+                                    var createdBy = string.IsNullOrWhiteSpace(report.CreatedBy)
+                                        ? "Not confirmed"
+                                        : report.CreatedBy;
+                                    var date = DateLabel(report);
+                                    var searchText =
+                                        $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}"
+                                            .ToLowerInvariant();
+
+                                    <tr class="report-row"
+                                        data-type="@type"
+                                        data-search="@searchText">
+                                        <td><span class="status-pill">@status</span></td>
+                                        <td>
+                                            <strong>@vessel</strong>
+                                            <small>@title</small>
+                                            <em>@reference</em>
+                                        </td>
+                                        <td><span class="type-badge">@typeLabel</span></td>
+                                        <td>@createdBy</td>
+                                        <td>@date</td>
+
+                                        @if (canSendReports)
+                                        {
+                                            <td>
+                                                <div class="report-send"
+                                                     data-report-type="@type"
+                                                     data-report-id="@report.Id"
+                                                     data-project-type="exsurvey">
+                                                    <div class="send-row">
+                                                        <input class="client-search"
+                                                               type="search"
+                                                               placeholder="Search Client name or email" />
+                                                        <select class="client-select">
+                                                            <option value="">Select Client</option>
+                                                        </select>
+                                                        <button type="button" class="send-report-btn">
+                                                            Send
+                                                        </button>
+                                                    </div>
+                                                    <div class="assigned-clients">
+                                                        Loading assigned clients...
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        }
+
+                                        <td>
+                                            <div class="report-actions">
+                                                <a class="view-report"
+                                                   target="_blank"
+                                                   rel="noopener"
+                                                   href="@Url.Action(
+                                                       "SavedReportFile",
+                                                       "Home",
+                                                       new
+                                                       {
+                                                           type = report.ReportType,
+                                                           id = report.Id
+                                                       })">
+                                                    <i class="fa-regular fa-eye"></i>
+                                                    View
+                                                </a>
+                                                <a class="download-report"
+                                                   href="@Url.Action(
+                                                       "SavedReportFile",
+                                                       "Home",
+                                                       new
+                                                       {
+                                                           type = report.ReportType,
+                                                           id = report.Id,
+                                                           download = true
+                                                       })">
+                                                    <i class="fa-solid fa-download"></i>
+                                                    Download
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            }
+
+            <div class="reports-empty @(visibleReportCount > 0 ? "" : "show")"
+                 id="reportsEmpty">
+
+                <span>
+                    <i class="fa-regular fa-folder-open"></i>
+                </span>
+
+                <h2>No reports found</h2>
+
+                <p>
+                    Saved reports will appear here after a report is generated.
+                </p>
+            </div>
+        }
+
     </main>
-    <script src="~/js/saved-reports.js" asp-append-version="true"></script>
+
+    <script src="~/js/saved-reports.js"
+            asp-append-version="true"></script>
 </body>
 </html>
