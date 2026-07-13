@@ -2,6 +2,8 @@
 
 namespace Survery_Certification_App_Consume.Models
 {
+
+
     public class AdminDashboardViewModel
     {
 
@@ -10,12 +12,18 @@ namespace Survery_Certification_App_Consume.Models
         public List<SavedReportViewModel> SavedReports { get; set; } = new();
         public TotalCertificateCountDto CertificateCounts { get; set; } = new();
         public SurveySummaryDto SurveySummary { get; set; } = new();
-
+        public List<UpcomingDeadlineDto> UpcomingDeadlines { get; set; } = new();
         public int TotalUsers { get; set; }
         public List<ASCENT.Models.VesselSummaryDto> FleetSummary { get; set; } = new();
         public string? FleetErrorMessage { get; set; }
     }
 
+
+    public class UpcomingDeadlineDto   // <-- also missing, add this
+    {
+        public string Title { get; set; } = string.Empty;
+        public int DaysRemaining { get; set; }
+    }
     public class SavedReportViewModel
     {
         public int Id { get; set; }
@@ -30,6 +38,23 @@ namespace Survery_Certification_App_Consume.Models
         public DateTime? SavedAt { get; set; }
     }
 
+    public class AssignedReportViewModel
+    {
+        public int AssignmentId { get; set; }
+        public int ReportId { get; set; }
+        public int? SurveyJobId { get; set; }
+        public string ReportType { get; set; } = string.Empty;
+        public string? Title { get; set; }
+        public string? VesselName { get; set; }
+        public string? Reference { get; set; }
+        public string? Status { get; set; }
+        public string? CreatedBy { get; set; }
+        public DateTime AssignedAt { get; set; }
+        public bool HasFile { get; set; }
+        public string? ViewUrl { get; set; }
+        public string? DownloadUrl { get; set; }
+    }
+
     public class SurveySummaryDto
     {
         public int TotalSurveyJobs { get; set; }
@@ -39,17 +64,24 @@ namespace Survery_Certification_App_Consume.Models
         public int ApprovedJobs { get; set; }
         public int ReturnedJobs { get; set; }
         public int AttentionJobs { get; set; }
+        public int LiveIhmJobs { get; set; }
         public int ThisWeekCompletedJobs { get; set; }
         public int ThisMonthCompletedJobs { get; set; }
         public int ThisYearCompletedJobs { get; set; }
         public int OverallCompletedJobs { get; set; }
+        public int IhmUsersCount { get; set; }
+        public int ExSurveyUsersCount { get; set; }
 
         public List<SurveyCompletionTrendPointDto> CompletionTrend { get; set; } = new();
     }
+
 
     public class SurveyCompletionTrendPointDto
     {
         public string Label { get; set; } = string.Empty;
         public int Count { get; set; }
     }
+
+
+
 }

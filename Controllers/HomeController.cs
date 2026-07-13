@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using Survery_Certification_App_Consume.Filters;
 using Survery_Certification_App_Consume.Models;
 using Survey_Certification_App.DTOS;
 using Survey_Certification_App.Models;
@@ -48,6 +49,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
             // Decode the JWT (you already have DecodeJwt(token) in this controller)
             var claims = DecodeJwt(token);
 
+
             // Store JWT in session
             HttpContext.Session.SetString("JWT", token);
             if (claims.TryGetValue("sub", out var sub))
@@ -59,20 +61,30 @@ namespace Health_Matrix_Consuming_Side.Controllers
             if (claims.TryGetValue("email", out var email))
                 HttpContext.Session.SetString("UserEmail", email);
 
-            if (claims.TryGetValue("role", out var role))
-                HttpContext.Session.SetString("UserRole", role);
+            claims.TryGetValue("role", out var role);
+            claims.TryGetValue("roleName", out var roleName);
+            var effectiveRole = !string.IsNullOrWhiteSpace(roleName)
+                ? roleName.Trim()
+                : role?.Trim() ?? string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(effectiveRole))
+                HttpContext.Session.SetString("UserRole", effectiveRole);
             if (claims.TryGetValue("projectId", out var projectId))
                 HttpContext.Session.SetString("ProjectId", projectId);
 
             if (claims.TryGetValue("projectName", out var projectName))
                 HttpContext.Session.SetString("ProjectName", projectName);
 
-            if (claims.TryGetValue("roleName", out var roleName))
+            if (!string.IsNullOrWhiteSpace(roleName))
                 HttpContext.Session.SetString("RoleName", roleName);
             // Decide where to go after login
-            if (string.IsNullOrEmpty(returnUrl))
+            if (IsClientRole(effectiveRole))
             {
-                returnUrl = Url.Action("Dashboard", "Home") ?? "/";
+                returnUrl = Url.Action(nameof(ClientDashboard), "Home") ?? "/Home/ClientDashboard";
+            }
+            else if (string.IsNullOrEmpty(returnUrl))
+            {
+                returnUrl = Url.Action(nameof(AdminDashboard), "Home") ?? "/";
             }
 
             return Redirect(returnUrl);
@@ -86,6 +98,10 @@ namespace Health_Matrix_Consuming_Side.Controllers
             return claims ?? new Dictionary<string, string>();
         }
 
+        private static bool IsClientRole(string? role) =>
+            string.Equals(role?.Trim(), "Client", StringComparison.OrdinalIgnoreCase);
+
+        [BlockClientAccess]
         public async Task<IActionResult> Index()
         {
             var jwt = HttpContext.Session.GetString("JWT");
@@ -166,6 +182,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
 
 
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        [BlockClientAccess]
         public async Task<IActionResult> AdminDashboard()
         {
             // Read JWT from session
@@ -176,7 +193,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
             }
             var sessionRole = HttpContext.Session.GetString("UserRole") ?? "";
             if (string.Equals(sessionRole, "Client", StringComparison.OrdinalIgnoreCase))
-                return RedirectToAction(nameof(SavedReports));
+                return RedirectToAction(nameof(ClientDashboard));
             var isAdmin = string.Equals(sessionRole, "Admin", StringComparison.OrdinalIgnoreCase);
 
             // Create client and attach JWT
@@ -316,6 +333,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
         }
         [HttpGet]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        [BlockClientAccess]
         public async Task<IActionResult> UsageAnalytics(
             DateTime? from,
             DateTime? to,
@@ -412,6 +430,22 @@ namespace Health_Matrix_Consuming_Side.Controllers
 
             return query.Count == 0 ? string.Empty : "?" + string.Join("&", query);
         }
+
+        [HttpGet]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        public Task<IActionResult> ClientDashboard()
+        {
+            if (!IsClientRole(HttpContext.Session.GetString("UserRole")) &&
+                !IsClientRole(HttpContext.Session.GetString("RoleName")))
+                return Task.FromResult<IActionResult>(RedirectToAction(nameof(AdminDashboard)));
+
+            return LoadClientAssignedReportsView();
+        }
+
+        [HttpGet]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        public Task<IActionResult> AssignedReports() => ClientDashboard();
+
         [HttpGet]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public async Task<IActionResult> SavedReports()
@@ -419,6 +453,10 @@ namespace Health_Matrix_Consuming_Side.Controllers
             var jwt = HttpContext.Session.GetString("JWT");
             if (string.IsNullOrWhiteSpace(jwt))
                 return RedirectToAction("Login", "Auth");
+
+            if (IsClientRole(HttpContext.Session.GetString("UserRole")) ||
+                IsClientRole(HttpContext.Session.GetString("RoleName")))
+                return await LoadClientAssignedReportsView();
 
             var client = _clientFactory.CreateClient("ApiClient");
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
@@ -436,6 +474,140 @@ namespace Health_Matrix_Consuming_Side.Controllers
                 ?? new List<SavedReportViewModel>());
         }
 
+        private async Task<IActionResult> LoadClientAssignedReportsView()
+        {
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (string.IsNullOrWhiteSpace(jwt))
+                return RedirectToAction("Login", "Auth");
+
+            var client = _clientFactory.CreateClient("ApiClient");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+            var response = await client.GetAsync("report-assignments/my-reports");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var assignedReports = JsonConvert.DeserializeObject<List<AssignedReportViewModel>>(json)
+                    ?? new List<AssignedReportViewModel>();
+
+                var reports = assignedReports.Select(report => new SavedReportViewModel
+                {
+                    Id = report.ReportId,
+                    ReportType = report.ReportType,
+                    Title = report.Title,
+                    VesselName = report.VesselName,
+                    Reference = report.Reference,
+                    Status = report.Status,
+                    CreatedBy = report.CreatedBy,
+                    SavedAt = report.AssignedAt
+                }).ToList();
+
+                return View("SavedReports", reports);
+            }
+
+            var primaryStatus = response.StatusCode;
+            var primaryBody = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning(
+                "Assigned reports API returned {StatusCode}: {Body}",
+                primaryStatus,
+                primaryBody);
+
+            // Fallback for older/running API builds. This endpoint also returns Client-assigned reports only.
+            var fallbackResponse = await client.GetAsync("AdminDashboard/saved-reports");
+            if (fallbackResponse.IsSuccessStatusCode)
+            {
+                var fallbackJson = await fallbackResponse.Content.ReadAsStringAsync();
+                var fallbackReports = JsonConvert.DeserializeObject<List<SavedReportViewModel>>(fallbackJson)
+                    ?? new List<SavedReportViewModel>();
+
+                return View("SavedReports", fallbackReports);
+            }
+
+            var fallbackBody = await fallbackResponse.Content.ReadAsStringAsync();
+            _logger.LogWarning(
+                "Assigned reports fallback API returned {StatusCode}: {Body}",
+                fallbackResponse.StatusCode,
+                fallbackBody);
+
+            ViewBag.LoadError = primaryStatus == System.Net.HttpStatusCode.Forbidden
+                ? "Your Client account is not authorized for assigned reports. Please confirm the user is approved as Client."
+                : $"Assigned reports could not be loaded. API returned {(int)primaryStatus} from assigned reports and {(int)fallbackResponse.StatusCode} from saved reports.";
+
+            return View("SavedReports", new List<SavedReportViewModel>());
+        }
+
+        [HttpGet]
+        [BlockClientAccess]
+        public async Task<IActionResult> ReportClients(string projectType)
+        {
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (string.IsNullOrWhiteSpace(jwt))
+                return Unauthorized();
+
+            var client = _clientFactory.CreateClient("ApiClient");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+            var response = await client.GetAsync(
+                $"report-assignments/clients?projectType={Uri.EscapeDataString(projectType ?? string.Empty)}");
+
+            var body = await response.Content.ReadAsStringAsync();
+            return StatusCode((int)response.StatusCode, body);
+        }
+
+        [HttpGet]
+        [BlockClientAccess]
+        public async Task<IActionResult> ReportAssignments(string type, int id)
+        {
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (string.IsNullOrWhiteSpace(jwt))
+                return Unauthorized();
+
+            var client = _clientFactory.CreateClient("ApiClient");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+            var response = await client.GetAsync(
+                $"report-assignments/{Uri.EscapeDataString(type ?? string.Empty)}/{id}");
+
+            var body = await response.Content.ReadAsStringAsync();
+            return StatusCode((int)response.StatusCode, body);
+        }
+
+        [HttpPost]
+        [BlockClientAccess]
+        public async Task<IActionResult> AssignReportToClient([FromBody] AssignReportToClientRequest request)
+        {
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (string.IsNullOrWhiteSpace(jwt))
+                return Unauthorized();
+
+            var client = _clientFactory.CreateClient("ApiClient");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+
+            var payload = JsonConvert.SerializeObject(request);
+            var response = await client.PostAsync(
+                "report-assignments",
+                new StringContent(payload, Encoding.UTF8, "application/json"));
+
+            var body = await response.Content.ReadAsStringAsync();
+            return StatusCode((int)response.StatusCode, body);
+        }
+
+        [HttpPost]
+        [BlockClientAccess]
+        public async Task<IActionResult> RevokeReportAssignment(int assignmentId)
+        {
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (string.IsNullOrWhiteSpace(jwt))
+                return Unauthorized();
+
+            var client = _clientFactory.CreateClient("ApiClient");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+            var response = await client.PostAsync(
+                $"report-assignments/{assignmentId}/revoke",
+                new StringContent("{}", Encoding.UTF8, "application/json"));
+
+            var body = await response.Content.ReadAsStringAsync();
+            return StatusCode((int)response.StatusCode, body);
+        }
+
 
         [HttpGet]
         public async Task<IActionResult> SavedReportFile(string type, int id, bool download = false)
@@ -445,11 +617,18 @@ namespace Health_Matrix_Consuming_Side.Controllers
                 return RedirectToAction("Login", "Auth");
 
             var normalizedType = (type ?? string.Empty).Trim().ToLowerInvariant();
-            if (normalizedType is not ("ihm" or "towage" or "seafastening" or "loadout"))
+            if (normalizedType is not ("ihm" or "exsurvey" or "towage" or "seafastening" or "loadout"))
                 return BadRequest("Invalid report type.");
+
+            if ((IsClientRole(HttpContext.Session.GetString("UserRole")) ||
+                 IsClientRole(HttpContext.Session.GetString("RoleName"))) &&
+                normalizedType is not ("ihm" or "exsurvey"))
+                return Forbid();
 
             var path = normalizedType == "ihm"
                 ? $"ihm-survey/jobs/{id}/report-pdf"
+                : normalizedType == "exsurvey"
+                    ? $"ex-survey/jobs/{id}/report"
                 : $"AdminDashboard/view-pdf/{Uri.EscapeDataString(normalizedType)}/{id}";
 
             var client = _clientFactory.CreateClient("ApiClient");
@@ -477,6 +656,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
         }
 
         [HttpGet]
+        [BlockClientAccess]
         public IActionResult EditSavedPdf(string type, int id, string? title = null)
         {
             var normalizedType = NormalizeReportType(type);
@@ -513,6 +693,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
         }
 
         [HttpGet]
+        [BlockClientAccess]
         public async Task<IActionResult> GetPdfEdits(string type, int id)
         {
             var normalizedType = NormalizeReportType(type);
@@ -563,6 +744,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
 
 
         [HttpPost]
+        [BlockClientAccess]
         public async Task<IActionResult> SavePdfEdits(
     [FromBody] PdfEditorDocument document)
         {
@@ -623,6 +805,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
 
 
         [HttpPost]
+        [BlockClientAccess]
         public async Task<IActionResult> GenerateEditedPdf([FromBody] PdfEditorDocument document)
         {
             try
@@ -750,6 +933,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
 
 
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        [BlockClientAccess]
         public async Task<IActionResult> Dashboard()
         {
             var jwt = HttpContext.Session.GetString("JWT");
@@ -904,12 +1088,15 @@ namespace Health_Matrix_Consuming_Side.Controllers
                     dynamic apiResponse = JsonConvert.DeserializeObject<dynamic>(responseContent);
                     string apiMessage = apiResponse?.message ?? "";
 
-                    bool isPendingApproval = apiMessage.Contains("Awaiting admin approval", StringComparison.OrdinalIgnoreCase);
+                    bool isPendingApproval =
+                        apiMessage.Contains("Awaiting admin approval", StringComparison.OrdinalIgnoreCase) ||
+                        apiMessage.Contains("Waiting for Admin Approval", StringComparison.OrdinalIgnoreCase) ||
+                        apiMessage.Contains("pending admin approval", StringComparison.OrdinalIgnoreCase);
 
                     return Json(new
                     {
                         success = true,
-                        message = isPendingApproval ? "Account created and pending admin approval." : "Registration successful!",
+                        message = isPendingApproval ? "Waiting for Admin Approval" : "Registration successful!",
                         redirectUrl = Url.Action("Login", "Auth")
                     });
                 }
@@ -1009,5 +1196,12 @@ namespace Health_Matrix_Consuming_Side.Controllers
 
     }
 
+    public sealed class AssignReportToClientRequest
+    {
+        public string ReportType { get; set; } = string.Empty;
+        public int ReportId { get; set; }
+        public int? SurveyJobId { get; set; }
+        public int ClientUserId { get; set; }
+    }
 
 }

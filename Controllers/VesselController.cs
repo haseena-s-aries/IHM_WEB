@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using Survery_Certification_App_Consume.Filters;
 using Survery_Certification_App_Consume.Models;
 using System.Net.Http.Headers;
 using System.Text;
 
 namespace Survery_Certification_App_Consume.Controllers
 {
+    [BlockClientAccess]
     public class VesselController : Controller
     {
         private readonly IHttpClientFactory _clientFactory;

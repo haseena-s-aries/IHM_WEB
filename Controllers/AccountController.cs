@@ -50,14 +50,21 @@ namespace Survey_Certification_App.Controllers
                 var username = principal.Claims.FirstOrDefault(c => c.Type == "username")?.Value;
                 var email = principal.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
                 var role = principal.Claims.FirstOrDefault(c => c.Type == "role")?.Value;
+                var roleName = principal.Claims.FirstOrDefault(c => c.Type == "roleName")?.Value;
+                var effectiveRole = !string.IsNullOrWhiteSpace(roleName) ? roleName.Trim() : role?.Trim() ?? "";
 
                 // Save to session
                 HttpContext.Session.SetString("JWT", token);
                 HttpContext.Session.SetString("Username", username ?? "");
                 HttpContext.Session.SetString("Email", email ?? "");
-                HttpContext.Session.SetString("Role", role ?? "");
+                HttpContext.Session.SetString("Role", effectiveRole);
+                HttpContext.Session.SetString("UserRole", effectiveRole);
+                HttpContext.Session.SetString("RoleName", roleName ?? effectiveRole);
 
                 // Redirect to Home/AdminDashboard
+                if (string.Equals(effectiveRole, "Client", StringComparison.OrdinalIgnoreCase))
+                    return RedirectToAction("ClientDashboard", "Home");
+
                 return Redirect(returnUrl);
             }
             catch (Exception ex)
