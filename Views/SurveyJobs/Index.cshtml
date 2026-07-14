@@ -874,6 +874,31 @@
             `;
         }
 
+        function markedSectionCode(item) {
+            const raw = item?.sectionTypeCode ?? item?.SectionTypeCode ?? item?.sectionType ?? item?.SectionType ?? item?.sectionTypeText ?? item?.SectionTypeText;
+            if (raw === null || raw === undefined) return 0;
+            const numeric = Number(raw);
+            if (!Number.isNaN(numeric)) return numeric;
+            const text = String(raw).toLowerCase();
+            if (text === "hazardous") return 1;
+            if (text === "appendix4") return 2;
+            return 0;
+        }
+
+        function markedStatusCode(item) {
+            const raw = item?.statusCode ?? item?.StatusCode ?? item?.status ?? item?.Status ?? item?.statusText ?? item?.StatusText;
+            if (raw === null || raw === undefined) return 0;
+            const numeric = Number(raw);
+            if (!Number.isNaN(numeric)) return numeric;
+            switch (String(raw).toLowerCase()) {
+                case "pending": return 1;
+                case "processing": return 2;
+                case "completed": return 3;
+                case "failed": return 4;
+                default: return 0;
+            }
+        }
+
         async function refreshMarkedImageStatus(element) {
             const jobId = element.dataset.jobId;
             if (!jobId) return;
@@ -888,11 +913,11 @@
                 const result = await response.json();
                 const items = result.items || result.Items || [];
 
-                const appendix4 = items.find(x => Number(x.sectionType ?? x.SectionType) === 2);
-                const hazardous = items.find(x => Number(x.sectionType ?? x.SectionType) === 1);
+                const appendix4 = items.find(x => markedSectionCode(x) === 2);
+                const hazardous = items.find(x => markedSectionCode(x) === 1);
 
-                const appendixStatus = Number(appendix4?.status ?? appendix4?.Status ?? 0);
-                const hazardousStatus = Number(hazardous?.status ?? hazardous?.Status ?? 0);
+                const appendixStatus = markedStatusCode(appendix4);
+                const hazardousStatus = markedStatusCode(hazardous);
 
                 if (appendixStatus === 3 && hazardousStatus === 3) {
                     setMarkedStatus(element, "ready", "Appendix 4 and I-2 images ready", "fa-circle-check");

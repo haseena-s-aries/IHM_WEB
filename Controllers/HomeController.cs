@@ -115,35 +115,43 @@ namespace Health_Matrix_Consuming_Side.Controllers
             var claims = DecodeJwt(jwt); // A method to decode the JWT and extract claims
             ViewData["Username"] = claims.ContainsKey("username") ? claims["username"] : "Unknown"; // Example usage of claims
 
-            // Make the GET request using _client
-            var response = await _client.GetAsync("AdminDashboard/certificate-report"); // ✅ Relative to https://localhost:7048/api/
-
             TotalCertificateCountDto model = new();
-
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                model = JsonConvert.DeserializeObject<TotalCertificateCountDto>(json)
-                    ?? new TotalCertificateCountDto();
-            }
 
             var role = HttpContext.Session.GetString("UserRole") ?? "";
             ViewBag.ProjectId = HttpContext.Session.GetString("ProjectId") ?? "";
             ViewBag.ProjectName = HttpContext.Session.GetString("ProjectName") ?? "";
             ViewBag.RoleName = HttpContext.Session.GetString("RoleName") ?? role;
-            var userId = HttpContext.Session.GetInt32("UserId") ?? 0;
             var isSurveyor = role.Equals("Surveyor", StringComparison.OrdinalIgnoreCase);
 
-            if (isSurveyor && userId > 0)
+            if (isSurveyor)
             {
-                var ihmJobs = await GetSurveyJobsForDashboard("IhmSurvey", userId);
-                var exJobs = await GetSurveyJobsForDashboard("ExSurvey", userId);
+                try
+                {
+                    var client = _clientFactory.CreateClient("ApiClient");
+                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+                    var response = await client.GetAsync("survey/dashboard/my-summary");
+                    var json = await response.Content.ReadAsStringAsync();
 
-                model.IhmSurveyJobs = ihmJobs.Count;
-                model.ExSurveyJobs = exJobs.Count;
-                model.TotalSurveyJobs = model.IhmSurveyJobs + model.ExSurveyJobs;
-                model.SubmittedSurveyJobs = ihmJobs.Concat(exJobs)
-                    .Count(x => string.Equals(x.Status, "Submitted", StringComparison.OrdinalIgnoreCase));
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var summary = JsonConvert.DeserializeObject<SurveyorDashboardSummaryDto>(json)
+                            ?? new SurveyorDashboardSummaryDto();
+                        model.LiveJobs = summary.LiveJobs;
+                        model.CompletedJobs = summary.CompletedJobs;
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Surveyor dashboard summary API returned {StatusCode}: {Body}",
+                            response.StatusCode,
+                            json);
+                        ViewBag.LoadError = "Survey dashboard summary could not be loaded.";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to load surveyor dashboard summary.");
+                    ViewBag.LoadError = "Survey dashboard summary could not be loaded.";
+                }
             }
 
             return View(model); // Return empty model if API fails

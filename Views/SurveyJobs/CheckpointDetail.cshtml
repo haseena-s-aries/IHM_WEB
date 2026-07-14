@@ -1101,6 +1101,31 @@
             hint.innerHTML = `<i class="fa-solid ${icon}"></i>${message}`;
         }
 
+        function markedSectionCode(item) {
+            const raw = item?.sectionTypeCode ?? item?.SectionTypeCode ?? item?.sectionType ?? item?.SectionType ?? item?.sectionTypeText ?? item?.SectionTypeText;
+            if (raw === null || raw === undefined) return 0;
+            const numeric = Number(raw);
+            if (!Number.isNaN(numeric)) return numeric;
+            const text = String(raw).toLowerCase();
+            if (text === "hazardous") return 1;
+            if (text === "appendix4") return 2;
+            return 0;
+        }
+
+        function markedStatusCode(item) {
+            const raw = item?.statusCode ?? item?.StatusCode ?? item?.status ?? item?.Status ?? item?.statusText ?? item?.StatusText;
+            if (raw === null || raw === undefined) return 0;
+            const numeric = Number(raw);
+            if (!Number.isNaN(numeric)) return numeric;
+            switch (String(raw).toLowerCase()) {
+                case "pending": return 1;
+                case "processing": return 2;
+                case "completed": return 3;
+                case "failed": return 4;
+                default: return 0;
+            }
+        }
+
         async function pollMarkedImageStatus() {
             setMarkerHint("Appendix 4 and I-2 images are generating...", "fa-spinner fa-spin");
 
@@ -1114,18 +1139,18 @@
 
                 const result = await response.json();
                 const items = result.items || result.Items || [];
-                const appendix4 = items.find(item => Number(item.sectionType ?? item.SectionType) === 2);
-                const hazardous = items.find(item => Number(item.sectionType ?? item.SectionType) === 1);
+                const appendix4 = items.find(item => markedSectionCode(item) === 2);
+                const hazardous = items.find(item => markedSectionCode(item) === 1);
 
-                const failed = [appendix4, hazardous].find(item => Number(item?.status ?? item?.Status) === 4);
+                const failed = [appendix4, hazardous].find(item => markedStatusCode(item) === 4);
                 if (failed) {
                     const error = failed.errorMessage || failed.ErrorMessage || "Marked image generation failed.";
                     setMarkerHint(escapeHtml(error), "fa-triangle-exclamation");
                     return;
                 }
 
-                const appendixReady = Number(appendix4?.status ?? appendix4?.Status) === 3;
-                const hazardousReady = Number(hazardous?.status ?? hazardous?.Status) === 3;
+                const appendixReady = markedStatusCode(appendix4) === 3;
+                const hazardousReady = markedStatusCode(hazardous) === 3;
 
                 if (appendixReady && hazardousReady) {
                     setMarkerHint("Appendix 4 and I-2 images are ready for PDF generation.", "fa-circle-check");

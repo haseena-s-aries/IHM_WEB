@@ -385,16 +385,33 @@ namespace Survery_Certification_App_Consume.Controllers
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    Response.StatusCode = (int)response.StatusCode;
-                    return Content(body, "application/json");
+                    _logger.LogWarning(
+                        "Unable to check marked image status for job {JobId}. API returned {StatusCode}: {Body}",
+                        jobId,
+                        (int)response.StatusCode,
+                        body);
+
+                    return Json(new
+                    {
+                        jobId,
+                        items = Array.Empty<object>(),
+                        statusUnavailable = true,
+                        message = "Marked image status is not available yet."
+                    });
                 }
 
                 return Content(body, "application/json");
             }
             catch (Exception ex)
             {
-                Response.StatusCode = 500;
-                return Json(new { message = ex.Message });
+                _logger.LogWarning(ex, "Unable to check marked image status for job {JobId}.", jobId);
+                return Json(new
+                {
+                    jobId,
+                    items = Array.Empty<object>(),
+                    statusUnavailable = true,
+                    message = "Marked image status is not available yet."
+                });
             }
         }
 

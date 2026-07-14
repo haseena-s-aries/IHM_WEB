@@ -1,493 +1,672 @@
-﻿@model Survey_Certification_App.Models.TotalCertificateCountDto
+@model Survey_Certification_App.Models.TotalCertificateCountDto
 
 @{
     ViewData["Title"] = "Survey Dashboard";
+    var surveyorName = ViewData["FullName"]?.ToString();
+    if (string.IsNullOrWhiteSpace(surveyorName))
+    {
+        surveyorName = "Surveyor";
+    }
+
+    var liveJobs = Model?.LiveJobs ?? 0;
+    var completedJobs = Model?.CompletedJobs ?? 0;
+    var totalAssigned = liveJobs + completedJobs;
+    var successRate = totalAssigned == 0 ? 0 : (int)Math.Round((completedJobs * 100.0) / totalAssigned);
+    var liveUrl = Url.Action("Ihm", "SurveyJobs", new { status = "live" }) ?? "/SurveyJobs/Ihm";
+    var completedUrl = Url.Action("Ihm", "SurveyJobs", new { status = "completed" }) ?? "/SurveyJobs/Ihm";
 }
 
 <style>
+    :root {
+        --primary: #2563eb;
+        --secondary: #16a34a;
+        --warning: #f59e0b;
+        --danger: #dc2626;
+        --accent: #7c3aed;
+        --bg: #f8fafc;
+        --card: #ffffff;
+        --text: #0f172a;
+        --muted: #64748b;
+        --line: #e2e8f0;
+    }
+
     html,
     body {
         margin: 0 !important;
         padding: 0 !important;
         width: 100%;
         overflow-x: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Inter", "Segoe UI", sans-serif;
     }
 
-        body > .container,
-        body > .container-fluid,
-        main,
-        .pb-3 {
-            max-width: 100% !important;
-            width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-    .top-bar {
-        width: 100vw;
-        margin-left: calc(50% - 50vw);
-        margin-right: calc(50% - 50vw);
-        border-radius: 0;
+    body > .container,
+    body > .container-fluid,
+    main,
+    .pb-3 {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
 
-    body {
-        margin: 0;
-        background: #eef4fb;
-        color: #102033;
-        font-family: 'Segoe UI', sans-serif;
-        overflow-x: hidden;
+    .surveyor-shell {
+        min-height: 100vh;
+        background:
+            radial-gradient(circle at 12% 0%, rgba(37, 99, 235, .08), transparent 28%),
+            var(--bg);
+        padding: 16px;
+        box-sizing: border-box;
     }
 
     .top-bar {
-        width: 100%;
-        min-height: 56px;
-        background: linear-gradient(90deg, #6b4fd3, #384a9f);
-        color: #fff;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0 18px;
-        font-weight: 800;
-        box-shadow: 0 4px 16px rgba(0,0,0,.12);
-        box-sizing: border-box;
-        position: sticky;
-        top: 0;
-        z-index: 1000;
+        gap: 14px;
+        margin-bottom: 16px;
     }
 
-    .top-bar-title {
-        font-size: 16px;
-        white-space: nowrap;
+    .top-title {
+        font-size: 18px;
+        font-weight: 900;
+        color: var(--text);
     }
 
-    .top-bar-actions {
+    .top-actions {
         display: flex;
         align-items: center;
-        gap: 16px;
-        flex-shrink: 0;
+        gap: 10px;
     }
 
-        .top-bar-actions a {
-            color: #fff;
-            text-decoration: none;
-        }
-
-    .dashboard-wrap {
-        width: 100%;
-        max-width: 100%;
-        padding: 22px;
-        box-sizing: border-box;
+    .icon-button {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        color: var(--text);
+        display: grid;
+        place-items: center;
+        text-decoration: none;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, .06);
     }
 
+    .dashboard {
+        max-width: 1180px;
+        margin: 0 auto;
+    }
 
     .hero {
         position: relative;
         overflow: hidden;
-        border-radius: 18px;
-        padding: 34px 38px;
-        background: linear-gradient(135deg, #14558f, #2d8bd4);
+        border-radius: 24px;
+        padding: 28px;
+        min-height: 174px;
         color: #fff;
-        min-height: 145px;
-        box-shadow: 0 14px 28px rgba(21, 85, 143, .22);
+        background: linear-gradient(135deg, #174b82, #2563eb 58%, #38bdf8);
+        box-shadow: 0 24px 48px rgba(37, 99, 235, .24);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
     }
 
-        .hero::before,
-        .hero::after {
-            content: "";
-            position: absolute;
-            border-radius: 50%;
-            background: rgba(255,255,255,.09);
-        }
+    .hero::before,
+    .hero::after {
+        content: "";
+        position: absolute;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .10);
+        border: 18px solid rgba(255, 255, 255, .06);
+    }
 
-        .hero::before {
-            width: 140px;
-            height: 140px;
-            right: -35px;
-            top: -45px;
-        }
+    .hero::before {
+        width: 180px;
+        height: 180px;
+        right: -58px;
+        top: -70px;
+    }
 
-        .hero::after {
-            width: 105px;
-            height: 105px;
-            right: 85px;
-            bottom: -55px;
-        }
+    .hero::after {
+        width: 132px;
+        height: 132px;
+        right: 118px;
+        bottom: -78px;
+    }
 
-    .hero-small {
-        font-size: 12px;
-        letter-spacing: 2px;
-        font-weight: 800;
-        opacity: .75;
+    .hero-content,
+    .hero-avatar {
+        position: relative;
+        z-index: 1;
+    }
+
+    .eyebrow {
+        margin: 0 0 10px;
         text-transform: uppercase;
+        letter-spacing: 1.8px;
+        font-size: 11px;
+        font-weight: 900;
+        color: rgba(255, 255, 255, .72);
     }
 
     .hero h1 {
-        margin: 12px 0 8px;
-        font-size: 27px;
-        font-weight: 900;
+        margin: 0 0 10px;
+        font-size: clamp(26px, 5vw, 38px);
+        font-weight: 950;
+        letter-spacing: -.03em;
     }
 
     .hero p {
-        margin: 0 0 20px;
-        color: rgba(255,255,255,.78);
-        font-size: 14px;
-    }
-
-    .status-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 15px;
-        border-radius: 30px;
-        background: rgba(255,255,255,.14);
-        border: 1px solid rgba(255,255,255,.18);
-        font-size: 11px;
-        font-weight: 900;
-    }
-
-    .status-dot {
-        width: 7px;
-        height: 7px;
-        background: #43f0b3;
-        border-radius: 50%;
-    }
-
-    .module-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 14px;
-        margin-top: 22px;
-    }
-
-    .module-card {
-        border: 0;
-        min-height: 118px;
-        border-radius: 16px;
-        color: #fff;
-        text-decoration: none;
-        padding: 18px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        box-shadow: 0 12px 22px rgba(0,0,0,.16);
-        transition: .2s;
-    }
-
-        .module-card:hover {
-            transform: translateY(-3px);
-            color: #fff;
-        }
-
-    .green {
-        background: linear-gradient(135deg, #159b90, #28c875);
-    }
-
-    .blue {
-        background: linear-gradient(135deg, #4558d8, #2379ff);
-    }
-
-    .orange {
-        background: linear-gradient(135deg, #ff3f74, #ff6538);
-    }
-
-    .module-icon {
-        width: 34px;
-        height: 34px;
-        border-radius: 12px;
-        display: grid;
-        place-items: center;
-        background: rgba(255,255,255,.18);
-        margin-bottom: 12px;
-    }
-
-    .module-title {
-        font-size: 15px;
-        font-weight: 900;
-        margin-bottom: 4px;
-    }
-
-    .module-text {
-        font-size: 12px;
-        color: rgba(255,255,255,.8);
-        line-height: 1.4;
-    }
-
-    .section-title {
-        font-size: 16px;
-        font-weight: 900;
-        margin: 24px 0 12px;
-    }
-
-    .summary-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 14px;
-    }
-
-    .summary-card {
-        background: #fff;
-        border: 1px solid #d7e3f1;
-        border-radius: 14px;
-        padding: 22px;
-        display: flex;
-        align-items: center;
-        gap: 18px;
-        min-height: 92px;
-        box-shadow: 0 6px 18px rgba(34, 64, 100, .08);
-    }
-
-    .summary-icon {
-        width: 46px;
-        height: 46px;
-        border-radius: 13px;
-        display: grid;
-        place-items: center;
-        font-size: 18px;
-    }
-
-    .i-green {
-        background: #dff8f1;
-        color: #0aa384;
-    }
-
-    .i-blue {
-        background: #e4e6ff;
-        color: #4455cc;
-    }
-
-    .i-red {
-        background: #ffe8e0;
-        color: #ff5735;
-    }
-
-    .i-cyan {
-        background: #dff8ff;
-        color: #00aeca;
-    }
-
-    .summary-number {
-        font-size: 28px;
-        font-weight: 900;
-        line-height: 1;
-    }
-
-    .summary-label {
-        margin-top: 8px;
-        color: #28506f;
-        font-size: 13px;
+        margin: 0 0 18px;
+        color: rgba(255, 255, 255, .82);
         font-weight: 700;
     }
 
-    .quick-list {
-        display: grid;
-        gap: 12px;
-    }
-
-    .quick-item {
-        min-height: 76px;
-        border-radius: 14px;
-        border: 1px solid #d7e3f1;
-        background: #fff;
-        display: flex;
+    .status-chip {
+        display: inline-flex;
         align-items: center;
-        justify-content: space-between;
-        padding: 14px 18px;
-        color: #102033;
-        text-decoration: none;
-        box-shadow: 0 6px 18px rgba(34, 64, 100, .08);
-    }
-
-    .quick-left {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-    }
-
-    .quick-title {
+        gap: 8px;
+        padding: 8px 13px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .14);
+        border: 1px solid rgba(255, 255, 255, .18);
+        font-size: 11px;
         font-weight: 900;
-        font-size: 15px;
+        text-transform: uppercase;
     }
 
-    .quick-sub {
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #22c55e;
+        box-shadow: 0 0 0 6px rgba(34, 197, 94, .16);
+    }
+
+    .hero-avatar {
+        width: 76px;
+        height: 76px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .15);
+        border: 1px solid rgba(255, 255, 255, .24);
+        display: grid;
+        place-items: center;
+        box-shadow: 0 18px 28px rgba(15, 23, 42, .18);
+        flex: 0 0 auto;
+    }
+
+    .hero-avatar i {
+        font-size: 38px;
+    }
+
+    .load-error {
+        margin-top: 16px;
+        padding: 13px 15px;
+        border-radius: 16px;
+        background: #fff1f2;
+        color: #be123c;
+        border: 1px solid #fecdd3;
         font-size: 13px;
-        color: #52708d;
-        margin-top: 3px;
+        font-weight: 900;
+    }
+
+    .large-kpis {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 18px;
+    }
+
+    .large-kpi {
+        position: relative;
+        overflow: hidden;
+        min-height: 144px;
+        padding: 24px;
+        border-radius: 20px;
+        text-decoration: none;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        box-shadow: 0 20px 38px rgba(15, 23, 42, .16);
+        transition: transform .18s ease, box-shadow .18s ease;
+    }
+
+    .large-kpi:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 24px 46px rgba(15, 23, 42, .22);
+        color: #fff;
+        text-decoration: none;
+    }
+
+    .large-kpi.blue {
+        background: linear-gradient(135deg, var(--primary), #1d4ed8);
+    }
+
+    .large-kpi.green {
+        background: linear-gradient(135deg, var(--secondary), #15803d);
+    }
+
+    .large-icon {
+        width: 58px;
+        height: 58px;
+        border-radius: 18px;
+        display: grid;
+        place-items: center;
+        background: rgba(255, 255, 255, .18);
+        flex: 0 0 auto;
+    }
+
+    .large-icon i {
+        font-size: 28px;
+    }
+
+    .large-copy {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .large-copy h2 {
+        margin: 0 0 8px;
+        font-size: 19px;
+        font-weight: 950;
+    }
+
+    .large-count {
+        font-size: 42px;
+        font-weight: 950;
+        line-height: 1;
+    }
+
+    .large-sub {
+        margin-top: 8px;
+        color: rgba(255, 255, 255, .84);
+        font-weight: 800;
+        font-size: 13px;
     }
 
     .arrow {
-        width: 32px;
-        height: 32px;
-        border-radius: 10px;
-        display: grid;
-        place-items: center;
-        background: #eef4fb;
-        color: #52708d;
+        font-size: 24px;
+        opacity: .94;
     }
 
-    @@media(max-width: 768px) {
-        .module-grid,
-        .summary-grid {
-            grid-template-columns: 1fr;
-        }
+    .section-title {
+        margin: 24px 0 12px;
+        font-size: 18px;
+        font-weight: 950;
+        color: var(--text);
+    }
 
-        .top-bar {
-            min-height: 52px;
-            padding: 0 14px;
-        }
+    .overview-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+    }
 
-        .top-bar-title {
-            font-size: 14px;
-        }
+    .small-kpi,
+    .panel,
+    .performance-card {
+        background: var(--card);
+        border-radius: 16px;
+        border: 1px solid rgba(226, 232, 240, .72);
+        box-shadow: 0 12px 30px rgba(15, 23, 42, .07);
+    }
 
-        .top-bar-actions {
-            gap: 12px;
-        }
+    .small-kpi {
+        padding: 16px;
+        min-height: 136px;
+        transition: transform .18s ease, box-shadow .18s ease;
+    }
 
-        .dashboard-wrap {
+    .small-kpi:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 18px 36px rgba(15, 23, 42, .10);
+    }
+
+    .mini-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        margin-bottom: 14px;
+    }
+
+    .mini-icon.blue { background: rgba(37, 99, 235, .12); color: var(--primary); }
+    .mini-icon.orange { background: rgba(245, 158, 11, .14); color: var(--warning); }
+    .mini-icon.red { background: rgba(220, 38, 38, .12); color: var(--danger); }
+    .mini-icon.purple { background: rgba(124, 58, 237, .12); color: var(--accent); }
+
+    .mini-count {
+        font-size: 27px;
+        font-weight: 950;
+        line-height: 1;
+        margin-bottom: 8px;
+    }
+
+    .mini-title {
+        font-weight: 950;
+        font-size: 13px;
+    }
+
+    .mini-sub {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .performance-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    .performance-card {
+        padding: 16px;
+        display: flex;
+        align-items: center;
+        gap: 13px;
+    }
+
+    .perf-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+    }
+
+    .perf-title {
+        color: #475569;
+        font-size: 12px;
+        font-weight: 900;
+    }
+
+    .perf-value {
+        margin-top: 5px;
+        font-size: 23px;
+        font-weight: 950;
+        line-height: 1;
+    }
+
+    .perf-sub {
+        margin-top: 4px;
+        color: #94a3b8;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .panel {
+        padding: 16px;
+    }
+
+    .activity-row,
+    .upcoming-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .activity-row:last-child,
+    .upcoming-row:last-child {
+        border-bottom: 0;
+    }
+
+    .row-main {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .row-title {
+        font-size: 13px;
+        font-weight: 950;
+    }
+
+    .row-sub {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .chip {
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 950;
+    }
+
+    .chip.green { background: rgba(22, 163, 74, .12); color: var(--secondary); }
+    .chip.orange { background: rgba(245, 158, 11, .14); color: var(--warning); }
+
+    .empty-state {
+        color: var(--muted);
+        font-weight: 800;
+        padding: 10px 0;
+    }
+
+    @@media (max-width: 900px) {
+        .overview-grid,
+        .performance-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @@media (max-width: 640px) {
+        .surveyor-shell {
             padding: 14px;
         }
 
         .hero {
-            padding: 26px;
+            padding: 22px;
+            align-items: flex-start;
+        }
+
+        .hero-avatar {
+            width: 58px;
+            height: 58px;
+        }
+
+        .overview-grid,
+        .performance-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .large-kpi {
+            padding: 20px;
+            min-height: 132px;
+        }
+
+        .large-kpis {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @@media (max-width: 420px) {
+        .overview-grid,
+        .performance-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .hero {
+            flex-direction: column;
         }
     }
 </style>
 
-<div class="top-bar">
-    <div class="top-bar-title">Survey Dashboard</div>
-
-    <div class="top-bar-actions">
-        <i class="fa-solid fa-moon"></i>
-
-        <a href="@Url.Action("Logout", "Home")">
-            <i class="fa-solid fa-right-from-bracket"></i>
-        </a>
-    </div>
-</div>
-
-<div class="dashboard-wrap">
-
-    <section class="hero">
-        <div class="hero-small">Marine Operations</div>
-        <h1>Welcome, @(ViewData["FullName"] ?? "Surveyor")</h1>
-        <p>Everything is organized and ready for review.</p>
-
-        <div class="status-pill">
-            <span class="status-dot"></span>
-            SYSTEM ONLINE
-        </div>
-    </section>
-
-    <div class="module-grid">
-        @* <a class="module-card green" href="#" data-bs-toggle="modal" data-bs-target="#createCertificateModal">
-            <div>
-                <div class="module-icon"><i class="fa-solid fa-certificate"></i></div>
-                <div class="module-title">Certificates</div>
-                <div class="module-text">Loadout · Towage<br />Seafastening</div>
-            </div>
-            <strong>Open <i class="fa-solid fa-arrow-right"></i></strong>
-        </a> *@
-
-        @if ((Context.Session.GetString("UserRole") ?? "") != "Client" &&
-     ((Context.Session.GetString("ProjectName") ?? "") == "IHM" ||
-      (Context.Session.GetString("UserRole") ?? "") == "Admin"))
-{
-    <a class="module-card blue" href="@Url.Action("Ihm", "SurveyJobs")">
-            <div>
-                <div class="module-icon"><i class="fa-solid fa-box-archive"></i></div>
-                <div class="module-title">IHM Survey</div>
-                <div class="module-text">Inventory of<br />Hazardous Materials</div>
-            </div>
-            <strong>Open <i class="fa-solid fa-arrow-right"></i></strong>
-        </a>
-        }
-        @if ((Context.Session.GetString("UserRole") ?? "") != "Client" &&
-        ((Context.Session.GetString("ProjectName") ?? "") == "EX Survey" ||
-      (Context.Session.GetString("UserRole") ?? "") == "Admin"))
-{
-        <a class="module-card orange" href="@Url.Action("Ex", "SurveyJobs")">
-            <div>
-                <div class="module-icon"><i class="fa-solid fa-route"></i></div>
-                <div class="module-title">Ex-Survey</div>
-                <div class="module-text">Explosion-proof<br />Equipment Survey</div>
-            </div>
-            <strong>Open <i class="fa-solid fa-arrow-right"></i></strong>
-        </a>
-
-}
-    </div>
-
-    <div class="section-title">Survey Summary</div>
-
-    <div class="summary-grid">
-        <div class="summary-card">
-            <div class="summary-icon i-green"><i class="fa-solid fa-clipboard-check"></i></div>
-            <div>
-                <div class="summary-number">@Model.TotalSurveyJobs</div>
-                <div class="summary-label">Survey Jobs</div>
-            </div>
-        </div>
-
-        <div class="summary-card">
-            <div class="summary-icon i-blue"><i class="fa-solid fa-box-archive"></i></div>
-            <div>
-                <div class="summary-number">@Model.IhmSurveyJobs</div>
-                <div class="summary-label">IHM Survey</div>
-            </div>
-        </div>
-
-        <div class="summary-card">
-            <div class="summary-icon i-red"><i class="fa-solid fa-route"></i></div>
-            <div>
-                <div class="summary-number">@Model.ExSurveyJobs</div>
-                <div class="summary-label">Ex-Survey</div>
-            </div>
-        </div>
-
-        <div class="summary-card">
-            <div class="summary-icon i-cyan"><i class="fa-solid fa-cloud-arrow-up"></i></div>
-            <div>
-                <div class="summary-number">@Model.SubmittedSurveyJobs</div>
-                <div class="summary-label">Submitted</div>
-            </div>
+<div class="surveyor-shell">
+    <div class="top-bar">
+        <div class="top-title">Surveyor Dashboard</div>
+        <div class="top-actions">
+            <a class="icon-button" href="@Url.Action("Logout", "Home")" title="Sign out">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </a>
         </div>
     </div>
 
-    <div class="section-title">Quick Actions</div>
-
-    <div class="quick-list">
-        @if ((Context.Session.GetString("UserRole") ?? "") != "Client" &&
-       ((Context.Session.GetString("ProjectName") ?? "") == "IHM" ||
-        (Context.Session.GetString("UserRole") ?? "") == "Admin"))
-        {
-            <a class="quick-item" href="@Url.Action("Ihm", "SurveyJobs")
-            ">
-                <div class="quick-left">
-                <div class="summary-icon i-blue"><i class="fa-solid fa-box-archive"></i></div>
-                <div>
-                    <div class="quick-title">IHM Survey Jobs</div>
-                    <div class="quick-sub">Open all IHM survey jobs</div>
+    <main class="dashboard">
+        <section class="hero">
+            <div class="hero-content">
+                <div class="eyebrow">Marine Operations</div>
+                <h1>Welcome, @surveyorName</h1>
+                <p>System Status: Online</p>
+                <div class="status-chip">
+                    <span class="status-dot"></span>
+                    System Online
                 </div>
             </div>
-            <div class="arrow"><i class="fa-solid fa-chevron-right"></i></div>
-        </a>
-        }
-        @if ((Context.Session.GetString("UserRole") ?? "") != "Client" &&
-       ((Context.Session.GetString("ProjectName") ?? "") == "EX Survey" ||
-        (Context.Session.GetString("UserRole") ?? "") == "Admin"))
+            <div class="hero-avatar">
+                <i class="fa-solid fa-user-astronaut"></i>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(ViewBag.LoadError as string))
         {
-            <a class="quick-item" href="@Url.Action("Ex", "SurveyJobs")
-            ">
-                <div class="quick-left">
-                <div class="summary-icon i-blue"><i class="fa-solid fa-route"></i></div>
+            <div class="load-error">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                @ViewBag.LoadError
+            </div>
+        }
+
+        <section class="large-kpis">
+            <a class="large-kpi blue" href="@liveUrl">
+                <div class="large-icon"><i class="fa-solid fa-clipboard-list"></i></div>
+                <div class="large-copy">
+                    <h2>IHM Live Jobs</h2>
+                    <div class="large-count">@liveJobs</div>
+                    <div class="large-sub">Assigned &amp; In Progress</div>
+                </div>
+                <i class="fa-solid fa-arrow-right arrow"></i>
+            </a>
+
+            <a class="large-kpi green" href="@completedUrl">
+                <div class="large-icon"><i class="fa-solid fa-circle-check"></i></div>
+                <div class="large-copy">
+                    <h2>IHM Completed Jobs</h2>
+                    <div class="large-count">@completedJobs</div>
+                    <div class="large-sub">Successfully Completed</div>
+                </div>
+                <i class="fa-solid fa-arrow-right arrow"></i>
+            </a>
+        </section>
+
+        <h2 class="section-title">Today's Overview</h2>
+        <section class="overview-grid">
+            <div class="small-kpi">
+                <div class="mini-icon blue"><i class="fa-solid fa-clipboard-check"></i></div>
+                <div class="mini-count">@completedJobs</div>
+                <div class="mini-title">Surveys Done</div>
+                <div class="mini-sub">Completed Today</div>
+            </div>
+            <div class="small-kpi">
+                <div class="mini-icon orange"><i class="fa-regular fa-clock"></i></div>
+                <div class="mini-count">@liveJobs</div>
+                <div class="mini-title">Pending Jobs</div>
+                <div class="mini-sub">Waiting to Start</div>
+            </div>
+            <div class="small-kpi">
+                <div class="mini-icon red"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div class="mini-count">0</div>
+                <div class="mini-title">Incomplete Jobs</div>
+                <div class="mini-sub">Needs Attention</div>
+            </div>
+            <div class="small-kpi">
+                <div class="mini-icon purple"><i class="fa-regular fa-calendar"></i></div>
+                <div class="mini-count">0</div>
+                <div class="mini-title">Due Today</div>
+                <div class="mini-sub">Deadline Today</div>
+            </div>
+        </section>
+
+        <h2 class="section-title">Performance</h2>
+        <section class="performance-grid">
+            <div class="performance-card">
+                <div class="perf-icon mini-icon blue"><i class="fa-solid fa-briefcase"></i></div>
                 <div>
-                    <div class="quick-title">Ex-Survey Jobs</div>
-                    <div class="quick-sub">Open all Ex-Survey jobs</div>
+                    <div class="perf-title">Total Assigned</div>
+                    <div class="perf-value">@totalAssigned</div>
+                    <div class="perf-sub">Live + completed jobs</div>
                 </div>
             </div>
-            <div class="arrow"><i class="fa-solid fa-chevron-right"></i></div>
-        </a>
-        }
-    </div>
+            <div class="performance-card">
+                <div class="perf-icon mini-icon green" style="background: rgba(22, 163, 74, .12); color: var(--secondary);"><i class="fa-solid fa-stopwatch"></i></div>
+                <div>
+                    <div class="perf-title">Average Completion Time</div>
+                    <div class="perf-value">N/A</div>
+                    <div class="perf-sub">Awaiting duration data</div>
+                </div>
+            </div>
+            <div class="performance-card">
+                <div class="perf-icon mini-icon purple"><i class="fa-solid fa-chart-line"></i></div>
+                <div>
+                    <div class="perf-title">Success Rate</div>
+                    <div class="perf-value">@successRate%</div>
+                    <div class="perf-sub">Completed vs assigned</div>
+                </div>
+            </div>
+        </section>
 
+        <h2 class="section-title">Recent Activity</h2>
+        <section class="panel">
+            @if (completedJobs <= 0 && liveJobs <= 0)
+            {
+                <div class="empty-state">No recent activity available yet.</div>
+            }
+            @if (completedJobs > 0)
+            {
+                <div class="activity-row">
+                    <i class="fa-solid fa-circle-check" style="color: var(--secondary);"></i>
+                    <div class="row-main">
+                        <div class="row-title">IHM completed survey jobs</div>
+                        <div class="row-sub">@completedJobs jobs</div>
+                    </div>
+                    <span class="chip green">Completed</span>
+                </div>
+            }
+            @if (liveJobs > 0)
+            {
+                <div class="activity-row">
+                    <i class="fa-solid fa-hourglass-half" style="color: var(--warning);"></i>
+                    <div class="row-main">
+                        <div class="row-title">IHM live survey jobs</div>
+                        <div class="row-sub">@liveJobs jobs active</div>
+                    </div>
+                    <span class="chip orange">Started</span>
+                </div>
+            }
+        </section>
+
+        <h2 class="section-title">Upcoming Surveys</h2>
+        <section class="panel">
+            @if (liveJobs <= 0)
+            {
+                <div class="empty-state">No upcoming surveys available.</div>
+            }
+            else
+            {
+                <div class="upcoming-row">
+                    <i class="fa-solid fa-ship" style="color: var(--primary);"></i>
+                    <div class="row-main">
+                        <div class="row-title">IHM Live Job Queue</div>
+                        <div class="row-sub">Open live jobs</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right" style="color: #94a3b8;"></i>
+                </div>
+                <div class="upcoming-row">
+                    <i class="fa-solid fa-ship" style="color: var(--primary);"></i>
+                    <div class="row-main">
+                        <div class="row-title">Assigned Survey Work</div>
+                        <div class="row-sub">In progress</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right" style="color: #94a3b8;"></i>
+                </div>
+            }
+        </section>
+    </main>
 </div>

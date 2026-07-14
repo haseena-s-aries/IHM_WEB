@@ -13,5 +13,13 @@ namespace Survey_Certification_App.Models
         public int IhmSurveyJobs { get; set; }
         public int ExSurveyJobs { get; set; }
         public int SubmittedSurveyJobs { get; set; }
+        public int LiveJobs { get; set; }
+        public int CompletedJobs { get; set; }
+    }
+
+    public class SurveyorDashboardSummaryDto
+    {
+        public int LiveJobs { get; set; }
+        public int CompletedJobs { get; set; }
     }
 }
