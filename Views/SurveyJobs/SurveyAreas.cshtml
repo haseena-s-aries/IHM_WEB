@@ -3,6 +3,10 @@
     Layout = null;
     var job = ViewBag.Job as Survery_Certification_App_Consume.Models.SurveyJobDto;
     var jobId = (int)(ViewBag.JobId ?? 0);
+    var ihmCompletionFilter = ViewBag.IhmCompletionFilter?.ToString();
+    var ihmFilterQuery = string.IsNullOrWhiteSpace(ihmCompletionFilter)
+        ? ""
+        : $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter!)}";
 }
 
 <!DOCTYPE html>
@@ -342,7 +346,7 @@
 
 <body>
     <header class="appbar">
-        <a class="back-btn" href="/SurveyJobs/Work?jobId=@jobId&surveyType=IHM%20Survey">
+        <a class="back-btn" href="/SurveyJobs/Work?jobId=@jobId&surveyType=IHM%20Survey@ihmFilterQuery">
             <i class="fa-solid fa-chevron-left"></i>
         </a>
         <h1 class="title">Survey Areas</h1>

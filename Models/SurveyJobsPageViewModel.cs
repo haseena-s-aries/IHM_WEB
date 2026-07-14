@@ -3,6 +3,7 @@
     public class SurveyJobsPageViewModel
     {
         public string SurveyType { get; set; } = "IHM Survey";
+        public string? IhmCompletionFilter { get; set; }
         public bool IsAdmin { get; set; }
         public List<SurveyJobDto> Jobs { get; set; } = new();
         public List<VesselDto> Vessels { get; set; } = new();

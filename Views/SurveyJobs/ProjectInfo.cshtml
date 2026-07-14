@@ -4,6 +4,10 @@
 
     string Val(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
     string DateVal(DateTime? value) => value.HasValue ? value.Value.ToLocalTime().ToString("dd/MM/yyyy") : "-";
+    var ihmCompletionFilter = ViewBag.IhmCompletionFilter?.ToString();
+    var listUrl = string.IsNullOrWhiteSpace(ihmCompletionFilter)
+        ? "/SurveyJobs/Ihm"
+        : $"/SurveyJobs/Ihm?ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter!)}";
 
     var activeAssignments = Model.Assignments
         .Where(x => !string.Equals(x.Status, "Returned", StringComparison.OrdinalIgnoreCase))
@@ -65,7 +69,7 @@
 </head>
 <body>
     <header class="appbar">
-        <a class="back-btn" href="/SurveyJobs/Ihm" aria-label="Back">
+        <a class="back-btn" href="@listUrl" aria-label="Back">
             <i class="fa-solid fa-chevron-left"></i>
         </a>
         <h1 class="appbar-title">Project Information</h1>
@@ -120,7 +124,7 @@
         </section>
 
         <div class="actions">
-            <a class="action-btn light" href="/SurveyJobs/Ihm">
+            <a class="action-btn light" href="@listUrl">
                 <i class="fa-solid fa-arrow-left"></i> Back to Jobs
             </a>
           

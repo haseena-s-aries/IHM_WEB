@@ -4,6 +4,14 @@
     Layout = null;
     var isIhm = Model.SurveyType == "IHM Survey";
     var backUrl = Model.IsAdmin ? "/Home/AdminDashboard" : "/Home/Index";
+    var hasIhmCompletionFilter = isIhm && !string.IsNullOrWhiteSpace(Model.IhmCompletionFilter);
+    var ihmFilterQuery = hasIhmCompletionFilter
+        ? $"&ihmCompletionFilter={Uri.EscapeDataString(Model.IhmCompletionFilter!)}"
+        : "";
+    var ihmFilterFirstQuery = hasIhmCompletionFilter
+        ? $"?ihmCompletionFilter={Uri.EscapeDataString(Model.IhmCompletionFilter!)}"
+        : "";
+    var listRefreshUrl = isIhm ? $"/SurveyJobs/Ihm{ihmFilterFirstQuery}" : "/SurveyJobs/Ex";
 }
 
 <!DOCTYPE html>
@@ -239,7 +247,7 @@
             </div>
 
             <span class="count-pill"><i class="fa-regular fa-briefcase"></i> @Model.Jobs.Count Jobs</span>
-            <a class="refresh-btn" href="@Url.Action(isIhm ? "Ihm" : "Ex", "SurveyJobs")"><i class="fa-solid fa-rotate-right"></i></a>
+            <a class="refresh-btn" href="@listRefreshUrl"><i class="fa-solid fa-rotate-right"></i></a>
 
             @if (Model.IsAdmin)
             {
@@ -275,8 +283,8 @@
             foreach (var job in Model.Jobs)
             {
                 var jobOpenUrl = Model.IsAdmin
-                    ? $"/SurveyJobs/ProjectInfo?jobId={job.Id}"
-                    : $"/SurveyJobs/Work?jobId={job.Id}&surveyType={Uri.EscapeDataString(Model.SurveyType)}";
+                    ? $"/SurveyJobs/ProjectInfo?jobId={job.Id}{ihmFilterQuery}"
+                    : $"/SurveyJobs/Work?jobId={job.Id}&surveyType={Uri.EscapeDataString(Model.SurveyType)}{ihmFilterQuery}";
                 var surveyDateText = job.SurveyDate.HasValue
                     ? job.SurveyDate.Value.ToLocalTime().ToString("dd-MM-yyyy")
                     : "Not selected";
@@ -360,6 +368,10 @@
                                 <form method="post" action="/SurveyJobs/UpdateSurveyDate" class="meta-date-form">
                                     <input type="hidden" name="jobId" value="@job.Id" />
                                     <input type="hidden" name="surveyType" value="@Model.SurveyType" />
+                                    @if (hasIhmCompletionFilter)
+                                    {
+                                        <input type="hidden" name="ihmCompletionFilter" value="@Model.IhmCompletionFilter" />
+                                    }
                                     <input type="date" name="surveyDate" value="@surveyDateValue" required />
                                     <button type="submit">@(job.SurveyDate.HasValue ? "Change" : "Select")</button>
                                 </form>
@@ -396,13 +408,13 @@
                     <div class="actions">
                         @if (Model.IsAdmin)
                         {
-                            <a class="action-btn blue" href="/SurveyJobs/ProjectInfo?jobId=@job.Id">
+                            <a class="action-btn blue" href="/SurveyJobs/ProjectInfo?jobId=@job.Id@ihmFilterQuery">
                                 <i class="fa-solid fa-up-right-from-square"></i> Open
                             </a>
                         }
                         else
                         {
-                            <a class="action-btn blue" href="/SurveyJobs/Work?jobId=@job.Id&surveyType=@Uri.EscapeDataString(Model.SurveyType)">
+                            <a class="action-btn blue" href="/SurveyJobs/Work?jobId=@job.Id&surveyType=@Uri.EscapeDataString(Model.SurveyType)@ihmFilterQuery">
                                 <i class="fa-solid fa-up-right-from-square"></i> Open
                             </a>
                         }
@@ -417,6 +429,10 @@
                               <form method="post" action="/SurveyJobs/Delete" class="d-inline" onsubmit="return confirm('Delete job @job.JobNumber? This cannot be undone.');">
                                 <input type="hidden" name="jobId" value="@job.Id" />
                                 <input type="hidden" name="surveyType" value="@Model.SurveyType" />
+                                @if (hasIhmCompletionFilter)
+                                {
+                                    <input type="hidden" name="ihmCompletionFilter" value="@Model.IhmCompletionFilter" />
+                                }
                                 <button type="submit" class="action-btn red">
                                     <i class="fa-regular fa-trash-can"></i> Delete
                                 </button>
@@ -433,6 +449,10 @@
 
                             <form method="post" enctype="multipart/form-data" action="/SurveyJobs/UploadIhmExcel" class="d-inline">
     <input type="hidden" name="jobId" value="@job.Id" />
+    @if (hasIhmCompletionFilter)
+    {
+        <input type="hidden" name="ihmCompletionFilter" value="@Model.IhmCompletionFilter" />
+    }
                                 <input type="file" name="file" accept=".xlsx" hidden onchange="showPageLoading('Uploading...'); this.form.submit();" id="excel-@job.Id" />
     <label class="action-btn green" for="excel-@job.Id">
         <i class="fa-regular fa-file-excel"></i>
@@ -462,6 +482,10 @@
                             <div class="modal-body">
                                 <input type="hidden" name="jobId" value="@job.Id" />
                                 <input type="hidden" name="surveyType" value="@Model.SurveyType" />
+                                @if (hasIhmCompletionFilter)
+                                {
+                                    <input type="hidden" name="ihmCompletionFilter" value="@Model.IhmCompletionFilter" />
+                                }
 
                                 <label class="form-label">Primary Surveyor</label>
                                 <select class="form-select mb-3" name="primarySurveyorUserId">
@@ -507,6 +531,10 @@
                                 </div>
                                 <div class="modal-body">
                                     <input type="hidden" name="jobId" value="@job.Id" />
+                                    @if (hasIhmCompletionFilter)
+                                    {
+                                        <input type="hidden" name="ihmCompletionFilter" value="@Model.IhmCompletionFilter" />
+                                    }
                                     <label class="form-label fw-bold">Layout visibility *</label>
                                     <select class="form-select area-layout-select" name="layoutTarget" required>
                                         <option value="common" selected
@@ -574,6 +602,10 @@
 
                 <div class="modal-body">
                     <input type="hidden" name="SurveyType" value="@Model.SurveyType" />
+                    @if (hasIhmCompletionFilter)
+                    {
+                        <input type="hidden" name="ihmCompletionFilter" value="@Model.IhmCompletionFilter" />
+                    }
 
                     <div class="row g-3">
                         <div class="col-md-12">

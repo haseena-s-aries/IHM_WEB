@@ -20,9 +20,15 @@ namespace Survery_Certification_App_Consume.Controllers
             _logger = logger;
         }
 
-        private async Task<SurveyJobsPageViewModel> BuildSurveyJobsModel(string surveyType)
+        private async Task<SurveyJobsPageViewModel> BuildSurveyJobsModel(
+            string surveyType,
+            string? ihmCompletionFilter = null)
         {
-            var model = new SurveyJobsPageViewModel { SurveyType = surveyType };
+            var model = new SurveyJobsPageViewModel
+            {
+                SurveyType = surveyType,
+                IhmCompletionFilter = surveyType == "IHM Survey" ? ihmCompletionFilter : null
+            };
 
             var role = HttpContext.Session.GetString("UserRole") ?? "";
             var userId = HttpContext.Session.GetInt32("UserId") ?? 0;
@@ -39,6 +45,8 @@ namespace Survery_Certification_App_Consume.Controllers
                 var jobsUrl = model.IsAdmin
                     ? $"survey/jobs?moduleType={Uri.EscapeDataString(apiModuleType)}"
                     : $"survey/jobs?moduleType={Uri.EscapeDataString(apiModuleType)}&assignedSurveyorUserId={userId}";
+                if (!string.IsNullOrWhiteSpace(ihmCompletionFilter) && surveyType == "IHM Survey")
+                    jobsUrl += $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter)}";
 
                 model.Jobs = await GetAsync<List<SurveyJobDto>>(client, jobsUrl) ?? new();
 
@@ -90,9 +98,9 @@ namespace Survery_Certification_App_Consume.Controllers
         }
 
 
-        public async Task<IActionResult> Ihm()
+        public async Task<IActionResult> Ihm(string? ihmCompletionFilter = null)
         {
-            var model = await BuildSurveyJobsModel("IHM Survey");
+            var model = await BuildSurveyJobsModel("IHM Survey", ihmCompletionFilter);
             return View("Index", model);
         }
 
@@ -103,9 +111,15 @@ namespace Survery_Certification_App_Consume.Controllers
             return View("Index", model);
         }
 
-        public async Task<IActionResult> Index(string surveyType = "IHM Survey")
+        public async Task<IActionResult> Index(
+            string surveyType = "IHM Survey",
+            string? ihmCompletionFilter = null)
         {
-            var model = new SurveyJobsPageViewModel { SurveyType = surveyType };
+            var model = new SurveyJobsPageViewModel
+            {
+                SurveyType = surveyType,
+                IhmCompletionFilter = surveyType == "IHM Survey" ? ihmCompletionFilter : null
+            };
             var role = HttpContext.Session.GetString("UserRole") ?? "";
             var userId = HttpContext.Session.GetInt32("UserId") ?? 0;
 
@@ -121,6 +135,8 @@ namespace Survery_Certification_App_Consume.Controllers
                 var jobsUrl = model.IsAdmin
                     ? $"survey/jobs?moduleType={Uri.EscapeDataString(apiModuleType)}"
                     : $"survey/jobs?moduleType={Uri.EscapeDataString(apiModuleType)}&assignedSurveyorUserId={userId}";
+                if (!string.IsNullOrWhiteSpace(ihmCompletionFilter) && surveyType == "IHM Survey")
+                    jobsUrl += $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter)}";
 
                 model.Jobs = await GetAsync<List<SurveyJobDto>>(client, jobsUrl) ?? new();
 
@@ -137,7 +153,7 @@ namespace Survery_Certification_App_Consume.Controllers
 
             return View(model);
         }
-        public async Task<IActionResult> Work(int jobId, string surveyType = "IHM Survey")
+        public async Task<IActionResult> Work(int jobId, string surveyType = "IHM Survey", string? ihmCompletionFilter = null)
         {
             try
             {
@@ -148,17 +164,18 @@ namespace Survery_Certification_App_Consume.Controllers
                 if (!response.IsSuccessStatusCode)
                 {
                     TempData["ErrorMessage"] = "Failed to load survey job: " + body;
-                    return RedirectToAction(surveyType == "IHM Survey" ? "Ihm" : "Ex");
+                    return RedirectToAction(surveyType == "IHM Survey" ? "Ihm" : "Ex", new { ihmCompletionFilter });
                 }
 
                 var job = JsonConvert.DeserializeObject<SurveyJobDto>(body);
                 if (job == null)
                 {
                     TempData["ErrorMessage"] = "Survey job not found.";
-                    return RedirectToAction(surveyType == "IHM Survey" ? "Ihm" : "Ex");
+                    return RedirectToAction(surveyType == "IHM Survey" ? "Ihm" : "Ex", new { ihmCompletionFilter });
                 }
 
                 ViewBag.SurveyType = surveyType;
+                ViewBag.IhmCompletionFilter = surveyType == "IHM Survey" ? ihmCompletionFilter : null;
 
                 if (surveyType == "IHM Survey")
                 {
@@ -207,10 +224,10 @@ namespace Survery_Certification_App_Consume.Controllers
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = ex.Message;
-                return RedirectToAction(surveyType == "IHM Survey" ? "Ihm" : "Ex");
+                return RedirectToAction(surveyType == "IHM Survey" ? "Ihm" : "Ex", new { ihmCompletionFilter });
             }
         }
-        public async Task<IActionResult> VesselInfo(int jobId)
+        public async Task<IActionResult> VesselInfo(int jobId, string? ihmCompletionFilter = null)
         {
             try
             {
@@ -220,27 +237,28 @@ namespace Survery_Certification_App_Consume.Controllers
                 if (job == null || !job.VesselId.HasValue)
                 {
                     TempData["ErrorMessage"] = "Vessel information not found.";
-                    return RedirectToAction("Work", new { jobId, surveyType = "IHM Survey" });
+                    return RedirectToAction("Work", new { jobId, surveyType = "IHM Survey", ihmCompletionFilter });
                 }
 
                 var vessel = await GetAsync<VesselDto>(client, $"vessels/{job.VesselId.Value}");
                 if (vessel == null)
                 {
                     TempData["ErrorMessage"] = "Vessel information not found.";
-                    return RedirectToAction("Work", new { jobId, surveyType = "IHM Survey" });
+                    return RedirectToAction("Work", new { jobId, surveyType = "IHM Survey", ihmCompletionFilter });
                 }
 
                 ViewBag.JobId = jobId;
+                ViewBag.IhmCompletionFilter = ihmCompletionFilter;
                 return View(vessel);
             }
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = "Failed to load vessel information: " + ex.Message;
-                return RedirectToAction("Work", new { jobId, surveyType = "IHM Survey" });
+                return RedirectToAction("Work", new { jobId, surveyType = "IHM Survey", ihmCompletionFilter });
             }
         }
 
-        public async Task<IActionResult> SurveyAreas(int jobId)
+        public async Task<IActionResult> SurveyAreas(int jobId, string? ihmCompletionFilter = null)
         {
             try
             {
@@ -254,12 +272,13 @@ namespace Survery_Certification_App_Consume.Controllers
 
                 ViewBag.Job = job;
                 ViewBag.JobId = jobId;
+                ViewBag.IhmCompletionFilter = ihmCompletionFilter;
                 return View(areas);
             }
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = "Failed to load survey areas: " + ex.Message;
-                return RedirectToAction("Work", new { jobId, surveyType = "IHM Survey" });
+                return RedirectToAction("Work", new { jobId, surveyType = "IHM Survey", ihmCompletionFilter });
             }
         }
 
@@ -711,7 +730,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 return Json(new { message = ex.Message });
             }
         }
-        public async Task<IActionResult> ProjectInfo(int jobId)
+        public async Task<IActionResult> ProjectInfo(int jobId, string? ihmCompletionFilter = null)
         {
             try
             {
@@ -722,27 +741,28 @@ namespace Survery_Certification_App_Consume.Controllers
                 if (!response.IsSuccessStatusCode)
                 {
                     TempData["ErrorMessage"] = "Failed to load project information: " + body;
-                    return RedirectToAction("Ihm");
+                    return RedirectToAction("Ihm", new { ihmCompletionFilter });
                 }
 
                 var job = JsonConvert.DeserializeObject<SurveyJobDto>(body);
                 if (job == null)
                 {
                     TempData["ErrorMessage"] = "Project information not found.";
-                    return RedirectToAction("Ihm");
+                    return RedirectToAction("Ihm", new { ihmCompletionFilter });
                 }
 
+                ViewBag.IhmCompletionFilter = ihmCompletionFilter;
                 return View(job);
             }
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = "Failed to load project information: " + ex.Message;
-                return RedirectToAction("Ihm");
+                return RedirectToAction("Ihm", new { ihmCompletionFilter });
             }
         }
 
         [HttpPost]
-        public async Task<IActionResult> Create(SurveyJobCreateRequest request)
+        public async Task<IActionResult> Create(SurveyJobCreateRequest request, string? ihmCompletionFilter = null)
         {
             var returnAction = request.SurveyType == "IHM Survey" ? "Ihm" : "Ex";
 
@@ -753,7 +773,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 string.IsNullOrWhiteSpace(request.EndDate))
             {
                 TempData["ErrorMessage"] = "Job number, vessel, audit port and dates are required.";
-                return RedirectToAction(returnAction);
+                return RedirectToAction(returnAction, new { ihmCompletionFilter });
             }
 
             if (request.PrimarySurveyorUserId.HasValue &&
@@ -761,7 +781,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 request.PrimarySurveyorUserId.Value == request.SecondarySurveyorUserId.Value)
             {
                 TempData["ErrorMessage"] = "Primary and secondary surveyor cannot be the same user.";
-                return RedirectToAction(returnAction);
+                return RedirectToAction(returnAction, new { ihmCompletionFilter });
             }
 
             var client = CreateApiClient();
@@ -791,7 +811,7 @@ namespace Survery_Certification_App_Consume.Controllers
             if (!response.IsSuccessStatusCode)
             {
                 TempData["ErrorMessage"] = "Create job failed: " + body;
-                return RedirectToAction(returnAction);
+                return RedirectToAction(returnAction, new { ihmCompletionFilter });
             }
 
             var createdJob = JsonConvert.DeserializeObject<SurveyJobDto>(body);
@@ -802,11 +822,11 @@ namespace Survery_Certification_App_Consume.Controllers
             }
 
             TempData["SuccessMessage"] = "Survey job created successfully.";
-            return RedirectToAction(returnAction);
+            return RedirectToAction(returnAction, new { ihmCompletionFilter });
         }
 
         [HttpPost]
-        public async Task<IActionResult> AssignSurveyors(int jobId, int? primarySurveyorUserId, int? secondarySurveyorUserId, string surveyType)
+        public async Task<IActionResult> AssignSurveyors(int jobId, int? primarySurveyorUserId, int? secondarySurveyorUserId, string surveyType, string? ihmCompletionFilter = null)
         {
             var returnAction = surveyType == "IHM Survey" ? "Ihm" : "Ex";
 
@@ -815,7 +835,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 primarySurveyorUserId.Value == secondarySurveyorUserId.Value)
             {
                 TempData["ErrorMessage"] = "Primary and secondary surveyor cannot be the same user.";
-                return RedirectToAction(returnAction);
+                return RedirectToAction(returnAction, new { ihmCompletionFilter });
             }
 
             try
@@ -829,18 +849,18 @@ namespace Survery_Certification_App_Consume.Controllers
                 TempData["ErrorMessage"] = "Assign surveyors failed: " + ex.Message;
             }
 
-            return RedirectToAction(returnAction);
+            return RedirectToAction(returnAction, new { ihmCompletionFilter });
         }
 
         [HttpPost]
-        public async Task<IActionResult> UpdateSurveyDate(int jobId, string surveyDate, string surveyType)
+        public async Task<IActionResult> UpdateSurveyDate(int jobId, string surveyDate, string surveyType, string? ihmCompletionFilter = null)
         {
             var returnAction = surveyType == "IHM Survey" ? "Ihm" : "Ex";
 
             if (string.IsNullOrWhiteSpace(surveyDate))
             {
                 TempData["ErrorMessage"] = "Survey date is required.";
-                return RedirectToAction(returnAction);
+                return RedirectToAction(returnAction, new { ihmCompletionFilter });
             }
 
             try
@@ -856,7 +876,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 if (!response.IsSuccessStatusCode)
                 {
                     TempData["ErrorMessage"] = "Survey date update failed: " + body;
-                    return RedirectToAction(returnAction);
+                    return RedirectToAction(returnAction, new { ihmCompletionFilter });
                 }
 
                 TempData["SuccessMessage"] = "Survey date saved successfully.";
@@ -866,11 +886,11 @@ namespace Survery_Certification_App_Consume.Controllers
                 TempData["ErrorMessage"] = "Survey date update failed: " + ex.Message;
             }
 
-            return RedirectToAction(returnAction);
+            return RedirectToAction(returnAction, new { ihmCompletionFilter });
         }
 
         [HttpPost]
-        public async Task<IActionResult> Delete(int jobId, string surveyType)
+        public async Task<IActionResult> Delete(int jobId, string surveyType, string? ihmCompletionFilter = null)
         {
             var returnAction = surveyType == "IHM Survey" ? "Ihm" : "Ex";
 
@@ -883,28 +903,28 @@ namespace Survery_Certification_App_Consume.Controllers
                 if (!response.IsSuccessStatusCode)
                 {
                     TempData["ErrorMessage"] = "Delete failed: " + body;
-                    return RedirectToAction(returnAction);
+                    return RedirectToAction(returnAction, new { ihmCompletionFilter });
                 }
 
                 TempData["SuccessMessage"] = "Survey job deleted successfully.";
-                return RedirectToAction(returnAction);
+                return RedirectToAction(returnAction, new { ihmCompletionFilter });
             }
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = "Delete failed: " + ex.Message;
-                return RedirectToAction(returnAction);
+                return RedirectToAction(returnAction, new { ihmCompletionFilter });
             }
         }
 
         [HttpPost]
-        public async Task<IActionResult> UploadIhmExcel(int jobId, IFormFile file)
+        public async Task<IActionResult> UploadIhmExcel(int jobId, IFormFile file, string? ihmCompletionFilter = null)
         {
             try
             {
                 if (file == null || file.Length == 0)
                 {
                     TempData["ErrorMessage"] = "Please select an Excel file.";
-                    return RedirectToAction("Ihm");
+                    return RedirectToAction("Ihm", new { ihmCompletionFilter });
                 }
 
                 var client = CreateApiClient();
@@ -920,24 +940,24 @@ namespace Survery_Certification_App_Consume.Controllers
                 TempData["SuccessMessage"] = isReupload
                     ? "Excel checklist uploaded successfully. Previous Excel data was replaced."
                     : "Excel checklist uploaded successfully.";
-                return RedirectToAction("Ihm");
+                return RedirectToAction("Ihm", new { ihmCompletionFilter });
             }
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = "Excel upload failed: " + ex.Message;
-                return RedirectToAction("Ihm");
+                return RedirectToAction("Ihm", new { ihmCompletionFilter });
             }
         }
 
 
 
         [HttpPost]
-        public async Task<IActionResult> UploadIhmLayout(int jobId, IFormFile file)
+        public async Task<IActionResult> UploadIhmLayout(int jobId, IFormFile file, string? ihmCompletionFilter = null)
         {
             if (file == null || file.Length == 0)
             {
                 TempData["ErrorMessage"] = "Please select a layout file.";
-                return RedirectToAction("Ihm");
+                return RedirectToAction("Ihm", new { ihmCompletionFilter });
             }
 
             var client = CreateApiClient();
@@ -956,21 +976,21 @@ namespace Survery_Certification_App_Consume.Controllers
             if (!response.IsSuccessStatusCode)
             {
                 TempData["ErrorMessage"] = "Failed to upload layout: " + body;
-                return RedirectToAction("Ihm");
+                return RedirectToAction("Ihm", new { ihmCompletionFilter });
             }
 
             TempData["SuccessMessage"] = "Layout uploaded successfully.";
-            return RedirectToAction("Ihm");
+            return RedirectToAction("Ihm", new { ihmCompletionFilter });
         }
 
         [HttpPost]
         public async Task<IActionResult> UploadIhmAreaLayout(
-            int jobId, string layoutTarget, string? newAreaName, List<IFormFile> files)
+            int jobId, string layoutTarget, string? newAreaName, List<IFormFile> files, string? ihmCompletionFilter = null)
         {
             if (files == null || files.Count == 0 || files.All(x => x.Length == 0))
             {
                 TempData["ErrorMessage"] = "Please select one layout image or PDF file.";
-                return RedirectToAction("Ihm");
+                return RedirectToAction("Ihm", new { ihmCompletionFilter });
             }
 
             try
@@ -1028,7 +1048,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 TempData["ErrorMessage"] = "Failed to upload layouts: " + ex.Message;
             }
 
-            return RedirectToAction("Ihm");
+            return RedirectToAction("Ihm", new { ihmCompletionFilter });
         }
 
         private async Task AssignSurveyorsInternal(HttpClient client, int jobId, int? primaryId, int? secondaryId)

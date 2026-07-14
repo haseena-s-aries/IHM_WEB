@@ -12,8 +12,8 @@
     var completedJobs = Model?.CompletedJobs ?? 0;
     var totalAssigned = liveJobs + completedJobs;
     var successRate = totalAssigned == 0 ? 0 : (int)Math.Round((completedJobs * 100.0) / totalAssigned);
-    var liveUrl = Url.Action("Ihm", "SurveyJobs", new { status = "live" }) ?? "/SurveyJobs/Ihm";
-    var completedUrl = Url.Action("Ihm", "SurveyJobs", new { status = "completed" }) ?? "/SurveyJobs/Ihm";
+    var liveUrl = Url.Action("Ihm", "SurveyJobs", new { ihmCompletionFilter = "live" }) ?? "/SurveyJobs/Ihm";
+    var completedUrl = Url.Action("Ihm", "SurveyJobs", new { ihmCompletionFilter = "completed" }) ?? "/SurveyJobs/Ihm";
 }
 
 <style>

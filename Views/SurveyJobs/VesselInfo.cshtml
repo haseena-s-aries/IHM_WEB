@@ -2,6 +2,10 @@
 @{
     Layout = null;
     var jobId = (int)(ViewBag.JobId ?? 0);
+    var ihmCompletionFilter = ViewBag.IhmCompletionFilter?.ToString();
+    var ihmFilterQuery = string.IsNullOrWhiteSpace(ihmCompletionFilter)
+        ? ""
+        : $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter!)}";
 
     string Val(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
     string Num(decimal? value) => value.HasValue ? value.Value.ToString("0.##") : "-";
@@ -137,7 +141,7 @@
 </head>
 <body>
     <header class="appbar">
-        <a class="back-btn" href="/SurveyJobs/Work?jobId=@jobId&surveyType=IHM%20Survey">
+        <a class="back-btn" href="/SurveyJobs/Work?jobId=@jobId&surveyType=IHM%20Survey@ihmFilterQuery">
             <i class="fa-solid fa-chevron-left"></i>
         </a>
         <h1 class="title">Vessel Info</h1>

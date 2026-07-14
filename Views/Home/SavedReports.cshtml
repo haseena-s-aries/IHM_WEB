@@ -100,6 +100,13 @@ var visibleCategories =
         ?? report.SavedDate?.ToString("dd MMM yyyy")
         ?? "Date unavailable";
 
+    string CreatedByLabel(SavedReportViewModel report) =>
+        !string.IsNullOrWhiteSpace(report.CreatedBy)
+            ? report.CreatedBy
+            : report.CreatedByUserId.HasValue && report.CreatedByUserId.Value > 0
+                ? $"User {report.CreatedByUserId.Value}"
+                : "Creator unavailable";
+
     var aurasReports = showAuras
         ? reports
             .Where(x =>
@@ -410,10 +417,7 @@ var visibleCategories =
                                             ? "Saved"
                                             : report.Status;
 
-                                    var createdBy =
-                                        string.IsNullOrWhiteSpace(report.CreatedBy)
-                                            ? "Not confirmed"
-                                            : report.CreatedBy;
+                                    var createdBy = CreatedByLabel(report);
 
                                     var date = DateLabel(report);
 
@@ -573,10 +577,7 @@ var visibleCategories =
                                             ? "Saved"
                                             : report.Status;
 
-                                    var createdBy =
-                                        string.IsNullOrWhiteSpace(report.CreatedBy)
-                                            ? "Not confirmed"
-                                            : report.CreatedBy;
+                                    var createdBy = CreatedByLabel(report);
 
                                     var date = DateLabel(report);
 
@@ -744,9 +745,7 @@ var visibleCategories =
                                     var status = string.IsNullOrWhiteSpace(report.Status)
                                         ? "Saved"
                                         : report.Status;
-                                    var createdBy = string.IsNullOrWhiteSpace(report.CreatedBy)
-                                        ? "Not confirmed"
-                                        : report.CreatedBy;
+                                    var createdBy = CreatedByLabel(report);
                                     var date = DateLabel(report);
                                     var searchText =
                                         $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}"

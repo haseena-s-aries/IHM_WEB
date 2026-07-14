@@ -52,6 +52,9 @@
         .state-row td { padding: 42px !important; color: #748198; }
         .role-badge { background: #edf3ff; color: #285fc6; border-radius: 999px; padding: 6px 11px; font-weight: 650; }
         .role-badge.pending { background: #fff4de; color: #a15c00; }
+        .project-stack { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+        .project-badge { background: #ecfdf5; color: #047857; border: 1px solid #bbf7d0; border-radius: 999px; padding: 5px 9px; font-size: 12px; font-weight: 700; }
+        .project-badge.pending { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
         .action-button { border-radius: 8px; min-width: 72px; }
 
         @@media (max-width: 768px) {
@@ -184,6 +187,7 @@
 <script>
                // Globals
         let allUsers = [];
+        let manageableProjects = [];
         let currentPage = 1;
         const usersPerPage = 10;
         const currentUserRole = "@currentRole";
@@ -221,7 +225,7 @@
                 },
                 error: function (xhr) {
                     const message = xhr.responseText || "Unable to load users. Please sign in again.";
-                    $("#userTableBody").html(`<tr class="state-row"><td colspan="4">${escapeHtml(message)}</td></tr>`);
+                    $("#userTableBody").html(`<tr class="state-row"><td colspan="5">${escapeHtml(message)}</td></tr>`);
                     $("#userCount").text("Unavailable");
                 }
             });
@@ -238,7 +242,9 @@
                 (user.fullName || "").toLowerCase().includes(input) ||
                 (user.email || "").toLowerCase().includes(input) ||
                 (user.role || "").toLowerCase().includes(input) ||
-                (user.requestedRole || "").toLowerCase().includes(input)
+                (user.requestedRole || "").toLowerCase().includes(input) ||
+                getProjectAccessText(user).toLowerCase().includes(input) ||
+                getStatusText(user).toLowerCase().includes(input)
             );
             renderFilteredTable(filtered);
             renderFilteredPagination(filtered);
@@ -280,10 +286,15 @@
                 const isPending = user.isApproved === false && user.requestedRole;
                 const roleText = isPending ? `Pending: ${user.requestedRole}` : user.role;
                 const roleClass = isPending ? "role-badge pending" : "role-badge";
+                const projectHtml = renderProjectBadges(user);
+                const statusText = getStatusText(user);
                 let row = `<tr>
-                    <td class="fw-semibold">${escapeHtml(user.fullName)}</td>
+                    <td class="fw-semibold">
+                        ${escapeHtml(user.fullName)}
+                        <div class="small text-muted">${escapeHtml(statusText)}</div>
+                    </td>
                             <td>${escapeHtml(user.email)}</td>
-        <td>${escapeHtml(user.projectName || "-")}</td>
+        <td>${projectHtml}</td>
         <td><span class="${roleClass}">${escapeHtml(roleText)}</span></td>
                     <td>
                         <button class="btn btn-outline-primary btn-sm action-button" onclick="editUser(${user.id})">Edit</button>
@@ -292,6 +303,51 @@
                 </tr>`;
                 tableBody.append(row);
             });
+        }
+
+        function getProjectAccesses(user) {
+            const rows = user.projectAccesses || user.ProjectAccesses || [];
+            return Array.isArray(rows) ? rows : [];
+        }
+
+        function getPrimaryProjectId(user) {
+            const projectId = Number(user.projectId || user.ProjectId || 0);
+            if (projectId > 0) return projectId;
+            const rows = getProjectAccesses(user).filter(row => row && row.isRejected !== true && row.IsRejected !== true);
+            if (!rows.length) return 0;
+            return Number(rows[0].projectId || rows[0].ProjectId || 0);
+        }
+
+        function getProjectAccessText(user) {
+            const rows = getProjectAccesses(user);
+            if (rows.length) {
+                return rows.map(row => {
+                    const name = row.projectName || row.ProjectName || "Project";
+                    const role = row.roleName || row.RoleName || user.role || "";
+                    return `${name} ${role}`.trim();
+                }).join(", ");
+            }
+            return user.projectName || user.ProjectName || "-";
+        }
+
+        function renderProjectBadges(user) {
+            const rows = getProjectAccesses(user);
+            if (rows.length) {
+                const html = rows.map(row => {
+                    const name = row.projectName || row.ProjectName || "Project";
+                    const role = row.roleName || row.RoleName || "";
+                    const pending = row.isApproved === false || row.IsApproved === false;
+                    return `<span class="project-badge ${pending ? "pending" : ""}">${escapeHtml(name)}${role ? " - " + escapeHtml(role) : ""}</span>`;
+                }).join("");
+                return `<div class="project-stack">${html}</div>`;
+            }
+            return `<span class="project-badge">${escapeHtml(user.projectName || user.ProjectName || "-")}</span>`;
+        }
+
+        function getStatusText(user) {
+            if (user.isRejected === true || user.IsRejected === true) return "Rejected";
+            if (user.isApproved === false || user.IsApproved === false) return "Pending";
+            return "Approved";
         }
 
         // Render Full Pagination
@@ -366,7 +422,7 @@
             $("#userRole option[value='Admin']").remove();
         }
 
-                            const editProjectId = user.projectId || currentProjectId;
+                            const editProjectId = getPrimaryProjectId(user) || currentProjectId;
         const editRole = user.role || user.roleName || user.requestedRole;
 
         await loadProjects(editProjectId);
@@ -386,25 +442,12 @@
 
             select.html('<option value="">-- Select Project --</option>');
 
-            if (!isCurrentUserAdmin) {
-                select.hide().prop("disabled", true);
-
-                $("#userProjectId").html(`<option value="${currentProjectId}">${currentProjectName}</option>`);
-                $("#userProjectId").val(currentProjectId);
-
-                display.val(currentProjectName || "Current Project").show();
-
-                $("#userProjectName").val(currentProjectName);
-
-                await loadRoles(currentProjectId, null);
-                return;
-            }
-
             display.hide();
             select.show().prop("disabled", false);
 
                     const projectResponse = await $.getJSON("/UserManager/Projects");
         const projects = Array.isArray(projectResponse) ? projectResponse : [];
+        manageableProjects = projects;
 
         projects.forEach(project => {
                 const id = project.id ?? project.Id;
@@ -415,11 +458,13 @@
                 select.append(`<option value="${id}">${escapeHtml(name)}</option>`);
             });
 
-            if (selectedProjectId) {
-                select.val(selectedProjectId);
+            const preferredProjectId = selectedProjectId || (!isCurrentUserAdmin && projects.length === 1 ? (projects[0].id ?? projects[0].Id) : null);
+
+            if (preferredProjectId) {
+                select.val(preferredProjectId);
                 const projectName = $("#userProjectId option:selected").text();
                 $("#userProjectName").val(projectName);
-                await loadRoles(selectedProjectId, null);
+                await loadRoles(preferredProjectId, null);
             }
         }
 
@@ -460,8 +505,6 @@
             }
         });
                  $("#userProjectId").on("change", async function () {
-            if (!isCurrentUserAdmin) return;
-
             const projectName = $("#userProjectId option:selected").text();
             $("#userProjectName").val(projectName);
 
@@ -488,19 +531,28 @@
             alert("Only Admin can create Admin users.");
             return;
         }
+            const selectedRole = $("#userRole").val();
+            const isAdminRole = (selectedRole || "").toLowerCase() === "admin";
+            const selectedProjectId = Number($("#userProjectId").val() || 0);
+
+            if (!isAdminRole && selectedProjectId <= 0) {
+                alert("Please select a project.");
+                return;
+            }
+
             let user = {
                 Id: id,
                 FullName: $("#userName").val(),
                 Email: $("#userEmail").val(),
-                Role: $("#userRole").val(),
-                     ProjectId: ($("#userRole").val() || "").toLowerCase() === "admin"
+                Role: selectedRole,
+                     ProjectId: isAdminRole
             ? null
-            : Number((isCurrentUserAdmin ? $("#userProjectId").val() : currentProjectId) || 0),
+            : selectedProjectId,
 
-        ProjectName: ($("#userRole").val() || "").toLowerCase() === "admin"
+        ProjectName: isAdminRole
             ? "All Projects"
-            : (isCurrentUserAdmin ? $("#userProjectName").val() : currentProjectName),
-        RoleName: $("#userRole").val(),
+            : $("#userProjectName").val(),
+        RoleName: selectedRole,
         RoleId: Number($("#userRole option:selected").data("role-id") || 0),
                 IsApproved: true,
                 RequestedRole: null,

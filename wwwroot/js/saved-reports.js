@@ -106,6 +106,18 @@
         return `${name}${email ? ` (${email})` : ""}`;
     }
 
+    function assignmentClientName(item) {
+        return item?.clientName
+            || item?.ClientName
+            || item?.clientEmail
+            || item?.ClientEmail
+            || item?.clientUser?.fullName
+            || item?.ClientUser?.FullName
+            || item?.clientUser?.email
+            || item?.ClientUser?.Email
+            || "Client";
+    }
+
     function renderClientOptions(select, clients, term = "") {
         if (!select) return;
 
@@ -132,8 +144,13 @@
         }
     }
 
-    async function loadClients(projectType) {
-        const response = await fetch(`/Home/ReportClients?projectType=${encodeURIComponent(projectType)}`, {
+    async function loadClients(projectType, term = "") {
+        let url = `/Home/ReportClients?projectType=${encodeURIComponent(projectType)}`;
+        if (term.trim()) {
+            url += `&search=${encodeURIComponent(term.trim())}`;
+        }
+
+        const response = await fetch(url, {
             headers: { "Accept": "application/json" }
         });
         const payload = await readJson(response);
@@ -157,11 +174,11 @@
         }
 
         container.innerHTML = assignments.map(item => {
-            const name = item.clientName || item.ClientName || item.clientEmail || item.ClientEmail || "Client";
+            const name = assignmentClientName(item);
             const id = item.id || item.Id;
             return `<span class="assigned-client">
-                ${name}
-                <button type="button" class="revoke-assignment" data-assignment-id="${id}">Remove</button>
+                ${escapeHtml(name)}
+                <button type="button" class="revoke-assignment" data-assignment-id="${escapeHtml(id)}">Remove</button>
             </span>`;
         }).join("");
     }
@@ -175,14 +192,20 @@
         const assigned = box.querySelector(".assigned-clients");
 
         try {
-            const clients = clientsCache[projectType] ?? await loadClients(projectType);
-            clientsCache[projectType] = clients;
+            const clientTerm = clientSearch?.value ?? "";
+            const cacheKey = `${projectType}|${clientTerm.trim().toLowerCase()}`;
+            const clients = clientsCache[cacheKey] ?? await loadClients(projectType, clientTerm);
+            clientsCache[cacheKey] = clients;
             box._clients = clients;
-            renderClientOptions(select, clients, clientSearch?.value ?? "");
+            renderClientOptions(select, clients);
 
             const assignments = await loadAssignments(type, id);
             renderAssignments(assigned, assignments);
         } catch (error) {
+            if (select) {
+                select.innerHTML = '<option value="">Unable to load Client users</option>';
+                select.disabled = true;
+            }
             assigned.textContent = error.message || "Unable to load assignments.";
         }
     }
@@ -198,6 +221,11 @@
         const box = searchInput.closest(".report-send");
         const select = box?.querySelector(".client-select");
         renderClientOptions(select, box?._clients ?? [], searchInput.value);
+
+        clearTimeout(searchInput._clientSearchTimer);
+        searchInput._clientSearchTimer = setTimeout(() => {
+            if (box) refreshSendBox(box, clientsCache);
+        }, 300);
     });
 
     document.addEventListener("click", async event => {

@@ -546,7 +546,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
 
         [HttpGet]
         [BlockClientAccess]
-        public async Task<IActionResult> ReportClients(string projectType)
+        public async Task<IActionResult> ReportClients(string projectType, string? search = null)
         {
             var jwt = HttpContext.Session.GetString("JWT");
             if (string.IsNullOrWhiteSpace(jwt))
@@ -554,11 +554,14 @@ namespace Health_Matrix_Consuming_Side.Controllers
 
             var client = _clientFactory.CreateClient("ApiClient");
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
-            var response = await client.GetAsync(
-                $"report-assignments/clients?projectType={Uri.EscapeDataString(projectType ?? string.Empty)}");
+            var url = $"report-assignments/clients?projectType={Uri.EscapeDataString(projectType ?? string.Empty)}";
+            if (!string.IsNullOrWhiteSpace(search))
+                url += $"&search={Uri.EscapeDataString(search)}";
+
+            var response = await client.GetAsync(url);
 
             var body = await response.Content.ReadAsStringAsync();
-            return StatusCode((int)response.StatusCode, body);
+            return JsonProxyResult(response, body);
         }
 
         [HttpGet]
@@ -575,7 +578,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
                 $"report-assignments/{Uri.EscapeDataString(type ?? string.Empty)}/{id}");
 
             var body = await response.Content.ReadAsStringAsync();
-            return StatusCode((int)response.StatusCode, body);
+            return JsonProxyResult(response, body);
         }
 
         [HttpPost]
@@ -595,7 +598,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
                 new StringContent(payload, Encoding.UTF8, "application/json"));
 
             var body = await response.Content.ReadAsStringAsync();
-            return StatusCode((int)response.StatusCode, body);
+            return JsonProxyResult(response, body);
         }
 
         [HttpPost]
@@ -613,7 +616,17 @@ namespace Health_Matrix_Consuming_Side.Controllers
                 new StringContent("{}", Encoding.UTF8, "application/json"));
 
             var body = await response.Content.ReadAsStringAsync();
-            return StatusCode((int)response.StatusCode, body);
+            return JsonProxyResult(response, body);
+        }
+
+        private static ContentResult JsonProxyResult(HttpResponseMessage response, string body)
+        {
+            return new ContentResult
+            {
+                StatusCode = (int)response.StatusCode,
+                ContentType = "application/json",
+                Content = string.IsNullOrWhiteSpace(body) ? "{}" : body
+            };
         }
 
 

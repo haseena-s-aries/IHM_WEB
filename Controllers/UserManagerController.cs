@@ -33,7 +33,7 @@ public class UserManagerController : Controller
     [HttpGet]
     public async Task<IActionResult> Projects()
     {
-        var request = CreateApiRequest(HttpMethod.Get, "User/projects");
+        var request = CreateApiRequest(HttpMethod.Get, "AdminDashboard/manageable-projects");
         var response = await _httpClient.SendAsync(request);
         var json = await response.Content.ReadAsStringAsync();
 
@@ -91,7 +91,6 @@ public class UserManagerController : Controller
             userDtos = userDtos
                 .Where(u => !IsAdminRole(u.Role))
                 .Where(u => !IsAdminRole(u.RequestedRole))
-                .Where(u => u.IsApproved)
                 .ToList();
         }
 
@@ -129,7 +128,7 @@ public class UserManagerController : Controller
                 message = "Only Admin can manage Admin users."
             });
         }
-        if (!IsAdmin())
+        if (!IsAdmin() && (!user.ProjectId.HasValue || user.ProjectId.Value <= 0))
         {
             var projectIdText = HttpContext.Session.GetString("ProjectId");
             if (int.TryParse(projectIdText, out var projectId))
