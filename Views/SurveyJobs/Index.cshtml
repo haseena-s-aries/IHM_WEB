@@ -295,16 +295,7 @@
                                 <p class="client">@job.ClientName</p>
                             }
                         </div>
-                        @if (isIhm)
-                        {
-                            <div class="marked-image-status"
-                                 data-marked-status
-                                 data-job-id="@job.Id">
-                                <i class="fa-solid fa-spinner fa-spin"></i>
-                                <span>Checking image status...</span>
-                            </div>
-                        }
-                        <span class="status">@job.Status</span>
+                        
                     </div>
 
                     <div class="line"></div>
@@ -864,15 +855,7 @@
             });
         });
           
-        function setMarkedStatus(element, state, message, iconClass) {
-            element.classList.remove("ready", "processing", "failed");
-            element.classList.add(state);
-
-            element.innerHTML = `
-                <i class="fa-solid ${iconClass}"></i>
-                <span>${message}</span>
-            `;
-        }
+        
 
         function markedSectionCode(item) {
             const raw = item?.sectionTypeCode ?? item?.SectionTypeCode ?? item?.sectionType ?? item?.SectionType ?? item?.sectionTypeText ?? item?.SectionTypeText;
@@ -899,44 +882,8 @@
             }
         }
 
-        async function refreshMarkedImageStatus(element) {
-            const jobId = element.dataset.jobId;
-            if (!jobId) return;
+       
 
-            try {
-                const response = await fetch(`/SurveyJobs/GetMarkedImageStatus?jobId=${jobId}`);
-                if (!response.ok) {
-                    setMarkedStatus(element, "failed", "Unable to check image status", "fa-triangle-exclamation");
-                    return;
-                }
-
-                const result = await response.json();
-                const items = result.items || result.Items || [];
-
-                const appendix4 = items.find(x => markedSectionCode(x) === 2);
-                const hazardous = items.find(x => markedSectionCode(x) === 1);
-
-                const appendixStatus = markedStatusCode(appendix4);
-                const hazardousStatus = markedStatusCode(hazardous);
-
-                if (appendixStatus === 3 && hazardousStatus === 3) {
-                    setMarkedStatus(element, "ready", "Appendix 4 and I-2 images ready", "fa-circle-check");
-                    return;
-                }
-
-                if (appendixStatus === 2 || hazardousStatus === 2) {
-                    setMarkedStatus(element, "processing", "Image generation running...", "fa-spinner fa-spin");
-                    setTimeout(() => refreshMarkedImageStatus(element), 5000);
-                    return;
-                }
-
-                setMarkedStatus(element, "processing", "Images not generated yet", "fa-clock");
-            } catch {
-                setMarkedStatus(element, "failed", "Unable to check image status", "fa-triangle-exclamation");
-            }
-        }
-
-        document.querySelectorAll("[data-marked-status]").forEach(refreshMarkedImageStatus);
     
         document.querySelectorAll(".job-card[data-card-href]").forEach(card => {
             card.addEventListener("click", event => {
