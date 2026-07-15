@@ -55,6 +55,10 @@
         .project-stack { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
         .project-badge { background: #ecfdf5; color: #047857; border: 1px solid #bbf7d0; border-radius: 999px; padding: 5px 9px; font-size: 12px; font-weight: 700; }
         .project-badge.pending { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+        .project-access-editor { border: 1px solid #e4eaf3; border-radius: 12px; padding: 10px; background: #f8fbff; }
+        .project-access-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border: 1px solid #dbe7f5; border-radius: 10px; background: #fff; margin-top: 8px; }
+        .project-access-row strong { display: block; color: #14213d; }
+        .project-access-row small { color: #65758b; font-weight: 700; }
         .action-button { border-radius: 8px; min-width: 72px; }
 
         @@media (max-width: 768px) {
@@ -157,6 +161,16 @@
                                 <option value="Surveyor">Surveyor</option>
                                 <option value="User">User</option>
                             </select>
+                            <div class="project-access-editor mt-3" id="projectAccessEditor">
+                                <div class="d-flex justify-content-between align-items-center gap-2">
+                                    <div>
+                                        <strong>Project access</strong>
+                                        <div class="small text-muted">Add, change, or remove each project role independently.</div>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="addOrUpdateProjectAccess()">Add / Update</button>
+                                </div>
+                                <div id="projectAccessList" class="mt-2"></div>
+                            </div>
                         </div>
 
                         <!-- Password Field -->
@@ -188,6 +202,7 @@
                // Globals
         let allUsers = [];
         let manageableProjects = [];
+        let projectAccessDraft = [];
         let currentPage = 1;
         const usersPerPage = 10;
         const currentUserRole = "@currentRole";
@@ -233,6 +248,105 @@
 
         function escapeHtml(value) {
             return $("<div>").text(value ?? "").html();
+        }
+
+        function normalizeProjectAccess(row) {
+            const projectId = Number(row.projectId ?? row.ProjectId ?? 0);
+            const project = manageableProjects.find(p => Number(p.id ?? p.Id) === projectId);
+            return {
+                Id: Number(row.id ?? row.Id ?? 0),
+                UserId: Number(row.userId ?? row.UserId ?? 0),
+                ProjectId: projectId,
+                ProjectName: row.projectName ?? row.ProjectName ?? project?.name ?? project?.Name ?? "",
+                ProjectCode: row.projectCode ?? row.ProjectCode ?? project?.code ?? project?.Code ?? "",
+                RoleId: Number(row.roleId ?? row.RoleId ?? 0) || null,
+                RoleName: row.roleName ?? row.RoleName ?? "",
+                IsActive: row.isActive ?? row.IsActive ?? true,
+                IsApproved: row.isApproved ?? row.IsApproved ?? true,
+                IsRejected: row.isRejected ?? row.IsRejected ?? false
+            };
+        }
+
+        function renderProjectAccessEditor() {
+            const list = $("#projectAccessList");
+            const selectedRole = ($("#userRole").val() || "").toLowerCase();
+            const isAdminRole = selectedRole === "admin";
+            $("#projectAccessEditor").toggle(!isAdminRole);
+
+            list.empty();
+            if (isAdminRole) return;
+
+            const activeRows = projectAccessDraft.filter(x => x.ProjectId > 0 && x.IsRejected !== true);
+            if (!activeRows.length) {
+                list.html('<div class="small text-muted mt-2">No project access added yet.</div>');
+                return;
+            }
+
+            activeRows.forEach(row => {
+                list.append(`
+                    <div class="project-access-row">
+                        <div>
+                            <strong>${escapeHtml(row.ProjectName || "Project")}</strong>
+                            <small>${escapeHtml(row.RoleName || "Role not selected")}</small>
+                        </div>
+                        <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeProjectAccess(${row.ProjectId})">Remove</button>
+                    </div>`);
+            });
+        }
+
+        function addOrUpdateProjectAccess() {
+            const selectedRole = $("#userRole").val();
+            if ((selectedRole || "").toLowerCase() === "admin") return;
+
+            const projectId = Number($("#userProjectId").val() || 0);
+            if (projectId <= 0) {
+                alert("Please select a project.");
+                return;
+            }
+
+            if (!selectedRole) {
+                alert("Please select a role.");
+                return;
+            }
+
+            const projectName = $("#userProjectId option:selected").text();
+            const roleId = Number($("#userRole option:selected").data("role-id") || 0) || null;
+            const existingIndex = projectAccessDraft.findIndex(x => Number(x.ProjectId) === projectId);
+            const nextRow = {
+                Id: existingIndex >= 0 ? projectAccessDraft[existingIndex].Id : 0,
+                UserId: Number($("#userId").val() || 0),
+                ProjectId: projectId,
+                ProjectName: projectName,
+                RoleId: roleId,
+                RoleName: selectedRole,
+                IsActive: true,
+                IsApproved: true,
+                IsRejected: false
+            };
+
+            if (existingIndex >= 0)
+                projectAccessDraft.splice(existingIndex, 1, nextRow);
+            else
+                projectAccessDraft.push(nextRow);
+
+            renderProjectAccessEditor();
+        }
+
+        function removeProjectAccess(projectId) {
+            projectAccessDraft = projectAccessDraft.filter(x => Number(x.ProjectId) !== Number(projectId));
+            const remaining = projectAccessDraft[0];
+            if (Number($("#userProjectId").val() || 0) === Number(projectId)) {
+                if (remaining) {
+                    $("#userProjectId").val(remaining.ProjectId);
+                    $("#userProjectName").val(remaining.ProjectName || "");
+                    loadRoles(remaining.ProjectId, remaining.RoleName || null);
+                } else {
+                    $("#userProjectId").val("");
+                    $("#userProjectName").val("");
+                    $("#userRole").val("");
+                }
+            }
+            renderProjectAccessEditor();
         }
 
         // Search Users
@@ -389,11 +503,13 @@
             $("#userId").val("");
             $("#userName").val("");
             $("#userEmail").val("");
+            projectAccessDraft = [];
                    loadProjects(null).then(() => {
             const defaultRole = isCurrentUserAdmin ? "User" : "Surveyor";
             if ($("#userRole option[value='" + defaultRole + "']").length) {
                 $("#userRole").val(defaultRole);
             }
+            renderProjectAccessEditor();
         });
          if (!isCurrentUserAdmin) {
             $("#userRole option[value='Admin']").remove();
@@ -422,11 +538,17 @@
             $("#userRole option[value='Admin']").remove();
         }
 
+                            projectAccessDraft = getProjectAccesses(user)
+                                .filter(row => row && row.isRejected !== true && row.IsRejected !== true)
+                                .map(normalizeProjectAccess)
+                                .filter(row => row.ProjectId > 0);
+
                             const editProjectId = getPrimaryProjectId(user) || currentProjectId;
         const editRole = user.role || user.roleName || user.requestedRole;
 
         await loadProjects(editProjectId);
         await loadRoles(editProjectId, editRole);
+        renderProjectAccessEditor();
                     $("#userPassword").val("").prop("disabled", true).parent().hide();
                     $("#confirmPassword").val("").prop("disabled", true).parent().hide();
                     $("#userModal").modal("show");
@@ -503,6 +625,7 @@
             } else if (isCurrentUserAdmin) {
                 $("#userProjectId").prop("disabled", false);
             }
+            renderProjectAccessEditor();
         });
                  $("#userProjectId").on("change", async function () {
             const projectName = $("#userProjectId option:selected").text();
@@ -535,10 +658,18 @@
             const isAdminRole = (selectedRole || "").toLowerCase() === "admin";
             const selectedProjectId = Number($("#userProjectId").val() || 0);
 
-            if (!isAdminRole && selectedProjectId <= 0) {
-                alert("Please select a project.");
+            if (!isAdminRole && !projectAccessDraft.length) {
+                if (selectedProjectId > 0 && selectedRole) {
+                    addOrUpdateProjectAccess();
+                }
+            }
+
+            if (!isAdminRole && !projectAccessDraft.length) {
+                alert("Please add at least one project access.");
                 return;
             }
+
+            const firstAccess = isAdminRole ? null : projectAccessDraft[0];
 
             let user = {
                 Id: id,
@@ -547,13 +678,15 @@
                 Role: selectedRole,
                      ProjectId: isAdminRole
             ? null
-            : selectedProjectId,
+            : firstAccess.ProjectId,
 
         ProjectName: isAdminRole
             ? "All Projects"
-            : $("#userProjectName").val(),
-        RoleName: selectedRole,
-        RoleId: Number($("#userRole option:selected").data("role-id") || 0),
+            : firstAccess.ProjectName,
+        RoleName: isAdminRole ? selectedRole : firstAccess.RoleName,
+        RoleId: isAdminRole ? Number($("#userRole option:selected").data("role-id") || 0) : firstAccess.RoleId,
+                ProjectAccesses: isAdminRole ? [] : projectAccessDraft,
+                ReplaceProjectAccesses: true,
                 IsApproved: true,
                 RequestedRole: null,
                 Password: isNew ? password : null

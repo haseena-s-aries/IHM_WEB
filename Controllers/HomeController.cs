@@ -287,6 +287,15 @@ namespace Health_Matrix_Consuming_Side.Controllers
                     reportsResponse.StatusCode);
             }
 
+            List<ProjectOption> manageableProjects = new();
+            var projectsResponse = await client.GetAsync("AdminDashboard/manageable-projects");
+            if (projectsResponse.IsSuccessStatusCode)
+            {
+                var projectsJson = await projectsResponse.Content.ReadAsStringAsync();
+                manageableProjects = JsonConvert.DeserializeObject<List<ProjectOption>>(projectsJson)
+                    ?? new List<ProjectOption>();
+            }
+
             List<ASCENT.Models.VesselSummaryDto> fleetSummary = new();
             string? fleetErrorMessage = null;
             var vesselResponse = await client.GetAsync("vessels");
@@ -332,6 +341,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
                 SavedReports = savedReports,
                 CertificateCounts = certificateCounts,
                 SurveySummary = surveySummary,
+                ManageableProjects = manageableProjects,
                 TotalUsers = totalUsers,
                 FleetSummary = fleetSummary,
                 FleetErrorMessage = fleetErrorMessage

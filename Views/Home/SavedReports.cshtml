@@ -66,10 +66,10 @@
 var showAuras = !isClient && (isAdmin || isAurasProject);
 var showIhm = isClient
     ? reports.Any(x => NormalizeType(x.ReportType) == "ihm")
-    : isAdmin || isIhmProject;
+    : isAdmin || isIhmProject || reports.Any(x => NormalizeType(x.ReportType) == "ihm");
 var showEx = isClient
     ? reports.Any(x => NormalizeType(x.ReportType) == "exsurvey")
-    : isAdmin || isExProject;
+    : isAdmin || isExProject || reports.Any(x => NormalizeType(x.ReportType) == "exsurvey");
 
 var visibleCategories =
     (showAuras ? 1 : 0) +

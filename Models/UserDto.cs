@@ -30,6 +30,8 @@ namespace Survery_Certification_App_Consume.Models
 
         public bool IsRejected { get; set; } = false;
 
+        public bool ReplaceProjectAccesses { get; set; }
+
         public List<UserProjectAccessDto> ProjectAccesses { get; set; } = new();
     }
 

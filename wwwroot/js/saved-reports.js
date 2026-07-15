@@ -72,6 +72,13 @@
     activeCategory = categoryButtons.find(button => button.classList.contains("active"))?.dataset.category
         ?? categoryButtons[0]?.dataset.category
         ?? "auras";
+    const requestedCategory = new URLSearchParams(window.location.search).get("category");
+    if (requestedCategory && categoryButtons.some(button => button.dataset.category === requestedCategory)) {
+        activeCategory = requestedCategory;
+        categoryButtons.forEach(button => {
+            button.classList.toggle("active", button.dataset.category === requestedCategory);
+        });
+    }
 
     async function readJson(response) {
         const text = await response.text();

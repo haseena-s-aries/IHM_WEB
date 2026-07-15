@@ -15,21 +15,27 @@
     var isIhmProject = string.Equals(projectName, "IHM", StringComparison.OrdinalIgnoreCase);
     var isExProject = string.Equals(projectName, "EX Survey", StringComparison.OrdinalIgnoreCase);
     var isAurasProject = string.Equals(projectName, "AURAS", StringComparison.OrdinalIgnoreCase);
+    bool HasProjectAccess(string name) =>
+        isAdmin ||
+        Model.ManageableProjects.Any(project => string.Equals(project.Name, name, StringComparison.OrdinalIgnoreCase)) ||
+        string.Equals(projectName, name, StringComparison.OrdinalIgnoreCase);
 
-    var canSeeIhm = isAdmin || isIhmProject;
-    var canSeeEx = isAdmin || isExProject;
-    var canSeeAuras = isAdmin || isAurasProject;
+    var canSeeIhm = HasProjectAccess("IHM");
+    var canSeeEx = HasProjectAccess("EX Survey");
+    var canSeeAuras = HasProjectAccess("AURAS");
     var canSeeUsers = !isClient;
     var profileTitle = isAdmin ? "Administrator" : "Manager";
     var ihmJobs = canSeeIhm ? surveys.IhmSurveyJobs : 0;
     var ihmReportCount = Model.SavedReports.Count(x =>
     string.Equals(x.ReportType, "ihm", StringComparison.OrdinalIgnoreCase));
+    var exReportCount = Model.SavedReports.Count(x =>
+    string.Equals(x.ReportType, "exsurvey", StringComparison.OrdinalIgnoreCase));
 
     var liveIhmJobs = surveys.IhmLiveJobs > 0 || surveys.IhmCompletedJobs > 0
         ? surveys.IhmLiveJobs
         : surveys.LiveIhmJobs;
-    var completedIhmJobs = surveys.IhmCompletedJobs;
     var exJobs = canSeeEx ? surveys.ExSurveyJobs : 0;
+    var liveExJobs = canSeeEx ? surveys.ExSurveyLiveJobs : 0;
     var submittedJobs = surveys.SubmittedJobs;
     var attentionJobs = surveys.AttentionJobs;
     var recentActivity = new List<(string Title, string Meta, string Tone)>();
@@ -239,69 +245,149 @@
                                 </button>
                             </article>
                         }
-                  @if (canSeeIhm)
-{
-    <article class="app-card">
-        <div class="app-card-top">
-            <span class="app-icon blue"><i class="fa-solid fa-briefcase"></i></span>
-            <b class="status-pill beta">Beta</b>
-        </div>
-        <h2>IHM All Jobs</h2>
-        <p>View all IHM survey jobs and job details.</p>
-        <div class="app-meta">
-            <span><strong>@ihmJobs</strong> job@(ihmJobs == 1 ? "" : "s")</span>
-            <span><strong>@submittedJobs</strong> submitted</span>
-        </div>
-        <a class="app-action light" href="@Url.Action("Ihm", "SurveyJobs")">
-            Open jobs <i class="fa-solid fa-arrow-right"></i>
-        </a>
-    </article>
+                        @if (canSeeIhm)
+                        {
+                            <article class="app-card">
+                                <div class="app-card-top">
+                                    <span class="app-icon blue"><i class="fa-solid fa-briefcase"></i></span>
+                                    <b class="status-pill beta">Beta</b>
+                                </div>
+                                <h2>IHM All Jobs</h2>
+                                <p>View all IHM survey jobs and job details.</p>
+                                <div class="app-meta">
+                                    <span><strong>@ihmJobs</strong> job@(ihmJobs == 1 ? "" : "s")</span>
+                                    <span><strong>@submittedJobs</strong> submitted</span>
+                                </div>
+                                <a class="app-action light" href="@Url.Action("Ihm", "SurveyJobs")">
+                                    Open jobs <i class="fa-solid fa-arrow-right"></i>
+                                </a>
+                            </article>
 
-    <article class="app-card">
-        <div class="app-card-top">
-            <span class="app-icon green"><i class="fa-solid fa-file-lines"></i></span>
-            <b class="status-pill active">Reports</b>
-        </div>
-        <h2>IHM Reports</h2>
-        <p>View saved IHM survey reports.</p>
-        <div class="app-meta">
-            <span><strong>@ihmReportCount</strong> report@(ihmReportCount == 1 ? "" : "s")</span>
-        </div>
-        <a class="app-action light" href="@Url.Action("SavedReports", "Home")">
-            Open reports <i class="fa-solid fa-arrow-right"></i>
-        </a>
-    </article>
+                            <article class="app-card">
+                                <div class="app-card-top">
+                                    <span class="app-icon green"><i class="fa-solid fa-file-lines"></i></span>
+                                    <b class="status-pill active">Reports</b>
+                                </div>
+                                <h2>IHM Reports</h2>
+                                <p>View saved IHM survey reports.</p>
+                                <div class="app-meta">
+                                    <span><strong>@ihmReportCount</strong> report@(ihmReportCount == 1 ? "" : "s")</span>
+                                </div>
+                                <a class="app-action light" href="@Url.Action("SavedReports", "Home")">
+                                    Open reports <i class="fa-solid fa-arrow-right"></i>
+                                </a>
+                            </article>
 
-    <article class="app-card">
-        <div class="app-card-top">
-            <span class="app-icon coral"><i class="fa-solid fa-spinner"></i></span>
-            <b class="status-pill soon">Live</b>
-        </div>
-        <h2>Live Jobs</h2>
-        <p>Ongoing IHM jobs currently in progress.</p>
-        <div class="app-meta">
-            <span><strong>@liveIhmJobs</strong> ongoing job@(liveIhmJobs == 1 ? "" : "s")</span>
-        </div>
-        <a class="app-action light" href="@Url.Action("Ihm", "SurveyJobs", new { ihmCompletionFilter = "live" })">
-            Open live jobs <i class="fa-solid fa-arrow-right"></i>
-        </a>
-    </article>
+                            @if (!isAdmin)
+                            {
+                                <article class="app-card">
+                                    <div class="app-card-top">
+                                        <span class="app-icon coral"><i class="fa-solid fa-spinner"></i></span>
+                                        <b class="status-pill soon">Live</b>
+                                    </div>
+                                    <h2>IHM Live Jobs</h2>
+                                    <p>Ongoing IHM jobs currently in progress.</p>
+                                    <div class="app-meta">
+                                        <span><strong>@liveIhmJobs</strong> ongoing job@(liveIhmJobs == 1 ? "" : "s")</span>
+                                    </div>
+                                    <a class="app-action light" href="@Url.Action("Ihm", "SurveyJobs", new { ihmCompletionFilter = "live" })">
+                                        Open live jobs <i class="fa-solid fa-arrow-right"></i>
+                                    </a>
+                                </article>
+                            }
+                        }
 
-    <article class="app-card">
-        <div class="app-card-top">
-            <span class="app-icon green"><i class="fa-solid fa-circle-check"></i></span>
-            <b class="status-pill active">Completed</b>
-        </div>
-        <h2>IHM Completed Jobs</h2>
-        <p>IHM jobs where all area survey checkpoints are completed.</p>
-        <div class="app-meta">
-            <span><strong>@completedIhmJobs</strong> completed job@(completedIhmJobs == 1 ? "" : "s")</span>
-        </div>
-        <a class="app-action light" href="@Url.Action("Ihm", "SurveyJobs", new { ihmCompletionFilter = "completed" })">
-            Open completed jobs <i class="fa-solid fa-arrow-right"></i>
-        </a>
-    </article>
-}
+                        @if (isAdmin && (canSeeIhm || canSeeEx))
+                        {
+                            <article class="app-card live-jobs-card">
+                                <div class="app-card-top">
+                                    <span class="app-icon coral"><i class="fa-solid fa-spinner"></i></span>
+                                    <b class="status-pill soon">Live</b>
+                                </div>
+                                <h2>Live Jobs</h2>
+                                <p>Ongoing jobs currently in progress across active survey projects.</p>
+                                <div class="live-summary-grid">
+                                    @if (canSeeIhm)
+                                    {
+                                        <span class="live-summary-item">
+                                            <strong>@liveIhmJobs</strong>
+                                            <small>IHM live jobs</small>
+                                        </span>
+                                    }
+                                    @if (canSeeEx)
+                                    {
+                                        <span class="live-summary-item">
+                                            <strong>@liveExJobs</strong>
+                                            <small>EX-Survey live jobs</small>
+                                        </span>
+                                    }
+                                </div>
+                                <div class="live-action-row">
+                                    @if (canSeeIhm)
+                                    {
+                                        <a class="app-action light" href="@Url.Action("Ihm", "SurveyJobs", new { ihmCompletionFilter = "live" })">
+                                            Open IHM <i class="fa-solid fa-arrow-right"></i>
+                                        </a>
+                                    }
+                                    @if (canSeeEx)
+                                    {
+                                        <a class="app-action light" href="@Url.Action("Ex", "SurveyJobs", new { jobCompletionFilter = "live" })">
+                                            Open EX <i class="fa-solid fa-arrow-right"></i>
+                                        </a>
+                                    }
+                                </div>
+                            </article>
+                        }
+                        @if (canSeeEx)
+                        {
+                            <article class="app-card">
+                                <div class="app-card-top">
+                                    <span class="app-icon blue"><i class="fa-solid fa-clipboard-list"></i></span>
+                                    <b class="status-pill beta">EX-Survey</b>
+                                </div>
+                                <h2>EX-Survey All Jobs</h2>
+                                <p>View all accessible EX-Survey jobs and job details.</p>
+                                <div class="app-meta">
+                                    <span><strong>@exJobs</strong> job@(exJobs == 1 ? "" : "s")</span>
+                                </div>
+                                <a class="app-action light" href="@Url.Action("Ex", "SurveyJobs")">
+                                    Open jobs <i class="fa-solid fa-arrow-right"></i>
+                                </a>
+                            </article>
+
+                            <article class="app-card">
+                                <div class="app-card-top">
+                                    <span class="app-icon green"><i class="fa-solid fa-file-lines"></i></span>
+                                    <b class="status-pill active">Reports</b>
+                                </div>
+                                <h2>EX-Survey Reports</h2>
+                                <p>View saved EX-Survey report documents.</p>
+                                <div class="app-meta">
+                                    <span><strong>@exReportCount</strong> report@(exReportCount == 1 ? "" : "s")</span>
+                                </div>
+                                <a class="app-action light" href="@Url.Action("SavedReports", "Home", new { category = "exsurvey" })">
+                                    Open reports <i class="fa-solid fa-arrow-right"></i>
+                                </a>
+                            </article>
+
+                            @if (!isAdmin)
+                            {
+                                <article class="app-card">
+                                    <div class="app-card-top">
+                                        <span class="app-icon coral"><i class="fa-solid fa-spinner"></i></span>
+                                        <b class="status-pill soon">Live</b>
+                                    </div>
+                                    <h2>EX-Survey Live Jobs</h2>
+                                    <p>Ongoing EX-Survey jobs currently in progress.</p>
+                                    <div class="app-meta">
+                                        <span><strong>@liveExJobs</strong> ongoing job@(liveExJobs == 1 ? "" : "s")</span>
+                                    </div>
+                                    <a class="app-action light" href="@Url.Action("Ex", "SurveyJobs", new { jobCompletionFilter = "live" })">
+                                        Open live jobs <i class="fa-solid fa-arrow-right"></i>
+                                    </a>
+                                </article>
+                            }
+                        }
                     </div>
                 </section>
 

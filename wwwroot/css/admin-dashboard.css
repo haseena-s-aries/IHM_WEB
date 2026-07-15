@@ -503,6 +503,50 @@ a {
     color: var(--auras-ink);
 }
 
+.live-jobs-card {
+    gap: 0;
+}
+
+.live-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid var(--auras-line);
+}
+
+.live-summary-item {
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--auras-line);
+    border-radius: 12px;
+    background: #f8faf8;
+}
+
+.live-summary-item strong {
+    display: block;
+    color: var(--auras-ink);
+    font-size: 24px;
+    font-weight: 900;
+    line-height: 1.1;
+}
+
+.live-summary-item small {
+    display: block;
+    margin-top: 4px;
+    color: var(--auras-muted);
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.live-action-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+}
+
 .app-action {
     min-height: 38px;
     width: 100%;
@@ -531,6 +575,13 @@ a {
     background: #eeeee8;
     color: #777c78;
     cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+    .live-summary-grid,
+    .live-action-row {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* ---------- Lower panels ---------- */

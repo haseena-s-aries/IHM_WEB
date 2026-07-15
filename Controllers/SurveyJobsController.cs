@@ -22,7 +22,8 @@ namespace Survery_Certification_App_Consume.Controllers
 
         private async Task<SurveyJobsPageViewModel> BuildSurveyJobsModel(
             string surveyType,
-            string? ihmCompletionFilter = null)
+            string? ihmCompletionFilter = null,
+            string? jobCompletionFilter = null)
         {
             var model = new SurveyJobsPageViewModel
             {
@@ -47,6 +48,8 @@ namespace Survery_Certification_App_Consume.Controllers
                     : $"survey/jobs?moduleType={Uri.EscapeDataString(apiModuleType)}&assignedSurveyorUserId={userId}";
                 if (!string.IsNullOrWhiteSpace(ihmCompletionFilter) && surveyType == "IHM Survey")
                     jobsUrl += $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter)}";
+                if (!string.IsNullOrWhiteSpace(jobCompletionFilter) && surveyType != "IHM Survey")
+                    jobsUrl += $"&jobCompletionFilter={Uri.EscapeDataString(jobCompletionFilter)}";
 
                 model.Jobs = await GetAsync<List<SurveyJobDto>>(client, jobsUrl) ?? new();
 
@@ -105,9 +108,9 @@ namespace Survery_Certification_App_Consume.Controllers
         }
 
 
-        public async Task<IActionResult> Ex()
+        public async Task<IActionResult> Ex(string? jobCompletionFilter = null)
         {
-            var model = await BuildSurveyJobsModel("EX Survey");
+            var model = await BuildSurveyJobsModel("EX Survey", jobCompletionFilter: jobCompletionFilter);
             return View("Index", model);
         }
 

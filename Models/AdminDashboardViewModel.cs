@@ -10,6 +10,7 @@ namespace Survery_Certification_App_Consume.Models
         public List<PendingUser> PendingUsers { get; set; } = new();
         public List<UserDto> Users { get; set; } = new();
         public List<SavedReportViewModel> SavedReports { get; set; } = new();
+        public List<ProjectOption> ManageableProjects { get; set; } = new();
         public TotalCertificateCountDto CertificateCounts { get; set; } = new();
         public SurveySummaryDto SurveySummary { get; set; } = new();
         public List<UpcomingDeadlineDto> UpcomingDeadlines { get; set; } = new();
@@ -67,6 +68,8 @@ namespace Survery_Certification_App_Consume.Models
         public int LiveIhmJobs { get; set; }
         public int IhmLiveJobs { get; set; }
         public int IhmCompletedJobs { get; set; }
+        public int ExSurveyLiveJobs { get; set; }
+        public int ExSurveyReports { get; set; }
         public int ThisWeekCompletedJobs { get; set; }
         public int ThisMonthCompletedJobs { get; set; }
         public int ThisYearCompletedJobs { get; set; }
