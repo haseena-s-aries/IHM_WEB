@@ -24,6 +24,7 @@
     var canSeeEx = HasProjectAccess("EX Survey");
     var canSeeAuras = HasProjectAccess("AURAS");
     var canSeeUsers = !isClient;
+    var canApproveUsers = isAdmin || Model.ManageableProjects.Any();
     var profileTitle = isAdmin ? "Administrator" : "Manager";
     var ihmJobs = canSeeIhm ? surveys.IhmSurveyJobs : 0;
     var ihmReportCount = Model.SavedReports.Count(x =>
@@ -99,7 +100,7 @@
 
             <nav class="side-nav" aria-label="Admin navigation">
                 <a class="active" href="#overview"><i class="fa-solid fa-table-columns"></i><span>Overview</span></a>
-                @if (isAdmin)
+                @if (canApproveUsers)
                 {
                     <a href="@Url.Action("PendingUsers", "Auth")"><i class="fa-solid fa-user-check"></i><span>Approvals</span><b>@pendingCount</b></a>
                 }

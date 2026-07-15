@@ -162,12 +162,9 @@
                                 <option value="User">User</option>
                             </select>
                             <div class="project-access-editor mt-3" id="projectAccessEditor">
-                                <div class="d-flex justify-content-between align-items-center gap-2">
-                                    <div>
-                                        <strong>Project access</strong>
-                                        <div class="small text-muted">Add, change, or remove each project role independently.</div>
-                                    </div>
-                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="addOrUpdateProjectAccess()">Add / Update</button>
+                                <div>
+                                    <strong>Project access</strong>
+                                    <div class="small text-muted">Select a project and role, then use Save to apply changes.</div>
                                 </div>
                                 <div id="projectAccessList" class="mt-2"></div>
                             </div>
@@ -294,19 +291,19 @@
             });
         }
 
-        function addOrUpdateProjectAccess() {
+        function addOrUpdateProjectAccess(showAlerts = true) {
             const selectedRole = $("#userRole").val();
-            if ((selectedRole || "").toLowerCase() === "admin") return;
+            if ((selectedRole || "").toLowerCase() === "admin") return true;
 
             const projectId = Number($("#userProjectId").val() || 0);
             if (projectId <= 0) {
-                alert("Please select a project.");
-                return;
+                if (showAlerts) alert("Please select a project.");
+                return false;
             }
 
             if (!selectedRole) {
-                alert("Please select a role.");
-                return;
+                if (showAlerts) alert("Please select a role.");
+                return false;
             }
 
             const projectName = $("#userProjectId option:selected").text();
@@ -330,6 +327,7 @@
                 projectAccessDraft.push(nextRow);
 
             renderProjectAccessEditor();
+            return true;
         }
 
         function removeProjectAccess(projectId) {
@@ -658,14 +656,12 @@
             const isAdminRole = (selectedRole || "").toLowerCase() === "admin";
             const selectedProjectId = Number($("#userProjectId").val() || 0);
 
-            if (!isAdminRole && !projectAccessDraft.length) {
-                if (selectedProjectId > 0 && selectedRole) {
-                    addOrUpdateProjectAccess();
-                }
+            if (!isAdminRole && selectedProjectId > 0 && selectedRole) {
+                addOrUpdateProjectAccess(false);
             }
 
             if (!isAdminRole && !projectAccessDraft.length) {
-                alert("Please add at least one project access.");
+                alert("Please select at least one project access.");
                 return;
             }
 

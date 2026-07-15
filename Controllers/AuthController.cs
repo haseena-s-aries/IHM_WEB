@@ -8,6 +8,7 @@ namespace YourMvcApp.Controllers
 {
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.Extensions.Configuration;
+    using System.Net.Http.Headers;
     using System.Net.Http;
     using System.Net.Http.Json;
     using System.Threading.Tasks;
@@ -27,7 +28,8 @@ namespace YourMvcApp.Controllers
         [BlockClientAccess]
         public async Task<IActionResult> GetNotificationCount()
         {
-            var response = await _httpClient.GetAsync("User/pending-users");
+            var response = await _httpClient.SendAsync(
+                CreateApiRequest(HttpMethod.Get, "User/pending-users"));
 
             if (!response.IsSuccessStatusCode)
                 return Json(new { count = 0 });
@@ -43,8 +45,10 @@ namespace YourMvcApp.Controllers
         [BlockClientAccess]
         public async Task<IActionResult> PendingUsers()
         {
-            var response = await _httpClient.GetAsync("User/pending-users");
-            var projectsResponse = await _httpClient.GetAsync("User/projects");
+            var response = await _httpClient.SendAsync(
+                CreateApiRequest(HttpMethod.Get, "User/pending-users"));
+            var projectsResponse = await _httpClient.SendAsync(
+                CreateApiRequest(HttpMethod.Get, "AdminDashboard/manageable-projects"));
             var projects = projectsResponse.IsSuccessStatusCode
                 ? await projectsResponse.Content.ReadFromJsonAsync<List<ProjectOption>>() ?? new List<ProjectOption>()
                 : new List<ProjectOption>();
@@ -88,9 +92,11 @@ namespace YourMvcApp.Controllers
                     return RedirectAfterApproval(returnUrl);
                 }
 
-                var response = await _httpClient.PostAsJsonAsync(
-                    $"User/approve-user/{id}",
-                    new { projectId = projectId.Value });
+                var response = await _httpClient.SendAsync(
+                    CreateApiRequest(
+                        HttpMethod.Post,
+                        $"User/approve-user/{id}",
+                        JsonContent.Create(new { projectId = projectId.Value })));
                 var responseBody = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
@@ -111,11 +117,15 @@ namespace YourMvcApp.Controllers
         // POST: /Auth/RejectUser
         [HttpPost]
         [BlockClientAccess]
-        public async Task<IActionResult> RejectUser(int id, string? returnUrl = null)
+        public async Task<IActionResult> RejectUser(int id, int? projectId, string? returnUrl = null)
         {
             try
             {
-                var response = await _httpClient.PostAsync($"User/reject-user/{id}", null);
+                var response = await _httpClient.SendAsync(
+                    CreateApiRequest(
+                        HttpMethod.Post,
+                        $"User/reject-user/{id}",
+                        JsonContent.Create(new { projectId })));
                 var responseBody = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
@@ -139,6 +149,16 @@ namespace YourMvcApp.Controllers
                 return LocalRedirect(returnUrl);
 
             return RedirectToAction(nameof(PendingUsers));
+        }
+
+        private HttpRequestMessage CreateApiRequest(HttpMethod method, string url, HttpContent? content = null)
+        {
+            var request = new HttpRequestMessage(method, url) { Content = content };
+            var token = HttpContext.Session.GetString("JWT");
+            if (!string.IsNullOrWhiteSpace(token))
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            return request;
         }
 
         [HttpGet]
