@@ -1413,6 +1413,7 @@
             "JobId",
 
             "VesselId",
+            "ClientName",
 
             "VesselName",
 
@@ -1488,7 +1489,7 @@
         ]);
         const forcedTemplateFields = {
 
-            ClientName: getProperty(source, "clientName"),
+           
             OhsClient: getProperty(source, "ohsClient")
         };
 

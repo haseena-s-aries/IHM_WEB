@@ -109,7 +109,8 @@
 
             saveUrl: '@Url.Action("SavePdfEdits", "Home")',
 
-            generateUrl: '@Url.Action("GenerateEditedPdf", "Home")'
+            generateUrl: '@Url.Action("GenerateEditedPdf", "Home")',
+            regenerateUrl: '@Url.Action("RegenerateSavedPdf", "Home", new { type = Model.ReportType, id = Model.ReportId })'
 
         };
     </script>

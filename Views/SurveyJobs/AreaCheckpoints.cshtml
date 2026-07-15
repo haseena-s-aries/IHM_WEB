@@ -2,6 +2,7 @@
 @{
     Layout = null;
     var jobId = (int)(ViewBag.JobId ?? 0);
+    var ihmCompletionFilter = ViewBag.IhmCompletionFilter?.ToString();
     var layouts = ViewBag.Layouts as List<Survery_Certification_App_Consume.Models.IhmLayoutAttachmentDto>
         ?? new List<Survery_Certification_App_Consume.Models.IhmLayoutAttachmentDto>();
     var layoutOptionsJson = Newtonsoft.Json.JsonConvert.SerializeObject(layouts.Select(layout => new
@@ -489,7 +490,7 @@
 
 <body>
     <header class="appbar">
-        <a class="back-btn" href="/SurveyJobs/SurveyAreas?jobId=@jobId">
+        <a class="back-btn" href="/SurveyJobs/SurveyAreas?jobId=@jobId@(string.IsNullOrWhiteSpace(ihmCompletionFilter) ? "" : $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter)}")">
             <i class="fa-solid fa-chevron-left"></i>
         </a>
         <div>

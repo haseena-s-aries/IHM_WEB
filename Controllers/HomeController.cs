@@ -114,7 +114,12 @@ namespace Health_Matrix_Consuming_Side.Controllers
             // Optionally, decode the JWT to access claims like username, role, etc.
             var claims = DecodeJwt(jwt); // A method to decode the JWT and extract claims
             ViewData["Username"] = claims.ContainsKey("username") ? claims["username"] : "Unknown"; // Example usage of claims
-
+            ViewData["FullName"] =
+                HttpContext.Session.GetString("UserFullName")
+                ?? (claims.ContainsKey("fullName") ? claims["fullName"] : null)
+                ?? (claims.ContainsKey("name") ? claims["name"] : null)
+                ?? HttpContext.Session.GetString("Username")
+                ?? "Surveyor";
             TotalCertificateCountDto model = new();
 
             var role = HttpContext.Session.GetString("UserRole") ?? "";
@@ -833,7 +838,34 @@ namespace Health_Matrix_Consuming_Side.Controllers
 
             return Ok(new { message = "PDF edits saved." });
         }
+        [HttpPost]
+        public async Task<IActionResult> RegenerateSavedPdf(string type, int id)
+        {
+            var normalizedType = NormalizeReportType(type);
+            if (normalizedType == null || id <= 0)
+                return BadRequest("Invalid report.");
 
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (string.IsNullOrWhiteSpace(jwt))
+                return Unauthorized();
+
+            var client = _clientFactory.CreateClient("ApiClient");
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", jwt);
+
+            var response = await client.PostAsync(
+                $"pdf-editor/{normalizedType}/{id}/regenerate",
+                null);
+
+            if (!response.IsSuccessStatusCode)
+                return StatusCode(
+                    (int)response.StatusCode,
+                    await response.Content.ReadAsStringAsync());
+
+            return Content(
+                await response.Content.ReadAsStringAsync(),
+                "application/json");
+        }
 
         [HttpPost]
         [BlockClientAccess]
