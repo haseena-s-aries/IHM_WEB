@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using Survery_Certification_App_Consume.Filters;
 using Survery_Certification_App_Consume.Models;
 using System.Net.Http.Headers;
 using System.Text;
-using Survery_Certification_App_Consume.Filters;
 namespace Survery_Certification_App_Consume.Controllers
 {
     [BlockClientAccess]
@@ -90,6 +90,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 {
                     model.Vessels = await GetAsync<List<VesselDto>>(client, "vessels") ?? new();
                     model.Surveyors = await GetAsync<List<SurveyorOptionDto>>(client, "User/surveyors") ?? new();
+                    model.Managers = await GetAsync<List<SurveyorOptionDto>>(client, "User/managers") ?? new();
                 }
             }
             catch (Exception ex)
@@ -147,6 +148,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 {
                     model.Vessels = await GetAsync<List<VesselDto>>(client, "vessels") ?? new();
                     model.Surveyors = await GetAsync<List<SurveyorOptionDto>>(client, "User/surveyors") ?? new();
+                    model.Managers = await GetAsync<List<SurveyorOptionDto>>(client, "User/managers") ?? new();
                 }
             }
             catch (Exception ex)
@@ -230,7 +232,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 return RedirectToAction(surveyType == "IHM Survey" ? "Ihm" : "Ex", new { ihmCompletionFilter });
             }
         }
-        public async Task<IActionResult> VesselInfo(int jobId, string? ihmCompletionFilter = null)
+        public async Task<IActionResult> VesselInfo(int jobId, string? ihmCompletionFilter = null, string? returnUrl = null)
         {
             try
             {
@@ -252,6 +254,7 @@ namespace Survery_Certification_App_Consume.Controllers
 
                 ViewBag.JobId = jobId;
                 ViewBag.IhmCompletionFilter = ihmCompletionFilter;
+                ViewBag.ReturnUrl = SafeIhmJobReturnUrl(returnUrl, jobId, ihmCompletionFilter);
                 return View(vessel);
             }
             catch (Exception ex)
@@ -261,7 +264,7 @@ namespace Survery_Certification_App_Consume.Controllers
             }
         }
 
-        public async Task<IActionResult> SurveyAreas(int jobId, string? ihmCompletionFilter = null)
+        public async Task<IActionResult> SurveyAreas(int jobId, string? ihmCompletionFilter = null, string? returnUrl = null)
         {
             try
             {
@@ -276,6 +279,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 ViewBag.Job = job;
                 ViewBag.JobId = jobId;
                 ViewBag.IhmCompletionFilter = ihmCompletionFilter;
+                ViewBag.ReturnUrl = SafeIhmJobReturnUrl(returnUrl, jobId, ihmCompletionFilter);
                 return View(areas);
             }
             catch (Exception ex)
@@ -285,7 +289,7 @@ namespace Survery_Certification_App_Consume.Controllers
             }
         }
 
-        public async Task<IActionResult> AreaCheckpoints(int jobId, int areaId, string? ihmCompletionFilter = null)
+        public async Task<IActionResult> AreaCheckpoints(int jobId, int areaId, string? ihmCompletionFilter = null, string? returnUrl = null)
         {
             try
             {
@@ -329,6 +333,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 ViewBag.JobId = jobId;
                 ViewBag.Layouts = areaLayouts;
                 ViewBag.IhmCompletionFilter = ihmCompletionFilter;
+                ViewBag.ReturnUrl = SafeSurveyAreasReturnUrl(returnUrl, jobId, ihmCompletionFilter);
                 return View(area);
             }
             catch (Exception ex)
@@ -734,7 +739,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 return Json(new { message = ex.Message });
             }
         }
-        public async Task<IActionResult> ProjectInfo(int jobId, string? ihmCompletionFilter = null)
+        public async Task<IActionResult> ProjectInfo(int jobId, string? ihmCompletionFilter = null, string? returnUrl = null)
         {
             try
             {
@@ -745,23 +750,24 @@ namespace Survery_Certification_App_Consume.Controllers
                 if (!response.IsSuccessStatusCode)
                 {
                     TempData["ErrorMessage"] = "Failed to load project information: " + body;
-                    return RedirectToAction("Ihm", new { ihmCompletionFilter });
+                    return RedirectToAction("Work", new { jobId, surveyType = "IHM Survey", ihmCompletionFilter });
                 }
 
                 var job = JsonConvert.DeserializeObject<SurveyJobDto>(body);
                 if (job == null)
                 {
                     TempData["ErrorMessage"] = "Project information not found.";
-                    return RedirectToAction("Ihm", new { ihmCompletionFilter });
+                    return RedirectToAction("Work", new { jobId, surveyType = "IHM Survey", ihmCompletionFilter });
                 }
 
                 ViewBag.IhmCompletionFilter = ihmCompletionFilter;
+                ViewBag.ReturnUrl = SafeIhmJobReturnUrl(returnUrl, jobId, ihmCompletionFilter);
                 return View(job);
             }
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = "Failed to load project information: " + ex.Message;
-                return RedirectToAction("Ihm", new { ihmCompletionFilter });
+                return RedirectToAction("Work", new { jobId, surveyType = "IHM Survey", ihmCompletionFilter });
             }
         }
 
@@ -803,6 +809,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 auditAddress = request.AuditAddress?.Trim(),
                 startDate = request.StartDate,
                 endDate = request.EndDate,
+                assignedManagerId = request.SurveyType == "IHM Survey" ? request.AssignedManagerId : null,
                 createdByUserId = HttpContext.Session.GetInt32("UserId") ?? 0
             };
 
@@ -830,7 +837,13 @@ namespace Survery_Certification_App_Consume.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> AssignSurveyors(int jobId, int? primarySurveyorUserId, int? secondarySurveyorUserId, string surveyType, string? ihmCompletionFilter = null)
+        public async Task<IActionResult> AssignSurveyors(
+            int jobId,
+            int? assignedManagerId,
+            int? primarySurveyorUserId,
+            int? secondarySurveyorUserId,
+            string surveyType,
+            string? ihmCompletionFilter = null)
         {
             var returnAction = surveyType == "IHM Survey" ? "Ihm" : "Ex";
 
@@ -845,8 +858,12 @@ namespace Survery_Certification_App_Consume.Controllers
             try
             {
                 var client = CreateApiClient();
+                if (surveyType == "IHM Survey")
+                {
+                    await UpdateAssignedManagerInternal(client, jobId, assignedManagerId);
+                }
                 await AssignSurveyorsInternal(client, jobId, primarySurveyorUserId, secondarySurveyorUserId);
-                TempData["SuccessMessage"] = "Surveyors assigned successfully.";
+                TempData["SuccessMessage"] = "Survey assignment updated successfully.";
             }
             catch (Exception ex)
             {
@@ -1079,6 +1096,28 @@ namespace Survery_Certification_App_Consume.Controllers
             }
         }
 
+        private async Task UpdateAssignedManagerInternal(HttpClient client, int jobId, int? assignedManagerId)
+        {
+            var payload = new
+            {
+                assignedManagerId
+            };
+
+            var response = await client.PostAsync(
+                $"survey/jobs/{jobId}/assigned-manager",
+                new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json")
+            );
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                throw new InvalidOperationException(
+                    string.IsNullOrWhiteSpace(body)
+                        ? "Unable to update assigned manager."
+                        : body);
+            }
+        }
+
         private async Task<string> UploadFile(int jobId, IFormFile file, string url, string fieldName)
         {
             if (file == null || file.Length == 0)
@@ -1142,6 +1181,34 @@ namespace Survery_Certification_App_Consume.Controllers
             return client;
         }
 
+        private string SafeIhmJobReturnUrl(string? returnUrl, int jobId, string? ihmCompletionFilter)
+        {
+            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+                return returnUrl;
+
+            return BuildIhmJobReturnUrl(jobId, ihmCompletionFilter);
+        }
+
+        private string SafeSurveyAreasReturnUrl(string? returnUrl, int jobId, string? ihmCompletionFilter)
+        {
+            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+                return returnUrl;
+
+            var filter = string.IsNullOrWhiteSpace(ihmCompletionFilter)
+                ? ""
+                : $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter)}";
+            return $"/SurveyJobs/SurveyAreas?jobId={jobId}{filter}";
+        }
+
+        private static string BuildIhmJobReturnUrl(int jobId, string? ihmCompletionFilter)
+        {
+            var filter = string.IsNullOrWhiteSpace(ihmCompletionFilter)
+                ? ""
+                : $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter)}";
+            return $"/SurveyJobs/Work?jobId={jobId}&surveyType=IHM%20Survey{filter}";
+        }
+
+
         private static async Task<T?> GetAsync<T>(HttpClient client, string url)
         {
             var response = await client.GetAsync(url);
@@ -1194,6 +1261,7 @@ namespace Survery_Certification_App_Consume.Controllers
         public string? AuditAddress { get; set; }
         public string? StartDate { get; set; }
         public string? EndDate { get; set; }
+        public int? AssignedManagerId { get; set; }
         public int? PrimarySurveyorUserId { get; set; }
         public int? SecondarySurveyorUserId { get; set; }
     }

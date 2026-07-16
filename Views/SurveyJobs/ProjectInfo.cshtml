@@ -5,11 +5,15 @@
     string Val(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
     string DateVal(DateTime? value) => value.HasValue ? value.Value.ToLocalTime().ToString("dd/MM/yyyy") : "-";
     var ihmCompletionFilter = ViewBag.IhmCompletionFilter?.ToString();
-    var listUrl = $"/SurveyJobs/Work?jobId={Model.Id}&surveyType=IHM%20Survey";
-    if (!string.IsNullOrWhiteSpace(ihmCompletionFilter))
+    var listUrl = string.IsNullOrWhiteSpace(ihmCompletionFilter)
+    ? $"/SurveyJobs/Work?jobId={Model.Id}&surveyType=IHM%20Survey"
+    : $"/SurveyJobs/Work?jobId={Model.Id}&surveyType=IHM%20Survey&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter!)}";
+    var returnUrl = ViewBag.ReturnUrl?.ToString();
+    if (!string.IsNullOrWhiteSpace(returnUrl))
     {
-        listUrl += $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter!)}";
+        listUrl = returnUrl;
     }
+
 
     var activeAssignments = Model.Assignments
         .Where(x => !string.Equals(x.Status, "Returned", StringComparison.OrdinalIgnoreCase))
@@ -43,29 +47,144 @@
             --ocean: #1976d2;
         }
 
-        * { box-sizing: border-box; }
-        body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-family: "Segoe UI", Arial, sans-serif; }
-        .appbar { min-height: 64px; display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--divider); background: #fff; }
-        .back-btn { width: 42px; height: 42px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; color: var(--text); text-decoration: none; background: var(--surface); }
-        .appbar-title { margin: 0; font-size: 20px; font-weight: 800; }
-        .page { max-width: 920px; margin: 0 auto; padding: 18px; }
-        .project-title { margin: 0; font-size: 22px; line-height: 1.2; font-weight: 900; }
-        .client { margin: 4px 0 20px; color: #0000008a; font-size: 14px; }
-        .section-card { width: 100%; margin-bottom: 18px; padding: 14px; border-radius: 10px; background: var(--surface); }
-        .section-title { margin: 0 0 12px; font-size: 15px; font-weight: 800; }
-        .item-row { display: grid; grid-template-columns: 155px 1fr; gap: 12px; padding-bottom: 10px; }
-        .item-row:last-child { padding-bottom: 0; }
-        .item-label { color: #0000008a; font-size: 14px; }
-        .item-value { min-width: 0; font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
-        .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
-        .action-btn { min-height: 42px; border-radius: 8px; padding: 10px 14px; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-weight: 800; border: 0; }
-        .blue { color: #fff; background: var(--ocean); }
-        .light { color: var(--ocean); background: #1976d214; }
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: "Segoe UI", Arial, sans-serif;
+        }
+
+        .appbar {
+            min-height: 64px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--divider);
+            background: #fff;
+        }
+
+        .back-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text);
+            text-decoration: none;
+            background: var(--surface);
+        }
+
+        .appbar-title {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        .page {
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 18px;
+        }
+
+        .project-title {
+            margin: 0;
+            font-size: 22px;
+            line-height: 1.2;
+            font-weight: 900;
+        }
+
+        .client {
+            margin: 4px 0 20px;
+            color: #0000008a;
+            font-size: 14px;
+        }
+
+        .section-card {
+            width: 100%;
+            margin-bottom: 18px;
+            padding: 14px;
+            border-radius: 10px;
+            background: var(--surface);
+        }
+
+        .section-title {
+            margin: 0 0 12px;
+            font-size: 15px;
+            font-weight: 800;
+        }
+
+        .item-row {
+            display: grid;
+            grid-template-columns: 155px 1fr;
+            gap: 12px;
+            padding-bottom: 10px;
+        }
+
+            .item-row:last-child {
+                padding-bottom: 0;
+            }
+
+        .item-label {
+            color: #0000008a;
+            font-size: 14px;
+        }
+
+        .item-value {
+            min-width: 0;
+            font-size: 14px;
+            font-weight: 700;
+            overflow-wrap: anywhere;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 4px;
+        }
+
+        .action-btn {
+            min-height: 42px;
+            border-radius: 8px;
+            padding: 10px 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            text-decoration: none;
+            font-weight: 800;
+            border: 0;
+        }
+
+        .blue {
+            color: #fff;
+            background: var(--ocean);
+        }
+
+        .light {
+            color: var(--ocean);
+            background: #1976d214;
+        }
 
         @@media (max-width: 560px) {
-            .page { padding: 14px; }
-            .item-row { grid-template-columns: 1fr; gap: 3px; }
-            .appbar-title { font-size: 18px; }
+            .page {
+                padding: 14px;
+            }
+
+            .item-row {
+                grid-template-columns: 1fr;
+                gap: 3px;
+            }
+
+            .appbar-title {
+                font-size: 18px;
+            }
         }
     </style>
 </head>
@@ -129,8 +248,9 @@
             <a class="action-btn light" href="@listUrl">
                 <i class="fa-solid fa-arrow-left"></i> Back to Jobs
             </a>
-          
+
         </div>
     </main>
 </body>
 </html>
+

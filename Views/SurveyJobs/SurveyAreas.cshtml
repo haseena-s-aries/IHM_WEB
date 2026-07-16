@@ -7,6 +7,14 @@
     var ihmFilterQuery = string.IsNullOrWhiteSpace(ihmCompletionFilter)
         ? ""
         : $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter!)}";
+    var returnUrl = ViewBag.ReturnUrl?.ToString();
+    if (string.IsNullOrWhiteSpace(returnUrl))
+    {
+        returnUrl = $"/SurveyJobs/Work?jobId={jobId}&surveyType=IHM%20Survey{ihmFilterQuery}";
+    }
+    var surveyAreasUrl = $"/SurveyJobs/SurveyAreas?jobId={jobId}{ihmFilterQuery}&returnUrl={Uri.EscapeDataString(returnUrl)}";
+    var areaReturnQuery = $"&returnUrl={Uri.EscapeDataString(surveyAreasUrl)}";
+
 }
 
 <!DOCTYPE html>
@@ -261,92 +269,80 @@
         /* Desktop XL */
 
         @@media (max-width:1200px) {
-            .grid
-
-        {
-            grid-template-columns: repeat(3,1fr);
-        }
-
+            .grid {
+                grid-template-columns: repeat(3,1fr);
+            }
         }
 
         @@media (max-width:900px) {
-            .grid
-
-        {
-            grid-template-columns: repeat(2,1fr);
-        }
-
+            .grid {
+                grid-template-columns: repeat(2,1fr);
+            }
         }
 
         @@media (max-width:620px) {
-            .page
+            .page {
+                padding: 14px;
+            }
 
-        {
-            padding: 14px;
-        }
+            .grid {
+                grid-template-columns: 1fr;
+            }
 
-        .grid {
-            grid-template-columns: 1fr;
-        }
 
-        
 
-        .title {
-            font-size: 22px;
-        }
+            .title {
+                font-size: 22px;
+            }
 
-        .sub {
-            font-size: 14px;
-        }
+            .sub {
+                font-size: 14px;
+            }
 
-        .area-card {
-            min-height: 200px;
-        }
+            .area-card {
+                min-height: 200px;
+            }
 
-        .name {
-            font-size: 15px;
-        }
+            .name {
+                font-size: 15px;
+            }
 
-        .layout-btn {
-            font-size: 10px;
-            padding: 6px 8px;
-        }
+            .layout-btn {
+                font-size: 10px;
+                padding: 6px 8px;
+            }
 
-        .stat-row {
-            font-size: 13px;
-        }
-
+            .stat-row {
+                font-size: 13px;
+            }
         }
 
 
         /* Small mobile */
 
         @@media (max-width:430px) {
-            .grid
+            .grid {
+                grid-template-columns: 1fr;
+            }
 
-        {
-            grid-template-columns: 1fr;
-        }
+            .area-card {
+                min-height: 185px;
+            }
 
-        .area-card {
-            min-height: 185px;
-        }
+            .card-head {
+                padding: 12px;
+            }
 
-        .card-head {
-            padding: 12px;
-        }
-
-        .card-body {
-            padding: 12px;
-        }
-
+            .card-body {
+                padding: 12px;
+            }
         }
     </style>
 </head>
 
 <body>
     <header class="appbar">
-        <a class="back-btn" href="/SurveyJobs/Work?jobId=@jobId&surveyType=IHM%20Survey@(string.IsNullOrWhiteSpace(ihmCompletionFilter) ? "" : $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter)}")">
+        <a class="back-btn" href="@returnUrl">
             <i class="fa-solid fa-chevron-left"></i>
         </a>
         <h1 class="title">Survey Areas</h1>
@@ -367,14 +363,14 @@
 
                 <div class="area-card">
                     <div class="card-head">
-                        <a class="name" href="/SurveyJobs/AreaCheckpoints?jobId=@jobId&areaId=@area.Id">
+                        <a class="name" href="/SurveyJobs/AreaCheckpoints?jobId=@jobId&areaId=@area.Id@ihmFilterQuery@areaReturnQuery">
                             @area.AreaName
                         </a>
 
-                        
+
                     </div>
 
-                    <a class="card-body" href="/SurveyJobs/AreaCheckpoints?jobId=@jobId&areaId=@area.Id">
+                    <a class="card-body" href="/SurveyJobs/AreaCheckpoints?jobId=@jobId&areaId=@area.Id@ihmFilterQuery@areaReturnQuery">
                         <div class="stat-row">
                             <span class="stat-left">
                                 <i class="fa-regular fa-circle-check"></i>

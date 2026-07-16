@@ -6,6 +6,11 @@
     var ihmFilterQuery = string.IsNullOrWhiteSpace(ihmCompletionFilter)
         ? ""
         : $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter!)}";
+    var returnUrl = ViewBag.ReturnUrl?.ToString();
+    if (string.IsNullOrWhiteSpace(returnUrl))
+    {
+        returnUrl = $"/SurveyJobs/Work?jobId={jobId}&surveyType=IHM%20Survey{ihmFilterQuery}";
+    }
 
     string Val(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
     string Num(decimal? value) => value.HasValue ? value.Value.ToString("0.##") : "-";
@@ -141,7 +146,7 @@
 </head>
 <body>
     <header class="appbar">
-        <a class="back-btn" href="/SurveyJobs/Work?jobId=@jobId&surveyType=IHM%20Survey@(string.IsNullOrWhiteSpace(ihmCompletionFilter) ? "" : $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter)}")">
+        <a class="back-btn" href="@returnUrl">
             <i class="fa-solid fa-chevron-left"></i>
         </a>
         <h1 class="title">Vessel Info</h1>
@@ -191,3 +196,4 @@
     </main>
 </body>
 </html>
+

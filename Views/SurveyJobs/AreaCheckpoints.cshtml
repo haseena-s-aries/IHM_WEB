@@ -5,6 +5,14 @@
     var ihmCompletionFilter = ViewBag.IhmCompletionFilter?.ToString();
     var layouts = ViewBag.Layouts as List<Survery_Certification_App_Consume.Models.IhmLayoutAttachmentDto>
         ?? new List<Survery_Certification_App_Consume.Models.IhmLayoutAttachmentDto>();
+    var ihmFilterQuery = string.IsNullOrWhiteSpace(ihmCompletionFilter)
+        ? ""
+        : $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter!)}";
+    var returnUrl = ViewBag.ReturnUrl?.ToString();
+    if (string.IsNullOrWhiteSpace(returnUrl))
+    {
+        returnUrl = $"/SurveyJobs/SurveyAreas?jobId={jobId}{ihmFilterQuery}";
+    }
     var layoutOptionsJson = Newtonsoft.Json.JsonConvert.SerializeObject(layouts.Select(layout => new
     {
         target = layout.Target,
@@ -316,6 +324,7 @@
             pointer-events: none;
             z-index: 9;
         }
+
         .marker-pin {
             position: absolute;
             transform: translate(-50%, -100%);
@@ -358,14 +367,14 @@
             margin-bottom: 12px;
         }
 
-        .marker-toolbar select {
-            width: 100%;
-            border: 1px solid #d8e3ee;
-            border-radius: 10px;
-            padding: 9px 12px;
-            font-size: 13px;
-            font-weight: 700;
-        }
+            .marker-toolbar select {
+                width: 100%;
+                border: 1px solid #d8e3ee;
+                border-radius: 10px;
+                padding: 9px 12px;
+                font-size: 13px;
+                font-weight: 700;
+            }
 
         .marker-foot {
             padding: 12px 16px;
@@ -422,68 +431,56 @@
         /* BREAKPOINTS */
 
         @@media (max-width:1200px) {
-            .grid
-
-        {
-            grid-template-columns: repeat(3,1fr);
-        }
-
+            .grid {
+                grid-template-columns: repeat(3,1fr);
+            }
         }
 
         @@media (max-width:900px) {
-            .grid
-
-        {
-            grid-template-columns: repeat(2,1fr);
-        }
-
+            .grid {
+                grid-template-columns: repeat(2,1fr);
+            }
         }
 
         @@media (max-width:620px) {
-            .page
+            .page {
+                padding: 14px;
+            }
 
-        {
-            padding: 14px;
-        }
+            .grid {
+                grid-template-columns: 1fr;
+            }
 
-        .grid {
-            grid-template-columns: 1fr;
-        }
 
-        
 
-        .cp-head {
-            padding: 14px;
-            min-height: 64px;
-        }
+            .cp-head {
+                padding: 14px;
+                min-height: 64px;
+            }
 
-        .cp-body {
-            padding: 14px;
-        }
+            .cp-body {
+                padding: 14px;
+            }
 
-        .title {
-            font-size: 18px;
-        }
+            .title {
+                font-size: 18px;
+            }
 
-        .cp-title {
-            font-size: 14px;
-        }
-
+            .cp-title {
+                font-size: 14px;
+            }
         }
 
         @@media (max-width:420px) {
-            .info-row
+            .info-row {
+                grid-template-columns: 1fr;
+                gap: 3px;
+            }
 
-        {
-            grid-template-columns: 1fr;
-            gap: 3px;
-        }
-
-        .status-box {
-            flex-direction: column;
-            align-items: flex-start;
-        }
-
+            .status-box {
+                flex-direction: column;
+                align-items: flex-start;
+            }
         }
     </style>
 </head>
@@ -571,7 +568,7 @@
                             </div>
                             <div class="result-text">Result: @result</div>
                         </div>
-                        
+
                     </div>
                 </article>
             }
@@ -883,7 +880,7 @@
                 const label = markerLabelText(marker, isActive ? markerState.label : "");
                 addMarkerPin(x, y, label, isActive, markerIdValue(marker));
             });
-           
+
 
                     if (hasUnsavedSelectedPin) {
                 addMarkerPin(markerState.xPercent, markerState.yPercent, markerState.label, true, 0);
@@ -1069,7 +1066,7 @@
             XPercent: Number(markerState.xPercent.toFixed(6)),
             YPercent: Number(markerState.yPercent.toFixed(6))
         };
-        
+
 
             console.log("IHM marker save payload", payload);
 
