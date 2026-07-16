@@ -680,17 +680,26 @@ async function generate() {
         if (!saveResponse.ok)
             throw new Error(await responseMessage(saveResponse, "Unable to save PDF edits."));
 
-        status.textContent = "Generating PDF...";
+        status.textContent = "Applying edits to saved PDF...";
 
-        const response = await fetch(config.generateUrl, {
+        const persistResponse = await fetch(config.regenerateUrl, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin"
+        });
+
+        if (!persistResponse.ok)
+            throw new Error(await responseMessage(persistResponse, "Unable to update saved PDF."));
+
+        status.textContent = "Opening edited PDF...";
+
+        const separator = config.pdfUrl.includes("?") ? "&" : "?";
+        const response = await fetch(`${config.pdfUrl}${separator}v=${Date.now()}`, {
             credentials: "same-origin",
-            body: JSON.stringify(payload())
+            cache: "no-store"
         });
 
         if (!response.ok)
-            throw new Error(await responseMessage(response, "Unable to generate edited PDF."));
+            throw new Error(await responseMessage(response, "Unable to open updated PDF."));
 
         status.textContent = "Opening edited PDF...";
         const generatedBlob = await response.blob();

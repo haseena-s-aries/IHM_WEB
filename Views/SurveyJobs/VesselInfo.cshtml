@@ -141,7 +141,7 @@
 </head>
 <body>
     <header class="appbar">
-        <a class="back-btn" href="/SurveyJobs/Work?jobId=@jobId&surveyType=IHM%20Survey@ihmFilterQuery">
+        <a class="back-btn" href="/SurveyJobs/Work?jobId=@jobId&surveyType=IHM%20Survey@(string.IsNullOrWhiteSpace(ihmCompletionFilter) ? "" : $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter)}")">
             <i class="fa-solid fa-chevron-left"></i>
         </a>
         <h1 class="title">Vessel Info</h1>

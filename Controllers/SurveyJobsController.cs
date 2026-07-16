@@ -285,7 +285,7 @@ namespace Survery_Certification_App_Consume.Controllers
             }
         }
 
-        public async Task<IActionResult> AreaCheckpoints(int jobId, int areaId)
+        public async Task<IActionResult> AreaCheckpoints(int jobId, int areaId, string? ihmCompletionFilter = null)
         {
             try
             {
@@ -328,6 +328,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 ViewBag.Job = job;
                 ViewBag.JobId = jobId;
                 ViewBag.Layouts = areaLayouts;
+                ViewBag.IhmCompletionFilter = ihmCompletionFilter;
                 return View(area);
             }
             catch (Exception ex)

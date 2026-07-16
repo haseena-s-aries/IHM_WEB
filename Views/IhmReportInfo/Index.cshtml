@@ -115,9 +115,9 @@
                                 <label class="field"><span>Call sign</span><input asp-for="CallSign" /></label>
                                 <label class="field"><span>Builder</span><input asp-for="Builder" /></label>
                                 <label class="field"><span>Date of build</span><input asp-for="DateOfBuild" type="date" /></label>
-                                <label class="field"><span>Deadweight</span><input asp-for="Deadweight" /></label>
-                                <label class="field"><span>Year built</span><input asp-for="YearBuilt" /></label>
-                                <label class="field"><span>Owner name</span><input asp-for="OwnerName" /></label>
+                                <input asp-for="Deadweight" type="hidden" />
+                                <input asp-for="YearBuilt" type="hidden" />
+                                <input asp-for="OwnerName" type="hidden" />
                                 <label class="field"><span>Ship manager</span><input asp-for="ShipManager" /></label>
                             </div>
                             <div class="metric-grid">
