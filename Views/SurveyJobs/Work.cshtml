@@ -14,6 +14,12 @@
         ? $"?ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter!)}"
         : "";
     var listUrl = isIhm ? $"/SurveyJobs/Ihm{ihmFilterFirstQuery}" : "/SurveyJobs/Ex";
+    var jobNavigationUrl = isIhm
+        ? $"/SurveyJobs/Work?jobId={Model.Id}&surveyType=IHM%20Survey{ihmFilterQuery}"
+        : $"/SurveyJobs/Work?jobId={Model.Id}&surveyType={Uri.EscapeDataString(surveyType)}";
+    var jobReturnQuery = isIhm
+        ? $"&returnUrl={Uri.EscapeDataString(jobNavigationUrl)}"
+        : "";
 
     var totalVisuals = (int)(ViewBag.TotalVisuals ?? 0);
     var totalSamples = (int)(ViewBag.TotalSamples ?? 0);
@@ -447,7 +453,7 @@
         <div class="section-title">Navigation</div>
 
         <div class="nav-grid">
-            <a class="nav-card blue-soft" href="/SurveyJobs/VesselInfo?jobId=@Model.Id@ihmFilterQuery">
+            <a class="nav-card blue-soft" href="/SurveyJobs/VesselInfo?jobId=@Model.Id@ihmFilterQuery@jobReturnQuery">
                 <div>
                     <div class="nav-icon blue-icon">
                         <i class="fa-solid fa-ship"></i>
@@ -456,7 +462,7 @@
                 </div>
             </a>
 
-            <a class="nav-card orange-soft" href="/SurveyJobs/ProjectInfo?jobId=@Model.Id@ihmFilterQuery">
+            <a class="nav-card orange-soft" href="/SurveyJobs/ProjectInfo?jobId=@Model.Id@ihmFilterQuery@jobReturnQuery">
                 <div>
                     <div class="nav-icon orange-icon">
                         <i class="fa-solid fa-briefcase"></i>
@@ -465,7 +471,7 @@
                 </div>
             </a>
 
-            <a class="nav-card green-soft" href="/SurveyJobs/SurveyAreas?jobId=@Model.Id@ihmFilterQuery">
+            <a class="nav-card green-soft" href="/SurveyJobs/SurveyAreas?jobId=@Model.Id@ihmFilterQuery@jobReturnQuery">
                 <div>
                     <div class="nav-icon green-icon">
                         <i class="fa-solid fa-map"></i>

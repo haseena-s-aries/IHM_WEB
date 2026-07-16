@@ -79,6 +79,47 @@ namespace Survery_Certification_App_Consume.Controllers
         }
 
         [HttpPost]
+        public async Task<IActionResult> Update(int id, SaveVesselRequest request)
+        {
+            if (id <= 0)
+            {
+                TempData["ErrorMessage"] = "Invalid vessel selected.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (string.IsNullOrWhiteSpace(request.VesselName))
+            {
+                TempData["ErrorMessage"] = "Vessel name is required.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            try
+            {
+                var client = CreateApiClient();
+                var json = JsonConvert.SerializeObject(request);
+                var response = await client.PutAsync(
+                    $"vessels/{id}",
+                    new StringContent(json, Encoding.UTF8, "application/json")
+                );
+                var body = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    TempData["ErrorMessage"] = "Update vessel failed: " + body;
+                    return RedirectToAction(nameof(Index));
+                }
+
+                TempData["SuccessMessage"] = "Vessel updated successfully.";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Update vessel failed: " + ex.Message;
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
+        [HttpPost]
         public async Task<IActionResult> Deactivate(int id)
         {
             try

@@ -487,6 +487,18 @@
                                     <input type="hidden" name="ihmCompletionFilter" value="@Model.IhmCompletionFilter" />
                                 }
 
+                                @if (isIhm)
+                                {
+                                    <label class="form-label">Assign Manager (Optional)</label>
+                                    <select class="form-select mb-3" name="assignedManagerId">
+                                        <option value="">No manager assigned</option>
+                                        @foreach (var manager in Model.Managers)
+                                        {
+                                            <option value="@manager.Id" selected="@(job.AssignedManagerId == manager.Id ? "selected" : null)">@manager.DisplayName</option>
+                                        }
+                                    </select>
+                                }
+
                                 <label class="form-label">Primary Surveyor</label>
                                 <select class="form-select mb-3" name="primarySurveyorUserId">
                                     <option value="">Not Assign</option>
@@ -657,6 +669,20 @@
                             <label class="form-label">End Date *</label>
                             <input class="form-control" type="date" name="EndDate" required />
                         </div>
+
+                        @if (isIhm)
+                        {
+                            <div class="col-md-12">
+                                <label class="form-label">Assign Manager (Optional)</label>
+                                <select class="form-select" name="AssignedManagerId">
+                                    <option value="">No manager assigned</option>
+                                    @foreach (var manager in Model.Managers)
+                                    {
+                                        <option value="@manager.Id">@manager.DisplayName</option>
+                                    }
+                                </select>
+                            </div>
+                        }
 
                         <div class="col-md-6">
                             <label class="form-label">Primary Surveyor</label>

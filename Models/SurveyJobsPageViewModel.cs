@@ -8,6 +8,7 @@
         public List<SurveyJobDto> Jobs { get; set; } = new();
         public List<VesselDto> Vessels { get; set; } = new();
         public List<SurveyorOptionDto> Surveyors { get; set; } = new();
+        public List<SurveyorOptionDto> Managers { get; set; } = new();
         public Dictionary<int, List<IhmAreaOptionDto>> AreasByJob { get; set; } = new();
         public Dictionary<int, Dictionary<string, IhmLayoutAttachmentDto>> LayoutAttachmentsByJob { get; set; } = new();
         public string? ErrorMessage { get; set; }
@@ -136,6 +137,8 @@
         public DateTime? AssignedAt { get; set; }
         public int? PrimarySurveyorUserId { get; set; }
         public int? SecondarySurveyorUserId { get; set; }
+        public int? AssignedManagerId { get; set; }
+        public string? AssignedManagerName { get; set; }
         public List<SurveyAssignmentDto> Assignments { get; set; } = new();
     }
 
