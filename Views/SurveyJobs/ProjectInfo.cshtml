@@ -1,15 +1,28 @@
+@using Microsoft.AspNetCore.Http
 @model SurveyJobDto
 @{
     Layout = null;
 
     string Val(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
     string DateVal(DateTime? value) => value.HasValue ? value.Value.ToLocalTime().ToString("dd/MM/yyyy") : "-";
+
     var ihmCompletionFilter = ViewBag.IhmCompletionFilter?.ToString();
-    var listUrl = string.IsNullOrWhiteSpace(ihmCompletionFilter)
-    ? $"/SurveyJobs/Work?jobId={Model.Id}&surveyType=IHM%20Survey"
-    : $"/SurveyJobs/Work?jobId={Model.Id}&surveyType=IHM%20Survey&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter!)}";
+    var role = Context.Session.GetString("UserRole") ?? "";
+    var isSurveyor = string.Equals(role, "Surveyor", StringComparison.OrdinalIgnoreCase);
+
+    var listUrl = isSurveyor
+        ? $"/SurveyJobs/Work?jobId={Model.Id}&surveyType=IHM%20Survey"
+        : "/SurveyJobs/Ihm";
+
+    if (!string.IsNullOrWhiteSpace(ihmCompletionFilter))
+    {
+        listUrl += isSurveyor
+            ? $"&ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter!)}"
+            : $"?ihmCompletionFilter={Uri.EscapeDataString(ihmCompletionFilter!)}";
+    }
+
     var returnUrl = ViewBag.ReturnUrl?.ToString();
-    if (!string.IsNullOrWhiteSpace(returnUrl))
+    if (isSurveyor && !string.IsNullOrWhiteSpace(returnUrl))
     {
         listUrl = returnUrl;
     }

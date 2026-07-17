@@ -7,6 +7,8 @@
     const categoryButtons = [...document.querySelectorAll(".category-card[data-category]")];
     const panels = [...document.querySelectorAll(".reports-section[data-panel]")];
     const empty = document.getElementById("reportsEmpty");
+    const hasCategoryFilters = categoryButtons.length > 0;
+    const hasTypeFilters = typeButtons.length > 0;
     let activeCategory = "auras";
     let activeType = "";
 
@@ -17,6 +19,8 @@
     }
 
     function syncTypeButtons() {
+        if (!hasTypeFilters) return;
+
         const allowed = availableTypesForCategory(activeCategory);
         if (!allowed.includes(activeType)) {
             activeType = "";
@@ -33,7 +37,9 @@
         const term = search?.value.trim().toLowerCase() ?? "";
         let visible = 0;
 
-        panels.forEach(panel => panel.classList.toggle("active", panel.dataset.panel === activeCategory));
+        panels.forEach(panel => {
+            panel.classList.toggle("active", !hasCategoryFilters || panel.dataset.panel === activeCategory);
+        });
         syncTypeButtons();
 
         rows.forEach(row => {
@@ -43,8 +49,8 @@
                 : rowType === "exsurvey"
                     ? "exsurvey"
                     : "auras";
-            const matchesCategory = rowCategory === activeCategory;
-            const matchesType = !activeType || rowType === activeType;
+            const matchesCategory = !hasCategoryFilters || rowCategory === activeCategory;
+            const matchesType = !hasTypeFilters || !activeType || rowType === activeType;
             const matchesSearch = !term || (row.dataset.search ?? "").includes(term);
             row.hidden = !(matchesCategory && matchesType && matchesSearch);
             if (!row.hidden) visible++;
@@ -66,18 +72,20 @@
         filterReports();
     }));
 
-    if (!categoryButtons.some(button => button.classList.contains("active")) && categoryButtons.length > 0) {
-        categoryButtons[0].classList.add("active");
-    }
-    activeCategory = categoryButtons.find(button => button.classList.contains("active"))?.dataset.category
-        ?? categoryButtons[0]?.dataset.category
-        ?? "auras";
-    const requestedCategory = new URLSearchParams(window.location.search).get("category");
-    if (requestedCategory && categoryButtons.some(button => button.dataset.category === requestedCategory)) {
-        activeCategory = requestedCategory;
-        categoryButtons.forEach(button => {
-            button.classList.toggle("active", button.dataset.category === requestedCategory);
-        });
+    if (hasCategoryFilters) {
+        if (!categoryButtons.some(button => button.classList.contains("active"))) {
+            categoryButtons[0].classList.add("active");
+        }
+        activeCategory = categoryButtons.find(button => button.classList.contains("active"))?.dataset.category
+            ?? categoryButtons[0]?.dataset.category
+            ?? "auras";
+        const requestedCategory = new URLSearchParams(window.location.search).get("category");
+        if (requestedCategory && categoryButtons.some(button => button.dataset.category === requestedCategory)) {
+            activeCategory = requestedCategory;
+            categoryButtons.forEach(button => {
+                button.classList.toggle("active", button.dataset.category === requestedCategory);
+            });
+        }
     }
 
     async function readJson(response) {

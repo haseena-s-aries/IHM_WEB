@@ -37,7 +37,6 @@
         : surveys.LiveIhmJobs;
     var exJobs = canSeeEx ? surveys.ExSurveyJobs : 0;
     var liveExJobs = canSeeEx ? surveys.ExSurveyLiveJobs : 0;
-    var submittedJobs = surveys.SubmittedJobs;
     var attentionJobs = surveys.AttentionJobs;
     var recentActivity = new List<(string Title, string Meta, string Tone)>();
 
@@ -113,10 +112,7 @@
                     <a href="@Url.Action("UsageAnalytics", "Home")"><i class="fa-solid fa-chart-line"></i> Usage Analytics</a>
                 }
                 <a href="@Url.Action("SavedReports", "Home")"><i class="fa-solid fa-file-lines"></i><span>Reports</span></a>
-                @if (!isClient)
-                {
-                    <a href="@Url.Action("Index", "Vessel")"><i class="fa-solid fa-ship"></i><span>Vessels</span></a>
-                }
+                <a href="@Url.Action("Index", "Vessel")"><i class="fa-solid fa-ship"></i><span>Vessels</span></a>
 
             </nav>
 
@@ -155,7 +151,7 @@
                     {
                         <article class="metric-card blue">
                             <span class="metric-icon"><i class="fa-solid fa-clipboard-check"></i></span>
-                            <div><small>IHM Survey jobs</small><strong>@ihmJobs</strong><span>@submittedJobs submitted</span></div>
+                            <div><small>IHM Survey jobs</small><strong>@ihmJobs</strong><span>IHM survey jobs</span></div>
                         </article>
                     }
 
@@ -183,17 +179,14 @@
                         </article>
                     }
 
-                    @if (!isClient)
-                    {
-                        <article class="metric-card teal">
-                            <span class="metric-icon"><i class="fa-solid fa-ship"></i></span>
-                            <div>
-                                <small>Vessels</small>
-                                <strong>@(Model.FleetSummary?.Count ?? 0)</strong>
-                                <span>Created vessels</span>
-                            </div>
-                        </article>
-                    }
+                    <article class="metric-card teal">
+                        <span class="metric-icon"><i class="fa-solid fa-ship"></i></span>
+                        <div>
+                            <small>Vessels</small>
+                            <strong>@(Model.FleetSummary?.Count ?? 0)</strong>
+                            <span>Created vessels</span>
+                        </div>
+                    </article>
 
                     @if (isAdmin)
 {
@@ -257,7 +250,6 @@
                                 <p>View all IHM survey jobs and job details.</p>
                                 <div class="app-meta">
                                     <span><strong>@ihmJobs</strong> job@(ihmJobs == 1 ? "" : "s")</span>
-                                    <span><strong>@submittedJobs</strong> submitted</span>
                                 </div>
                                 <a class="app-action light" href="@Url.Action("Ihm", "SurveyJobs")">
                                     Open jobs <i class="fa-solid fa-arrow-right"></i>
@@ -393,9 +385,7 @@
                 </section>
 
                 <section class="lower-grid">
-                    @if (!isClient)
-                    {
-                        <article class="panel fleet-panel">
+                    <article class="panel fleet-panel">
                             <div class="panel-heading">
                                 <div><h2>Vessel Master</h2></div>
                                 <a class="panel-link" href="@Url.Action("Index", "Vessel")">
@@ -453,8 +443,7 @@
                                     }
                                 </div>
                             }
-                        </article>
-                    }
+                    </article>
                     <article class="panel activity-panel">
                         <div class="panel-heading">
                             <div><h2>Recent activity</h2></div>

@@ -61,7 +61,6 @@ namespace Survery_Certification_App_Consume.Models
         public int TotalSurveyJobs { get; set; }
         public int IhmSurveyJobs { get; set; }
         public int ExSurveyJobs { get; set; }
-        public int SubmittedJobs { get; set; }
         public int ApprovedJobs { get; set; }
         public int ReturnedJobs { get; set; }
         public int AttentionJobs { get; set; }

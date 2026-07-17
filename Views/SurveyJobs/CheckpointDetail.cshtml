@@ -54,13 +54,17 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <style>
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             background: #f4f7fb;
             color: #102033;
             font-family: "Segoe UI", Arial, sans-serif;
         }
+
         .appbar {
             min-height: 64px;
             display: flex;
@@ -73,6 +77,7 @@
             top: 0;
             z-index: 50;
         }
+
         .back-btn {
             width: 38px;
             height: 38px;
@@ -82,8 +87,19 @@
             text-decoration: none;
             border-radius: 10px;
         }
-        .title { margin: 0; font-size: 15px; font-weight: 800; }
-        .sub { margin: 2px 0 0; color: #607d9a; font-size: 11px; }
+
+        .title {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 800;
+        }
+
+        .sub {
+            margin: 2px 0 0;
+            color: #607d9a;
+            font-size: 11px;
+        }
+
         .save-btn {
             margin-left: auto;
             border: 0;
@@ -97,6 +113,7 @@
             align-items: center;
             gap: 7px;
         }
+
         .tabs {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -106,6 +123,7 @@
             top: 64px;
             z-index: 45;
         }
+
         .tab {
             border: 0;
             background: transparent;
@@ -117,8 +135,17 @@
             letter-spacing: .8px;
             border-bottom: 3px solid transparent;
         }
-        .tab.active { color: #00d4aa; border-bottom-color: #00d4aa; }
-        .tab i { display: block; font-size: 16px; margin-bottom: 4px; }
+
+            .tab.active {
+                color: #00d4aa;
+                border-bottom-color: #00d4aa;
+            }
+
+            .tab i {
+                display: block;
+                font-size: 16px;
+                margin-bottom: 4px;
+            }
 
         .page {
             padding: 20px;
@@ -135,8 +162,15 @@
                 width: min(100vw - 24px, 1500px);
                 margin: 0 auto;
             }
-        .tab-panel { display: none; }
-        .tab-panel.active { display: block; }
+
+        .tab-panel {
+            display: none;
+        }
+
+            .tab-panel.active {
+                display: block;
+            }
+
         .section-label {
             margin: 0 0 12px;
             color: #607d9a;
@@ -145,6 +179,7 @@
             letter-spacing: 1.5px;
             text-transform: uppercase;
         }
+
         .card-box {
             background: #ffffff;
             border: 1px solid #d8e3ee;
@@ -152,6 +187,7 @@
             padding: 14px;
             margin-bottom: 18px;
         }
+
         .info-row {
             display: grid;
             grid-template-columns: 150px 1fr;
@@ -159,7 +195,11 @@
             padding-bottom: 10px;
             align-items: start;
         }
-        .info-row:last-child { padding-bottom: 0; }
+
+            .info-row:last-child {
+                padding-bottom: 0;
+            }
+
         .info-label {
             color: #607d9a;
             font-size: 12px;
@@ -167,14 +207,22 @@
             align-items: center;
             gap: 10px;
         }
-        .info-label i { width: 16px; }
+
+            .info-label i {
+                width: 16px;
+            }
+
         .info-value {
             color: #102033;
             font-size: 12px;
             font-weight: 700;
             overflow-wrap: anywhere;
         }
-        .hazmat { color: #ff5252; }
+
+        .hazmat {
+            color: #ff5252;
+        }
+
         .audit-chip {
             display: flex;
             align-items: center;
@@ -185,12 +233,22 @@
             background: rgba(76, 175, 140, .12);
             margin-bottom: 12px;
         }
-        .audit-chip.pending {
-            border-color: rgba(143, 168, 196, .35);
-            background: rgba(143, 168, 196, .12);
-        }
-        .audit-chip strong { display: block; font-size: 13px; }
-        .audit-chip small { color: #607d9a; font-size: 11px; }
+
+            .audit-chip.pending {
+                border-color: rgba(143, 168, 196, .35);
+                background: rgba(143, 168, 196, .12);
+            }
+
+            .audit-chip strong {
+                display: block;
+                font-size: 13px;
+            }
+
+            .audit-chip small {
+                color: #607d9a;
+                font-size: 11px;
+            }
+
         .field {
             width: 100%;
             border: 1px solid #d8e3ee;
@@ -201,7 +259,13 @@
             font-size: 13px;
             font-weight: 650;
         }
-        textarea.field { min-height: 96px; resize: vertical; line-height: 1.5; }
+
+        textarea.field {
+            min-height: 96px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
         .field-row {
             display: grid;
             grid-template-columns: 170px 1fr;
@@ -209,16 +273,38 @@
             align-items: center;
             margin-bottom: 12px;
         }
+
         .switch-row {
             display: flex;
             align-items: center;
             gap: 14px;
         }
-        .switch-row .copy { flex: 1; }
-        .switch-title { font-size: 13px; font-weight: 900; }
-        .switch-sub { color: #607d9a; font-size: 12px; }
-        .switch { position: relative; width: 50px; height: 28px; flex: 0 0 auto; }
-        .switch input { display: none; }
+
+            .switch-row .copy {
+                flex: 1;
+            }
+
+        .switch-title {
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .switch-sub {
+            color: #607d9a;
+            font-size: 12px;
+        }
+
+        .switch {
+            position: relative;
+            width: 50px;
+            height: 28px;
+            flex: 0 0 auto;
+        }
+
+            .switch input {
+                display: none;
+            }
+
         .slider {
             position: absolute;
             inset: 0;
@@ -227,19 +313,28 @@
             border-radius: 999px;
             cursor: pointer;
         }
-        .slider:before {
-            content: "";
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            left: 4px;
-            top: 3px;
-            background: #607d9a;
-            border-radius: 50%;
-            transition: .2s;
+
+            .slider:before {
+                content: "";
+                position: absolute;
+                width: 20px;
+                height: 20px;
+                left: 4px;
+                top: 3px;
+                background: #607d9a;
+                border-radius: 50%;
+                transition: .2s;
+            }
+
+        .switch input:checked + .slider {
+            background: rgba(0, 212, 170, .22);
+            border-color: #00d4aa;
         }
-        .switch input:checked + .slider { background: rgba(0, 212, 170, .22); border-color: #00d4aa; }
-        .switch input:checked + .slider:before { transform: translateX(20px); background: #00d4aa; }
+
+            .switch input:checked + .slider:before {
+                transform: translateX(20px);
+                background: #00d4aa;
+            }
 
         .auto-map-summary {
             display: grid;
@@ -316,13 +411,11 @@
                 }
 
         @@media (max-width: 800px) {
-            .auto-map-summary
-
-        {
-            grid-template-columns: 1fr;
+            .auto-map-summary {
+                grid-template-columns: 1fr;
+            }
         }
 
-        }
         .layout-shell {
             min-height: calc(100vh - 170px);
             position: relative;
@@ -331,6 +424,7 @@
             overflow: hidden;
             background: #ffffff;
         }
+
         .layout-toolbar {
             position: absolute;
             top: 12px;
@@ -341,17 +435,19 @@
             gap: 10px;
             align-items: center;
         }
-        .layout-toolbar select {
-            flex: 1;
-            min-width: 0;
-            background: rgba(255, 255, 255, .96);
-            color: #102033;
-            border: 1px solid #d8e3ee;
-            border-radius: 12px;
-            padding: 10px 12px;
-            font-size: 12px;
-            font-weight: 800;
-        }
+
+            .layout-toolbar select {
+                flex: 1;
+                min-width: 0;
+                background: rgba(255, 255, 255, .96);
+                color: #102033;
+                border: 1px solid #d8e3ee;
+                border-radius: 12px;
+                padding: 10px 12px;
+                font-size: 12px;
+                font-weight: 800;
+            }
+
         .layout-action {
             border: 1px solid #d8e3ee;
             background: rgba(255, 255, 255, .96);
@@ -362,7 +458,10 @@
             font-weight: 800;
             white-space: nowrap;
         }
-        #markerSaveBtn { display: none; }
+
+        #markerSaveBtn {
+            display: none;
+        }
 
         .layout-stage {
             min-height: calc(100vh - 170px);
@@ -399,6 +498,7 @@
         .layout-stage:not(.dragging) .image-wrap {
             margin: auto;
         }
+
         .layout-image {
             display: block;
             width: auto;
@@ -418,6 +518,7 @@
             contain: layout paint;
             pointer-events: none;
         }
+
         .marker-pin {
             position: absolute;
             width: 0;
@@ -427,6 +528,7 @@
             text-align: center;
             pointer-events: auto;
         }
+
         .pin-content {
             position: absolute;
             left: calc(-36px * var(--pin-scale, 1));
@@ -451,10 +553,10 @@
             }
 
                 .marker-pin.ocr-existing .pin-label::after {
-
                     font-size: 9px;
                     font-weight: 800;
                 }
+
         .pin-label {
             display: block;
             min-width: 34px;
@@ -471,7 +573,12 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        .marker-pin i { font-size: 32px; line-height: 32px; }
+
+        .marker-pin i {
+            font-size: 32px;
+            line-height: 32px;
+        }
+
         .layout-hint {
             position: absolute;
             left: 0;
@@ -480,25 +587,31 @@
             text-align: center;
             z-index: 4;
         }
-        .layout-hint span {
-            display: inline-flex;
-            align-items: center;
-            gap: 7px;
-            padding: 8px 14px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, .94);
-            border: 1px solid #d8e3ee;
-            color: #607d9a;
-            font-size: 11px;
-            font-weight: 800;
-        }
+
+            .layout-hint span {
+                display: inline-flex;
+                align-items: center;
+                gap: 7px;
+                padding: 8px 14px;
+                border-radius: 999px;
+                background: rgba(255, 255, 255, .94);
+                border: 1px solid #d8e3ee;
+                color: #607d9a;
+                font-size: 11px;
+                font-weight: 800;
+            }
+
         .empty-state {
             color: #607d9a;
             text-align: center;
             padding: 50px 16px;
             font-weight: 750;
         }
-        .upload-bar { padding: 16px; }
+
+        .upload-bar {
+            padding: 16px;
+        }
+
         .upload-btn {
             width: 100%;
             height: 46px;
@@ -508,12 +621,14 @@
             color: #0d1b2a;
             font-weight: 900;
         }
+
         .photo-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 12px;
             padding: 0 16px 16px;
         }
+
         .photo-card {
             position: relative;
             aspect-ratio: 1 / .9;
@@ -522,18 +637,26 @@
             background: #eef4fb;
             border: 1px solid #d8e3ee;
         }
-        .photo-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .photo-card.image-error::after {
-            content: "Image not available";
-            position: absolute;
-            inset: 0;
-            display: grid;
-            place-items: center;
-            color: #607d9a;
-            font-size: 12px;
-            font-weight: 800;
-            background: #eef4fb;
-        }
+
+            .photo-card img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+            }
+
+            .photo-card.image-error::after {
+                content: "Image not available";
+                position: absolute;
+                inset: 0;
+                display: grid;
+                place-items: center;
+                color: #607d9a;
+                font-size: 12px;
+                font-weight: 800;
+                background: #eef4fb;
+            }
+
         .delete-photo {
             position: absolute;
             top: 8px;
@@ -545,21 +668,52 @@
             background: rgba(0,0,0,.58);
             color: #fff;
         }
+
         .alert-line {
             margin-bottom: 14px;
             border-radius: 12px;
             padding: 10px 12px;
             font-weight: 800;
         }
-        .alert-line.success { background: rgba(76,175,140,.16); color: #7be0bd; border: 1px solid rgba(76,175,140,.35); }
-        .alert-line.error { background: rgba(255,82,82,.14); color: #ff9c9c; border: 1px solid rgba(255,82,82,.35); }
+
+            .alert-line.success {
+                background: rgba(76,175,140,.16);
+                color: #7be0bd;
+                border: 1px solid rgba(76,175,140,.35);
+            }
+
+            .alert-line.error {
+                background: rgba(255,82,82,.14);
+                color: #ff9c9c;
+                border: 1px solid rgba(255,82,82,.35);
+            }
+
         @@media(max-width: 760px) {
-            .page { padding: 16px; }
-            .info-row, .field-row { grid-template-columns: 1fr; gap: 6px; }
-            .photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .save-btn span { display: none; }
-            .layout-toolbar { flex-direction: column; align-items: stretch; }
-            .layout-stage { padding-top: 112px; }
+            .page {
+                padding: 16px;
+            }
+
+            .info-row, .field-row {
+                grid-template-columns: 1fr;
+                gap: 6px;
+            }
+
+            .photo-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .save-btn span {
+                display: none;
+            }
+
+            .layout-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .layout-stage {
+                padding-top: 112px;
+            }
         }
     </style>
 </head>
@@ -739,7 +893,7 @@
                         <div id="pendingSamplesList" class="sample-list muted">Click Auto Map</div>
                     </div>
                 </div>
-                
+
                 <div class="layout-stage">
                     @if (string.IsNullOrWhiteSpace(layoutPath))
                     {
@@ -916,7 +1070,7 @@
         }
 
 
-      
+
 
                 function refreshAutoMapLists(result) {
             const mappedCheckpointIds = new Set(
@@ -1142,12 +1296,14 @@
                 const appendix4 = items.find(item => markedSectionCode(item) === 2);
                 const hazardous = items.find(item => markedSectionCode(item) === 1);
 
-                const failed = [appendix4, hazardous].find(item => markedStatusCode(item) === 4);
-                if (failed) {
-                    const error = failed.errorMessage || failed.ErrorMessage || "Marked image generation failed.";
-                    setMarkerHint(escapeHtml(error), "fa-triangle-exclamation");
-                    return;
-                }
+            const appendixFailed = markedStatusCode(appendix4) === 4;
+        if (appendixFailed) {
+            setMarkerHint("Marked image update failed. Please try again.", "fa-triangle-exclamation");
+            return;
+        }
+
+        // Do not show hazardous I-2 backend/Python error here.
+        // It only means some expected markers are still pending.
 
                 const appendixReady = markedStatusCode(appendix4) === 3;
                 const hazardousReady = markedStatusCode(hazardous) === 3;
@@ -1190,7 +1346,7 @@
                     throw new Error(result.message || text || "Auto mapping failed.");
                 }
 
-                setMarkerHint(`Mapped ${result.mapped || 0} marker(s). Updating generated images...`, "fa-circle-check");
+                setMarkerHint(`Mapped ${result.mapped || 0} marker(s).`, "fa-circle-check");
 
                 await loadMarkers();
                 refreshAutoMapLists(result);

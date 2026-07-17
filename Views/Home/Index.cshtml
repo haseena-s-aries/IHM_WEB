@@ -21,7 +21,6 @@
         --primary: #2563eb;
         --secondary: #16a34a;
         --warning: #f59e0b;
-        --danger: #dc2626;
         --accent: #7c3aed;
         --bg: #f8fafc;
         --card: #ffffff;
@@ -301,12 +300,11 @@
 
     .overview-grid {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 14px;
     }
 
     .small-kpi,
-    .panel,
     .performance-card {
         background: var(--card);
         border-radius: 16px;
@@ -336,7 +334,6 @@
 
     .mini-icon.blue { background: rgba(37, 99, 235, .12); color: var(--primary); }
     .mini-icon.orange { background: rgba(245, 158, 11, .14); color: var(--warning); }
-    .mini-icon.red { background: rgba(220, 38, 38, .12); color: var(--danger); }
     .mini-icon.purple { background: rgba(124, 58, 237, .12); color: var(--accent); }
 
     .mini-count {
@@ -400,59 +397,7 @@
         font-weight: 700;
     }
 
-    .panel {
-        padding: 16px;
-    }
-
-    .activity-row,
-    .upcoming-row {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 10px 0;
-        border-bottom: 1px solid #f1f5f9;
-    }
-
-    .activity-row:last-child,
-    .upcoming-row:last-child {
-        border-bottom: 0;
-    }
-
-    .row-main {
-        flex: 1;
-        min-width: 0;
-    }
-
-    .row-title {
-        font-size: 13px;
-        font-weight: 950;
-    }
-
-    .row-sub {
-        margin-top: 4px;
-        color: var(--muted);
-        font-size: 11px;
-        font-weight: 700;
-    }
-
-    .chip {
-        padding: 6px 10px;
-        border-radius: 999px;
-        font-size: 10px;
-        font-weight: 950;
-    }
-
-    .chip.green { background: rgba(22, 163, 74, .12); color: var(--secondary); }
-    .chip.orange { background: rgba(245, 158, 11, .14); color: var(--warning); }
-
-    .empty-state {
-        color: var(--muted);
-        font-weight: 800;
-        padding: 10px 0;
-    }
-
     @@media (max-width: 900px) {
-        .overview-grid,
         .performance-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
@@ -473,9 +418,12 @@
             height: 58px;
         }
 
-        .overview-grid,
         .performance-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .overview-grid {
+            grid-template-columns: 1fr;
         }
 
         .large-kpi {
@@ -571,12 +519,6 @@
                 <div class="mini-sub">Waiting to Start</div>
             </div>
             <div class="small-kpi">
-                <div class="mini-icon red"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                <div class="mini-count">0</div>
-                <div class="mini-title">Incomplete Jobs</div>
-                <div class="mini-sub">Needs Attention</div>
-            </div>
-            <div class="small-kpi">
                 <div class="mini-icon purple"><i class="fa-regular fa-calendar"></i></div>
                 <div class="mini-count">0</div>
                 <div class="mini-title">Due Today</div>
@@ -610,63 +552,6 @@
                     <div class="perf-sub">Completed vs assigned</div>
                 </div>
             </div>
-        </section>
-
-        <h2 class="section-title">Recent Activity</h2>
-        <section class="panel">
-            @if (completedJobs <= 0 && liveJobs <= 0)
-            {
-                <div class="empty-state">No recent activity available yet.</div>
-            }
-            @if (completedJobs > 0)
-            {
-                <div class="activity-row">
-                    <i class="fa-solid fa-circle-check" style="color: var(--secondary);"></i>
-                    <div class="row-main">
-                        <div class="row-title">IHM completed survey jobs</div>
-                        <div class="row-sub">@completedJobs jobs</div>
-                    </div>
-                    <span class="chip green">Completed</span>
-                </div>
-            }
-            @if (liveJobs > 0)
-            {
-                <div class="activity-row">
-                    <i class="fa-solid fa-hourglass-half" style="color: var(--warning);"></i>
-                    <div class="row-main">
-                        <div class="row-title">IHM live survey jobs</div>
-                        <div class="row-sub">@liveJobs jobs active</div>
-                    </div>
-                    <span class="chip orange">Started</span>
-                </div>
-            }
-        </section>
-
-        <h2 class="section-title">Upcoming Surveys</h2>
-        <section class="panel">
-            @if (liveJobs <= 0)
-            {
-                <div class="empty-state">No upcoming surveys available.</div>
-            }
-            else
-            {
-                <div class="upcoming-row">
-                    <i class="fa-solid fa-ship" style="color: var(--primary);"></i>
-                    <div class="row-main">
-                        <div class="row-title">IHM Live Job Queue</div>
-                        <div class="row-sub">Open live jobs</div>
-                    </div>
-                    <i class="fa-solid fa-chevron-right" style="color: #94a3b8;"></i>
-                </div>
-                <div class="upcoming-row">
-                    <i class="fa-solid fa-ship" style="color: var(--primary);"></i>
-                    <div class="row-main">
-                        <div class="row-title">Assigned Survey Work</div>
-                        <div class="row-sub">In progress</div>
-                    </div>
-                    <i class="fa-solid fa-chevron-right" style="color: #94a3b8;"></i>
-                </div>
-            }
         </section>
     </main>
 </div>

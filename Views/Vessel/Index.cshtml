@@ -1,6 +1,8 @@
 @model VesselMasterViewModel
 @{
     Layout = null;
+    var userRole = Context.Session.GetString("UserRole") ?? "";
+    var canModifyVessels = !string.Equals(userRole, "Client", StringComparison.OrdinalIgnoreCase);
 
     string Val(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
     string NumVal(decimal? value) => value.HasValue ? (value.Value % 1 == 0 ? value.Value.ToString("0") : value.Value.ToString("0.##")) : "-";
@@ -137,9 +139,12 @@
             }
 
             <a class="header-btn" href="/Vessel/Index" title="Refresh"><i class="fa-solid fa-rotate-right"></i></a>
+            @if (canModifyVessels)
+            {
 <button class="add-btn" data-bs-toggle="modal" data-bs-target="#createVesselModal">
 <i class="fa-solid fa-plus me-1"></i> Add Vessel
 </button>
+            }
 </div>
 
         <div class="search-box">
@@ -161,7 +166,10 @@
 <div class="empty">
 <i class="fa-regular fa-compass fa-3x"></i>
 <p class="mt-3">No vessels registered yet</p>
+                    @if (canModifyVessels)
+                    {
 <p>Tap "Add Vessel" to register your first vessel.</p>
+                    }
 </div>
         }
         else
@@ -207,17 +215,20 @@
 <button class="action-btn blue" data-bs-toggle="modal" data-bs-target="#vesselDetail-@vessel.Id">
 <i class="fa-solid fa-circle-info"></i> Details
 </button>
+                            @if (canModifyVessels)
+                            {
 <button class="action-btn amber" data-bs-toggle="modal" data-bs-target="#editVessel-@vessel.Id">
 <i class="fa-regular fa-pen-to-square"></i> Edit
 </button>
-                            @if (!string.Equals(vessel.Status, "Inactive", StringComparison.OrdinalIgnoreCase))
-                            {
+                                @if (!string.Equals(vessel.Status, "Inactive", StringComparison.OrdinalIgnoreCase))
+                                {
 <form method="post" action="/Vessel/Deactivate" onsubmit="return confirm('Deactivate vessel @vessel.VesselName?');">
 <input type="hidden" name="id" value="@vessel.Id" />
 <button type="submit" class="action-btn red">
 <i class="fa-regular fa-circle-xmark"></i> Deactivate
 </button>
 </form>
+                                }
                             }
 </div>
 </article>
@@ -285,6 +296,8 @@
 </div>
 </div>
 
+                    @if (canModifyVessels)
+                    {
                     <div class="modal fade" id="editVessel-@vessel.Id" tabindex="-1" aria-hidden="true">
 <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
 <form class="modal-content" method="post" action="/Vessel/Update">
@@ -339,11 +352,14 @@
 </form>
 </div>
 </div>
+                    }
                 }
 </section>
         }
 </main>
 
+    @if (canModifyVessels)
+    {
     <div class="modal fade" id="createVesselModal" tabindex="-1" aria-hidden="true">
 <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
 <form class="modal-content" method="post" action="/Vessel/Create">
@@ -396,6 +412,7 @@
 </form>
 </div>
 </div>
+    }
 
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 <script>

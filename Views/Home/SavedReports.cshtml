@@ -131,6 +131,8 @@ var visibleCategories =
 
     var visibleReportCount =
         aurasReports.Count + ihmReports.Count + exReports.Count;
+
+    var clientTableClass = isClient ? " report-table-client" : "";
 }
 
 <!DOCTYPE html>
@@ -166,6 +168,10 @@ var visibleCategories =
                 <span>Assigned Reports</span>
             </span>
         }
+        <a class="back-link" href="@Url.Action("Index", "Vessel")">
+            <i class="fa-solid fa-ship"></i>
+            <span>Vessels</span>
+        </a>
         <a class="back-link" href="@Url.Action("Logout", "Home")">
             <i class="fa-solid fa-arrow-right-from-bracket"></i>
             <span>Sign Out</span>
@@ -239,8 +245,10 @@ var visibleCategories =
         }
         else
         {
-           <section class="report-categories @(visibleCategories == 1 ? "single-category" : "")"
-         aria-label="Report categories">
+            @if (!isClient)
+            {
+                <section class="report-categories @(visibleCategories == 1 ? "single-category" : "")"
+                         aria-label="Report categories">
 
                 @if (showAuras)
                 {
@@ -302,9 +310,10 @@ var visibleCategories =
                     </button>
                 }
 
-            </section>
+                </section>
+            }
 
-            <section class="report-toolbar">
+            <section class="report-toolbar @(isClient ? "client-report-toolbar" : "")">
 
                 <label class="report-search">
                     <i class="fa-solid fa-magnifying-glass"></i>
@@ -315,47 +324,50 @@ var visibleCategories =
                            autocomplete="off" />
                 </label>
 
-                <div class="type-filters">
-                    <button class="active"
-                            type="button"
-                            data-type="">
-                        All
-                    </button>
-
-                    @if (showAuras)
-                    {
-                        <button type="button"
-                                data-type="towage">
-                            Towage
+                @if (!isClient)
+                {
+                    <div class="type-filters">
+                        <button class="active"
+                                type="button"
+                                data-type="">
+                            All
                         </button>
 
-                        <button type="button"
-                                data-type="seafastening">
-                            Sea Fastening
-                        </button>
+                        @if (showAuras)
+                        {
+                            <button type="button"
+                                    data-type="towage">
+                                Towage
+                            </button>
 
-                        <button type="button"
-                                data-type="loadout">
-                            Loadout
-                        </button>
-                    }
+                            <button type="button"
+                                    data-type="seafastening">
+                                Sea Fastening
+                            </button>
 
-                    @if (showIhm)
-                    {
-                        <button type="button"
-                                data-type="ihm">
-                            IHM
-                        </button>
-                    }
+                            <button type="button"
+                                    data-type="loadout">
+                                Loadout
+                            </button>
+                        }
 
-                    @if (showEx)
-                    {
-                        <button type="button"
-                                data-type="exsurvey">
-                            EX-Survey
-                        </button>
-                    }
-                </div>
+                        @if (showIhm)
+                        {
+                            <button type="button"
+                                    data-type="ihm">
+                                IHM
+                            </button>
+                        }
+
+                        @if (showEx)
+                        {
+                            <button type="button"
+                                    data-type="exsurvey">
+                                EX-Survey
+                            </button>
+                        }
+                    </div>
+                }
 
             </section>
 
@@ -375,11 +387,14 @@ var visibleCategories =
                     </div>
 
                     <div class="report-table-wrap">
-                        <table class="report-table">
+                        <table class="report-table@(clientTableClass)">
 
                             <thead>
                                 <tr>
-                                    <th>Status</th>
+                                    @if (!isClient)
+                                    {
+                                        <th>Status</th>
+                                    }
                                     <th>Vessel / Job</th>
                                     <th>Report Type</th>
                                     <th>Created By</th>
@@ -422,7 +437,9 @@ var visibleCategories =
                                     var date = DateLabel(report);
 
                                     var searchText =
-                                        $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}"
+                                        (isClient
+                                            ? $"{vessel} {title} {reference} {typeLabel} {createdBy} {date}"
+                                            : $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}")
                                             .ToLowerInvariant();
 
                                     var editUrl = Url.Action(
@@ -439,11 +456,14 @@ var visibleCategories =
                                         data-type="@type"
                                         data-search="@searchText">
 
-                                        <td>
-                                            <span class="status-pill">
-                                                @status
-                                            </span>
-                                        </td>
+                                        @if (!isClient)
+                                        {
+                                            <td>
+                                                <span class="status-pill">
+                                                    @status
+                                                </span>
+                                            </td>
+                                        }
 
                                         <td>
                                             <strong>@vessel</strong>
@@ -517,7 +537,7 @@ var visibleCategories =
 
             @if (showIhm)
             {
-                <section class="reports-section @(showAuras ? "" : "active")"
+                <section class="reports-section @(isClient || !showAuras ? "active" : "")"
                          data-panel="ihm">
 
                     <div class="section-heading">
@@ -531,11 +551,14 @@ var visibleCategories =
                     </div>
 
                     <div class="report-table-wrap">
-                        <table class="report-table">
+                        <table class="report-table@(clientTableClass)">
 
                             <thead>
                                 <tr>
-                                    <th>Status</th>
+                                    @if (!isClient)
+                                    {
+                                        <th>Status</th>
+                                    }
                                     <th>Vessel / Job</th>
                                     <th>Report Type</th>
                                     <th>Created By</th>
@@ -582,7 +605,9 @@ var visibleCategories =
                                     var date = DateLabel(report);
 
                                     var searchText =
-                                        $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}"
+                                        (isClient
+                                            ? $"{vessel} {title} {reference} {typeLabel} {createdBy} {date}"
+                                            : $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}")
                                             .ToLowerInvariant();
 
                                     var editUrl = Url.Action(
@@ -599,11 +624,14 @@ var visibleCategories =
                                         data-type="@type"
                                         data-search="@searchText">
 
-                                        <td>
-                                            <span class="status-pill">
-                                                @status
-                                            </span>
-                                        </td>
+                                        @if (!isClient)
+                                        {
+                                            <td>
+                                                <span class="status-pill">
+                                                    @status
+                                                </span>
+                                            </td>
+                                        }
 
                                         <td>
                                             <strong>@vessel</strong>
@@ -702,7 +730,7 @@ var visibleCategories =
 
             @if (showEx)
             {
-                <section class="reports-section @(!showAuras && !showIhm ? "active" : "")"
+                <section class="reports-section @(isClient || (!showAuras && !showIhm) ? "active" : "")"
                          data-panel="exsurvey">
 
                     <div class="section-heading">
@@ -713,10 +741,13 @@ var visibleCategories =
                     </div>
 
                     <div class="report-table-wrap">
-                        <table class="report-table">
+                        <table class="report-table@(clientTableClass)">
                             <thead>
                                 <tr>
-                                    <th>Status</th>
+                                    @if (!isClient)
+                                    {
+                                        <th>Status</th>
+                                    }
                                     <th>Vessel / Job</th>
                                     <th>Report Type</th>
                                     <th>Created By</th>
@@ -748,13 +779,18 @@ var visibleCategories =
                                     var createdBy = CreatedByLabel(report);
                                     var date = DateLabel(report);
                                     var searchText =
-                                        $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}"
+                                        (isClient
+                                            ? $"{vessel} {title} {reference} {typeLabel} {createdBy} {date}"
+                                            : $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}")
                                             .ToLowerInvariant();
 
                                     <tr class="report-row"
                                         data-type="@type"
                                         data-search="@searchText">
-                                        <td><span class="status-pill">@status</span></td>
+                                        @if (!isClient)
+                                        {
+                                            <td><span class="status-pill">@status</span></td>
+                                        }
                                         <td>
                                             <strong>@vessel</strong>
                                             <small>@title</small>
