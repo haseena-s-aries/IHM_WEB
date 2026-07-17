@@ -874,6 +874,73 @@ namespace Survery_Certification_App_Consume.Controllers
         }
 
         [HttpPost]
+        public async Task<IActionResult> Edit(int jobId, SurveyJobCreateRequest request, string? ihmCompletionFilter = null)
+        {
+            var returnAction = request.SurveyType == "IHM Survey" ? "Ihm" : "Ex";
+
+            if (jobId <= 0 ||
+                !request.VesselId.HasValue ||
+                string.IsNullOrWhiteSpace(request.AuditPort) ||
+                string.IsNullOrWhiteSpace(request.StartDate) ||
+                string.IsNullOrWhiteSpace(request.EndDate))
+            {
+                TempData["ErrorMessage"] = "Vessel, audit port and dates are required.";
+                return RedirectToAction(returnAction, new { ihmCompletionFilter });
+            }
+
+            if (request.PrimarySurveyorUserId.HasValue &&
+                request.SecondarySurveyorUserId.HasValue &&
+                request.PrimarySurveyorUserId.Value == request.SecondarySurveyorUserId.Value)
+            {
+                TempData["ErrorMessage"] = "Primary and secondary surveyor cannot be the same user.";
+                return RedirectToAction(returnAction, new { ihmCompletionFilter });
+            }
+
+            try
+            {
+                var client = CreateApiClient();
+                var payload = new
+                {
+                    clientName = request.ClientName?.Trim(),
+                    projectName = request.ProjectName?.Trim(),
+                    vesselId = request.VesselId,
+                    siteName = request.AuditPort?.Trim(),
+                    auditPort = request.AuditPort?.Trim(),
+                    auditAddress = request.AuditAddress?.Trim(),
+                    startDate = request.StartDate,
+                    surveyDate = request.SurveyDate,
+                    endDate = request.EndDate,
+                    assignedManagerId = request.SurveyType == "IHM Survey" ? request.AssignedManagerId : null
+                };
+
+                var response = await client.PutAsync(
+                    $"survey/jobs/{jobId}",
+                    new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json")
+                );
+                var body = await response.Content.ReadAsStringAsync();
+                if (!response.IsSuccessStatusCode)
+                {
+                    TempData["ErrorMessage"] = "Edit job failed: " + body;
+                    return RedirectToAction(returnAction, new { ihmCompletionFilter });
+                }
+
+                if (request.SurveyType == "IHM Survey")
+                {
+                    await UpdateAssignedManagerInternal(client, jobId, request.AssignedManagerId);
+                }
+                await AssignSurveyorsInternal(client, jobId, request.PrimarySurveyorUserId, request.SecondarySurveyorUserId);
+
+                TempData["SuccessMessage"] = "Survey job updated successfully.";
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Edit job failed: " + ex.Message;
+            }
+
+            return RedirectToAction(returnAction, new { ihmCompletionFilter });
+        }
+
+        [HttpPost]
         public async Task<IActionResult> UpdateSurveyDate(int jobId, string surveyDate, string surveyType, string? ihmCompletionFilter = null)
         {
             var returnAction = surveyType == "IHM Survey" ? "Ihm" : "Ex";
@@ -959,8 +1026,8 @@ namespace Survery_Certification_App_Consume.Controllers
                 var message = await UploadFile(jobId, file, $"ihm-survey/jobs/{jobId}/import-excel", "file");
 
                 TempData["SuccessMessage"] = isReupload
-                    ? "Excel checklist uploaded successfully. Previous Excel data was replaced."
-                    : "Excel checklist uploaded successfully.";
+                    ? "VSCP Checklist Template replaced successfully."
+                    : "VSCP Checklist Template uploaded successfully.";
                 return RedirectToAction("Ihm", new { ihmCompletionFilter });
             }
             catch (Exception ex)
@@ -968,6 +1035,27 @@ namespace Survery_Certification_App_Consume.Controllers
                 TempData["ErrorMessage"] = "Excel upload failed: " + ex.Message;
                 return RedirectToAction("Ihm", new { ihmCompletionFilter });
             }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ViewVscpChecklist(int jobId, string? ihmCompletionFilter = null)
+        {
+            var response = await CreateApiClient()
+                .GetAsync($"ihm-survey/jobs/{jobId}/vscp-checklist");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                TempData["ErrorMessage"] = await response.Content.ReadAsStringAsync();
+                return RedirectToAction("Ihm", new { ihmCompletionFilter });
+            }
+
+            var contentType = response.Content.Headers.ContentType?.ToString()
+                ?? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+                ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+                ?? $"vscp-checklist-{jobId}.xlsx";
+
+            return File(await response.Content.ReadAsByteArrayAsync(), contentType, fileName);
         }
 
 
@@ -1260,6 +1348,7 @@ namespace Survery_Certification_App_Consume.Controllers
         public string? AuditPort { get; set; }
         public string? AuditAddress { get; set; }
         public string? StartDate { get; set; }
+        public string? SurveyDate { get; set; }
         public string? EndDate { get; set; }
         public int? AssignedManagerId { get; set; }
         public int? PrimarySurveyorUserId { get; set; }

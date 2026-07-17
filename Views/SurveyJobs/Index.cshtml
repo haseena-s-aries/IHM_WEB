@@ -49,7 +49,11 @@
         .job-icon { width:46px; height:46px; border-radius:12px; background:linear-gradient(135deg,#0b1d33,#1e3a5f); color:white; display:flex; align-items:center; justify-content:center; }
         .job-title { font-size:16px; font-weight:800; margin:0; }
         .client { color:#607080; font-size:12px; margin:2px 0 0; }
-        .status { padding:5px 10px; border-radius:20px; font-size:11px; font-weight:800; background:#1976d21a; color:#1976d2; }
+        .status { padding:6px 11px; border-radius:20px; font-size:11px; font-weight:800; white-space:nowrap; border:1px solid transparent; }
+        .status-completed { background:#43a04718; color:#2e7d32; border-color:#43a04730; }
+        .status-pending { background:#ffa7261f; color:#9a5b00; border-color:#ffa72638; }
+        .status-in-progress { background:#1976d21a; color:#1976d2; border-color:#1976d230; }
+        .status-not-started { background:#90a0b01f; color:#607080; border-color:#90a0b040; }
 
         .marked-image-status {
             position: absolute;
@@ -291,8 +295,25 @@
                 var surveyDateValue = job.SurveyDate.HasValue
                     ? job.SurveyDate.Value.ToString("yyyy-MM-dd")
                     : "";
+                var displayStatus = string.IsNullOrWhiteSpace(job.DisplayStatus)
+                    ? "Not Started"
+                    : job.DisplayStatus;
+                var statusCss = displayStatus switch
+                {
+                    "Completed" => "completed",
+                    "Pending" => "pending",
+                    "In Progress" => "in-progress",
+                    _ => "not-started"
+                };
+                var statusIcon = displayStatus switch
+                {
+                    "Completed" => "fa-circle-check",
+                    "Pending" => "fa-clock",
+                    "In Progress" => "fa-spinner",
+                    _ => "fa-circle"
+                };
 
-                <article class="job-card" data-card-href="@jobOpenUrl" data-search="@($"{job.JobNumber} {job.ClientName} {job.VesselName} {job.SiteName} {job.Status}".ToLower())">
+                <article class="job-card" data-card-href="@jobOpenUrl" data-search="@($"{job.JobNumber} {job.ClientName} {job.VesselName} {job.SiteName} {job.Status} {displayStatus}".ToLower())">
                     <div class="job-head">
                         <div class="job-icon"><i class="fa-solid @(isIhm ? "fa-clipboard-list" : "fa-helmet-safety")"></i></div>
 
@@ -303,7 +324,10 @@
                                 <p class="client">@job.ClientName</p>
                             }
                         </div>
-                        
+
+                        <span class="status status-@statusCss" title="@($"{job.CompletedItems}/{job.TotalItems} complete")">
+                            <i class="fa-solid @statusIcon"></i> @displayStatus
+                        </span>
                     </div>
 
                     <div class="line"></div>
@@ -359,7 +383,7 @@
                         <div class="meta-tile">
                             <div class="meta-label"><i class="fa-regular fa-calendar-check"></i> Survey Date</div>
 
-                            @if (Model.IsAdmin)
+                            @if (!job.CanEdit)
                             {
                                 <div class="meta-value">@surveyDateText</div>
                             }
@@ -419,8 +443,12 @@
                             </a>
                         }
 
-                        @if (Model.IsAdmin)
+                        @if (job.CanEdit)
                         {
+                            <button class="action-btn amber" data-bs-toggle="modal" data-bs-target="#editJobModal-@job.Id">
+                                <i class="fa-regular fa-pen-to-square"></i> Edit
+                            </button>
+
                             <button class="action-btn teal" data-bs-toggle="modal" data-bs-target="#assignModal-@job.Id">
                                 <i class="fa-solid @(hasAssignedSurveyor ? "fa-repeat" : "fa-user-plus")"></i>
                                 @(hasAssignedSurveyor ? "Reassign Surveyor" : "Assign Surveyor")
@@ -443,22 +471,34 @@
 
                         @if (Model.IsAdmin && isIhm)
                         {
-                            var hasExcelData = Model.AreasByJob.ContainsKey(job.Id) &&
-                            Model.AreasByJob[job.Id] != null &&
-                            Model.AreasByJob[job.Id].Any();
+                            var hasVscpChecklist = !string.IsNullOrWhiteSpace(job.VscpChecklistFilePath);
+                            var checklistQuery = hasIhmCompletionFilter
+                                ? $"&ihmCompletionFilter={Uri.EscapeDataString(Model.IhmCompletionFilter!)}"
+                                : string.Empty;
 
                             <form method="post" enctype="multipart/form-data" action="/SurveyJobs/UploadIhmExcel" class="d-inline">
-    <input type="hidden" name="jobId" value="@job.Id" />
-    @if (hasIhmCompletionFilter)
-    {
-        <input type="hidden" name="ihmCompletionFilter" value="@Model.IhmCompletionFilter" />
-    }
+                                <input type="hidden" name="jobId" value="@job.Id" />
+                                @if (hasIhmCompletionFilter)
+                                {
+                                    <input type="hidden" name="ihmCompletionFilter" value="@Model.IhmCompletionFilter" />
+                                }
                                 <input type="file" name="file" accept=".xlsx" hidden onchange="showPageLoading('Uploading...'); this.form.submit();" id="excel-@job.Id" />
-    <label class="action-btn green" for="excel-@job.Id">
-        <i class="fa-regular fa-file-excel"></i>
-        @(hasExcelData ? "Reupload Excel" : "Upload Excel")
-    </label>
-</form>
+                                @if (hasVscpChecklist)
+                                {
+                                    <a class="action-btn purple" href="/SurveyJobs/ViewVscpChecklist?jobId=@job.Id@checklistQuery">
+                                        <i class="fa-regular fa-eye"></i> View VSCP Checklist
+                                    </a>
+                                    <label class="action-btn green" for="excel-@job.Id">
+                                        <i class="fa-regular fa-file-excel"></i> Replace VSCP Checklist Template
+                                    </label>
+                                }
+                                else
+                                {
+                                    <label class="action-btn green" for="excel-@job.Id">
+                                        <i class="fa-regular fa-file-excel"></i> Upload VSCP Checklist Template
+                                    </label>
+                                }
+                            </form>
 
                             <a class="action-btn purple" href="/IhmReportInfo/Index?jobId=@job.Id">
                                 <i class="fa-regular fa-file-pdf"></i> IHM Report
@@ -471,6 +511,112 @@
                     </div>
                 </article>
 
+                @if (job.CanEdit)
+                {
+                <div class="modal fade" id="editJobModal-@job.Id" tabindex="-1">
+                    <div class="modal-dialog modal-lg modal-dialog-centered">
+                        <form class="modal-content" method="post" action="/SurveyJobs/Edit">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Edit Job - @job.JobNumber</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+
+                            <div class="modal-body">
+                                <input type="hidden" name="jobId" value="@job.Id" />
+                                <input type="hidden" name="SurveyType" value="@Model.SurveyType" />
+                                @if (hasIhmCompletionFilter)
+                                {
+                                    <input type="hidden" name="ihmCompletionFilter" value="@Model.IhmCompletionFilter" />
+                                }
+
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Project Name</label>
+                                        <input class="form-control" name="ProjectName" value="@job.ProjectName" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Audit Port *</label>
+                                        <input class="form-control" name="AuditPort" value="@(job.AuditPort ?? job.SiteName)" required />
+                                    </div>
+                                    <div class="col-md-12">
+                                        <label class="form-label">Audit Address</label>
+                                        <input class="form-control" name="AuditAddress" value="@job.AuditAddress" />
+                                    </div>
+                                    <div class="col-md-12">
+                                        <label class="form-label">Select Vessel *</label>
+                                        <select class="form-select" name="VesselId" required>
+                                            <option value="">Select vessel</option>
+                                            @foreach (var vessel in Model.Vessels)
+                                            {
+                                                <option value="@vessel.Id" selected="@(job.VesselId == vessel.Id ? "selected" : null)">
+                                                    @vessel.VesselName @(string.IsNullOrWhiteSpace(vessel.ImoNumber) ? "" : $" - IMO {vessel.ImoNumber}")
+                                                </option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-md-12">
+                                        <label class="form-label">Client Name</label>
+                                        <input class="form-control" name="ClientName" value="@job.ClientName" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Start Date *</label>
+                                        <input class="form-control" type="date" name="StartDate" value="@(job.StartDate?.ToString("yyyy-MM-dd"))" required />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Survey Date</label>
+                                        <input class="form-control" type="date" name="SurveyDate" value="@(job.SurveyDate?.ToString("yyyy-MM-dd"))" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">End Date *</label>
+                                        <input class="form-control" type="date" name="EndDate" value="@(job.EndDate?.ToString("yyyy-MM-dd"))" required />
+                                    </div>
+                                    @if (isIhm)
+                                    {
+                                        <div class="col-md-12">
+                                            <label class="form-label">Assign Manager (Optional)</label>
+                                            <select class="form-select" name="AssignedManagerId">
+                                                <option value="">No manager assigned</option>
+                                                @foreach (var manager in Model.Managers)
+                                                {
+                                                    <option value="@manager.Id" selected="@(job.AssignedManagerId == manager.Id ? "selected" : null)">@manager.DisplayName</option>
+                                                }
+                                            </select>
+                                        </div>
+                                    }
+                                    <div class="col-md-6">
+                                        <label class="form-label">Primary Surveyor</label>
+                                        <select class="form-select" name="PrimarySurveyorUserId">
+                                            <option value="">Not Assign</option>
+                                            @foreach (var s in Model.Surveyors)
+                                            {
+                                                <option value="@s.Id" selected="@(job.PrimarySurveyorUserId == s.Id ? "selected" : null)">@s.DisplayName</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Secondary Surveyor</label>
+                                        <select class="form-select" name="SecondarySurveyorUserId">
+                                            <option value="">Not Assign</option>
+                                            @foreach (var s in Model.Surveyors)
+                                            {
+                                                <option value="@s.Id" selected="@(job.SecondarySurveyorUserId == s.Id ? "selected" : null)">@s.DisplayName</option>
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                }
+
+                @if (job.CanEdit)
+                {
                 <div class="modal fade" id="assignModal-@job.Id" tabindex="-1">
                     <div class="modal-dialog modal-dialog-centered">
                         <form class="modal-content" method="post" action="/SurveyJobs/AssignSurveyors">
@@ -525,6 +671,7 @@
                         </form>
                     </div>
                 </div>
+                }
 
                 @if (Model.IsAdmin && isIhm)
                 {

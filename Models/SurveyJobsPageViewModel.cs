@@ -133,12 +133,20 @@
         public string? AuditPort { get; set; }
         public string? AuditAddress { get; set; }
         public string Status { get; set; } = "Draft";
+        public string DisplayStatus { get; set; } = "Not Started";
+        public int CompletedItems { get; set; }
+        public int TotalItems { get; set; }
+        public decimal CompletionPercentage { get; set; }
+        public bool CanEdit { get; set; }
         public string? AssignedSurveyorName { get; set; }
         public DateTime? AssignedAt { get; set; }
         public int? PrimarySurveyorUserId { get; set; }
         public int? SecondarySurveyorUserId { get; set; }
         public int? AssignedManagerId { get; set; }
         public string? AssignedManagerName { get; set; }
+        public string? VscpChecklistFilePath { get; set; }
+        public string? VscpChecklistFileName { get; set; }
+        public DateTime? VscpChecklistUploadedAt { get; set; }
         public List<SurveyAssignmentDto> Assignments { get; set; } = new();
     }
 
@@ -180,6 +188,10 @@
         public string Status { get; set; } = "Active";
         public int? ProjectId { get; set; }
         public string? ProjectName { get; set; }
+        public int? CreatedByUserId { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+        public bool CanEdit { get; set; }
     }
 
     public class VesselMasterViewModel

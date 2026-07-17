@@ -2,7 +2,9 @@
 @{
     Layout = null;
     var userRole = Context.Session.GetString("UserRole") ?? "";
-    var canModifyVessels = !string.Equals(userRole, "Client", StringComparison.OrdinalIgnoreCase);
+    var canCreateVessels =
+        string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(userRole, "Manager", StringComparison.OrdinalIgnoreCase);
 
     string Val(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
     string NumVal(decimal? value) => value.HasValue ? (value.Value % 1 == 0 ? value.Value.ToString("0") : value.Value.ToString("0.##")) : "-";
@@ -139,7 +141,7 @@
             }
 
             <a class="header-btn" href="/Vessel/Index" title="Refresh"><i class="fa-solid fa-rotate-right"></i></a>
-            @if (canModifyVessels)
+            @if (canCreateVessels)
             {
 <button class="add-btn" data-bs-toggle="modal" data-bs-target="#createVesselModal">
 <i class="fa-solid fa-plus me-1"></i> Add Vessel
@@ -166,7 +168,7 @@
 <div class="empty">
 <i class="fa-regular fa-compass fa-3x"></i>
 <p class="mt-3">No vessels registered yet</p>
-                    @if (canModifyVessels)
+                    @if (canCreateVessels)
                     {
 <p>Tap "Add Vessel" to register your first vessel.</p>
                     }
@@ -215,7 +217,7 @@
 <button class="action-btn blue" data-bs-toggle="modal" data-bs-target="#vesselDetail-@vessel.Id">
 <i class="fa-solid fa-circle-info"></i> Details
 </button>
-                            @if (canModifyVessels)
+                            @if (vessel.CanEdit)
                             {
 <button class="action-btn amber" data-bs-toggle="modal" data-bs-target="#editVessel-@vessel.Id">
 <i class="fa-regular fa-pen-to-square"></i> Edit
@@ -296,7 +298,7 @@
 </div>
 </div>
 
-                    @if (canModifyVessels)
+                    @if (vessel.CanEdit)
                     {
                     <div class="modal fade" id="editVessel-@vessel.Id" tabindex="-1" aria-hidden="true">
 <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -358,7 +360,7 @@
         }
 </main>
 
-    @if (canModifyVessels)
+    @if (canCreateVessels)
     {
     <div class="modal fade" id="createVesselModal" tabindex="-1" aria-hidden="true">
 <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
