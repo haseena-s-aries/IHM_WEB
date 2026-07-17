@@ -210,12 +210,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/admin-dashboard.css" asp-append-version="true" />
     <style>
+        html,
+        body {
+            min-height: 100%;
+            height: auto;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
         body {
             background: #f6f5f1;
             font-family: "Plus Jakarta Sans", sans-serif;
         }
 
         .analytics-shell {
+            min-height: 100vh;
             padding: 24px;
         }
 
