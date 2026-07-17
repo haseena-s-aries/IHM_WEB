@@ -4,6 +4,18 @@
     Layout = null;
     var isIhm = Model.SurveyType == "IHM Survey";
     var backUrl = Model.IsAdmin ? "/Home/AdminDashboard" : "/Home/Index";
+    var userRole = Context.Session.GetString("UserRole") ?? string.Empty;
+    var currentUserIdText =
+    Context.Session.GetString("UserId") ??
+    Context.Session.GetString("UserID") ??
+    Context.Session.GetString("CurrentUserId");
+
+    var currentUserId = int.TryParse(currentUserIdText, out var parsedUserId)
+        ? parsedUserId
+        : 0;
+
+    var isManager = string.Equals(userRole, "Manager", StringComparison.OrdinalIgnoreCase);
+    var isSurveyor = string.Equals(userRole, "Surveyor", StringComparison.OrdinalIgnoreCase);
     var hasIhmCompletionFilter = isIhm && !string.IsNullOrWhiteSpace(Model.IhmCompletionFilter);
     var ihmFilterQuery = hasIhmCompletionFilter
         ? $"&ihmCompletionFilter={Uri.EscapeDataString(Model.IhmCompletionFilter!)}"
@@ -383,7 +395,7 @@
                         <div class="meta-tile">
                             <div class="meta-label"><i class="fa-regular fa-calendar-check"></i> Survey Date</div>
 
-                            @if (!job.CanEdit)
+                            @if (!isSurveyor)
                             {
                                 <div class="meta-value">@surveyDateText</div>
                             }
@@ -558,15 +570,23 @@
                                         <label class="form-label">Client Name</label>
                                         <input class="form-control" name="ClientName" value="@job.ClientName" />
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-6">
                                         <label class="form-label">Start Date *</label>
                                         <input class="form-control" type="date" name="StartDate" value="@(job.StartDate?.ToString("yyyy-MM-dd"))" required />
                                     </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">Survey Date</label>
-                                        <input class="form-control" type="date" name="SurveyDate" value="@(job.SurveyDate?.ToString("yyyy-MM-dd"))" />
-                                    </div>
-                                    <div class="col-md-4">
+                                    @* <div class="col-md-4">
+                                            <label class="form-label">Survey Date</label>
+                                            @if (isSurveyor)
+                                            {
+                                                <input class="form-control" type="date" name="SurveyDate" value="@(job.SurveyDate?.ToString("yyyy-MM-dd"))" />
+                                            }
+                                            else
+                                            {
+                                                <input class="form-control" type="text" value="@surveyDateText" readonly />
+                                                <input type="hidden" name="SurveyDate" value="@(job.SurveyDate?.ToString("yyyy-MM-dd"))" />
+                                            }
+                                    </div> *@
+                                    <div class="col-md-6">
                                         <label class="form-label">End Date *</label>
                                         <input class="form-control" type="date" name="EndDate" value="@(job.EndDate?.ToString("yyyy-MM-dd"))" required />
                                     </div>
@@ -575,11 +595,19 @@
                                         <div class="col-md-12">
                                             <label class="form-label">Assign Manager (Optional)</label>
                                             <select class="form-select" name="AssignedManagerId">
-                                                <option value="">No manager assigned</option>
-                                                @foreach (var manager in Model.Managers)
-                                                {
-                                                    <option value="@manager.Id" selected="@(job.AssignedManagerId == manager.Id ? "selected" : null)">@manager.DisplayName</option>
-                                                }
+                                                    <option value="">No manager assigned</option>
+                                                    @foreach (var manager in Model.Managers)
+                                                    {
+                                                        var selectedManager =
+                                                        job.AssignedManagerId == manager.Id ||
+                                                        (!job.AssignedManagerId.HasValue && isManager && manager.Id == currentUserId)
+                                                        ? "selected"
+                                                        : null;
+
+                                                        <option value="@manager.Id" selected="@selectedManager">
+                                                            @manager.DisplayName
+                                                        </option>
+                                                    }
                                             </select>
                                         </div>
                                     }
@@ -637,11 +665,19 @@
                                 {
                                     <label class="form-label">Assign Manager (Optional)</label>
                                     <select class="form-select mb-3" name="assignedManagerId">
-                                        <option value="">No manager assigned</option>
-                                        @foreach (var manager in Model.Managers)
-                                        {
-                                            <option value="@manager.Id" selected="@(job.AssignedManagerId == manager.Id ? "selected" : null)">@manager.DisplayName</option>
-                                        }
+                                            <option value="">No manager assigned</option>
+                                            @foreach (var manager in Model.Managers)
+                                            {
+                                                var selectedManager =
+                                                job.AssignedManagerId == manager.Id ||
+                                                (!job.AssignedManagerId.HasValue && isManager && manager.Id == currentUserId)
+                                                ? "selected"
+                                                : null;
+
+                                                <option value="@manager.Id" selected="@selectedManager">
+                                                    @manager.DisplayName
+                                                </option>
+                                            }
                                     </select>
                                 }
 
@@ -825,7 +861,14 @@
                                     <option value="">No manager assigned</option>
                                     @foreach (var manager in Model.Managers)
                                     {
-                                        <option value="@manager.Id">@manager.DisplayName</option>
+                                        var selectedManager =
+                                        isManager && manager.Id == currentUserId
+                                        ? "selected"
+                                        : null;
+
+                                        <option value="@manager.Id" selected="@selectedManager">
+                                            @manager.DisplayName
+                                        </option>
                                     }
                                 </select>
                             </div>

@@ -153,29 +153,45 @@ var visibleCategories =
 
 <body>
     <header class="reports-topbar">
+        <div class="topbar-left">
+            @if (!isClient)
+            {
+                <a class="back-link"
+                   href="@Url.Action(dashboardAction, "Home")">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>Dashboard</span>
+                </a>
+            }
+            else
+            {
+                <span class="back-link">
+                    <i class="fa-solid fa-file-shield"></i>
+                    <span>Assigned Reports</span>
+                </span>
+            }
+        </div>
+
         @if (!isClient)
         {
-            <a class="back-link"
-               href="@Url.Action(dashboardAction, "Home")">
-                <i class="fa-solid fa-arrow-left"></i>
-                <span>Dashboard</span>
-            </a>
+            <div class="topbar-right">
+                <a class="back-link" href="@Url.Action("Index", "Vessel")">
+                    <i class="fa-solid fa-ship"></i>
+                    <span>Vessels</span>
+                </a>
+
+                <a class="back-link signout-link" href="@Url.Action("Logout", "Home")">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    <span>Sign Out</span>
+                </a>
+            </div>
         }
         else
         {
-            <span class="back-link">
-                <i class="fa-solid fa-file-shield"></i>
-                <span>Assigned Reports</span>
-            </span>
+            <a class="back-link signout-link" href="@Url.Action("Logout", "Home")">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                <span>Sign Out</span>
+            </a>
         }
-        <a class="back-link" href="@Url.Action("Index", "Vessel")">
-            <i class="fa-solid fa-ship"></i>
-            <span>Vessels</span>
-        </a>
-        <a class="back-link" href="@Url.Action("Logout", "Home")">
-            <i class="fa-solid fa-arrow-right-from-bracket"></i>
-            <span>Sign Out</span>
-        </a>
     </header>
 
     <main class="reports-page">
