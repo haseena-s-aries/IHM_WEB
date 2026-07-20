@@ -35,6 +35,7 @@
         StringComparison.OrdinalIgnoreCase);
     var canSendReports = isAdmin || isManager;
     var canEditReports = !isClient;
+    var showReportStatus = isAdmin;
 
     const int AURAS_PROJECT_ID = 3;
     const int IHM_PROJECT_ID = 1;
@@ -171,27 +172,20 @@ var visibleCategories =
             }
         </div>
 
-        @if (!isClient)
-        {
-            <div class="topbar-right">
-                <a class="back-link" href="@Url.Action("Index", "Vessel")">
-                    <i class="fa-solid fa-ship"></i>
-                    <span>Vessels</span>
-                </a>
+        <div class="topbar-right">
+            <a class="back-link" href="@Url.Action("Index", "Auth")">
+                <i class="fa-solid fa-user-circle"></i>
+                <span>Profile</span>
+            </a>
 
+            @if (isClient)
+            {
                 <a class="back-link signout-link" href="@Url.Action("Logout", "Home")">
                     <i class="fa-solid fa-arrow-right-from-bracket"></i>
                     <span>Sign Out</span>
                 </a>
-            </div>
-        }
-        else
-        {
-            <a class="back-link signout-link" href="@Url.Action("Logout", "Home")">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i>
-                <span>Sign Out</span>
-            </a>
-        }
+            }
+        </div>
     </header>
 
     <main class="reports-page">
@@ -407,7 +401,7 @@ var visibleCategories =
 
                             <thead>
                                 <tr>
-                                    @if (!isClient)
+                                    @if (showReportStatus)
                                     {
                                         <th>Status</th>
                                     }
@@ -453,9 +447,9 @@ var visibleCategories =
                                     var date = DateLabel(report);
 
                                     var searchText =
-                                        (isClient
-                                            ? $"{vessel} {title} {reference} {typeLabel} {createdBy} {date}"
-                                            : $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}")
+                                        (showReportStatus
+                                            ? $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}"
+                                            : $"{vessel} {title} {reference} {typeLabel} {createdBy} {date}")
                                             .ToLowerInvariant();
 
                                     var editUrl = Url.Action(
@@ -472,7 +466,7 @@ var visibleCategories =
                                         data-type="@type"
                                         data-search="@searchText">
 
-                                        @if (!isClient)
+                                        @if (showReportStatus)
                                         {
                                             <td>
                                                 <span class="status-pill">
@@ -567,11 +561,23 @@ var visibleCategories =
                     </div>
 
                     <div class="report-table-wrap">
-                        <table class="report-table@(clientTableClass)">
+                        <table class="report-table report-table-with-send@(clientTableClass)">
+                            <colgroup>
+                                @if (showReportStatus)
+                                {
+                                    <col class="status-col" />
+                                }
+                                <col class="report-info-col" />
+                                <col class="report-type-col" />
+                                <col class="report-user-col" />
+                                <col class="report-date-col" />
+                                <col class="send-report-col" />
+                                <col class="actions-col" />
+                            </colgroup>
 
                             <thead>
                                 <tr>
-                                    @if (!isClient)
+                                    @if (showReportStatus)
                                     {
                                         <th>Status</th>
                                     }
@@ -621,9 +627,9 @@ var visibleCategories =
                                     var date = DateLabel(report);
 
                                     var searchText =
-                                        (isClient
-                                            ? $"{vessel} {title} {reference} {typeLabel} {createdBy} {date}"
-                                            : $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}")
+                                        (showReportStatus
+                                            ? $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}"
+                                            : $"{vessel} {title} {reference} {typeLabel} {createdBy} {date}")
                                             .ToLowerInvariant();
 
                                     var editUrl = Url.Action(
@@ -640,7 +646,7 @@ var visibleCategories =
                                         data-type="@type"
                                         data-search="@searchText">
 
-                                        @if (!isClient)
+                                        @if (showReportStatus)
                                         {
                                             <td>
                                                 <span class="status-pill">
@@ -719,6 +725,8 @@ var visibleCategories =
                                                 </a>
 
                                                 <a class="download-report"
+                                                   target="_blank"
+                                                   rel="noopener"
                                                    href="@Url.Action(
                                                        "SavedReportFile",
                                                        "Home",
@@ -757,10 +765,22 @@ var visibleCategories =
                     </div>
 
                     <div class="report-table-wrap">
-                        <table class="report-table@(clientTableClass)">
+                        <table class="report-table report-table-with-send@(clientTableClass)">
+                            <colgroup>
+                                @if (showReportStatus)
+                                {
+                                    <col class="status-col" />
+                                }
+                                <col class="report-info-col" />
+                                <col class="report-type-col" />
+                                <col class="report-user-col" />
+                                <col class="report-date-col" />
+                                <col class="send-report-col" />
+                                <col class="actions-col" />
+                            </colgroup>
                             <thead>
                                 <tr>
-                                    @if (!isClient)
+                                    @if (showReportStatus)
                                     {
                                         <th>Status</th>
                                     }
@@ -795,15 +815,15 @@ var visibleCategories =
                                     var createdBy = CreatedByLabel(report);
                                     var date = DateLabel(report);
                                     var searchText =
-                                        (isClient
-                                            ? $"{vessel} {title} {reference} {typeLabel} {createdBy} {date}"
-                                            : $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}")
+                                        (showReportStatus
+                                            ? $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}"
+                                            : $"{vessel} {title} {reference} {typeLabel} {createdBy} {date}")
                                             .ToLowerInvariant();
 
                                     <tr class="report-row"
                                         data-type="@type"
                                         data-search="@searchText">
-                                        @if (!isClient)
+                                        @if (showReportStatus)
                                         {
                                             <td><span class="status-pill">@status</span></td>
                                         }

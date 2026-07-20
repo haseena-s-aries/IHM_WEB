@@ -1,4 +1,12 @@
 ﻿@model Survery_Certification_App_Consume.Models.ProfileDto
+@using System.Text.Json
+@{
+    var profileName = Model?.FullName ?? Context.Session.GetString("UserFullName") ?? "User";
+    var profileEmail = Model?.Email ?? Context.Session.GetString("UserEmail") ?? "";
+    var profileRole = Model?.Role ?? Context.Session.GetString("UserRole") ?? "";
+    var profileId = Model?.UserId ?? Context.Session.GetInt32("UserId") ?? 0;
+    string Js(string? value) => JsonSerializer.Serialize(value ?? string.Empty);
+}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -25,7 +33,17 @@
                 </tr>
             </thead>
             <tbody id="userTableBody">
-                <!-- User data will be dynamically loaded here -->
+                <tr>
+                    <td>@profileName</td>
+                    <td>@profileEmail</td>
+                    <td>@profileRole</td>
+                    <td>
+                        <button class="btn btn-warning btn-sm"
+                                onclick="editUser(@profileId, @Html.Raw(Js(profileName)), @Html.Raw(Js(profileEmail)), @Html.Raw(Js(profileRole)))">
+                            Edit
+                        </button>
+                    </td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -70,6 +88,10 @@
 
         if (role === 'Admin' || role === 'Manager') {
             window.location.href = '/Home/AdminDashboard';
+        } else if (role === 'Surveyor') {
+            window.location.href = '/Home/Index';
+        } else if (role === 'Client') {
+            window.location.href = '/Home/ClientDashboard';
         } else {
             window.location.href = '/Home/Dashboard'; // for regular users
         }
@@ -87,13 +109,17 @@
                 success: function (response) {
                     if (response.success) {
                         var user = response.data;
+                        var userId = user.userId || user.UserId || user.id || user.Id || 0;
+                        var fullName = user.fullName || user.FullName || "";
+                        var email = user.email || user.Email || "";
+                        var role = user.role || user.Role || "";
                         var row = `
                             <tr>
-                                <td>${user.fullName}</td>
-                                <td>${user.email}</td>
-                                <td>${user.role}</td>
+                                <td>${fullName}</td>
+                                <td>${email}</td>
+                                <td>${role}</td>
                                 <td>
-                                    <button class="btn btn-warning btn-sm" onclick="editUser('${user.id}', '${user.fullName}', '${user.email}', '${user.role}')">
+                                    <button class="btn btn-warning btn-sm" onclick="editUser('${userId}', '${fullName}', '${email}', '${role}')">
                                         Edit
                                     </button>
                                 </td>

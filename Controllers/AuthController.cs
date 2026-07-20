@@ -171,15 +171,14 @@ namespace YourMvcApp.Controllers
                 return RedirectToAction("Login", "Auth");
             }
 
-            var response = await _httpClient.GetAsync($"{_apiBaseUrl}/GetProfile/{userId}");
+            ViewBag.UserRole = HttpContext.Session.GetString("UserRole");
+
+            var response = await _httpClient.SendAsync(
+                CreateApiRequest(HttpMethod.Get, $"User/GetProfile/{userId}"));
             if (response.IsSuccessStatusCode)
             {
                 var jsonData = await response.Content.ReadAsStringAsync();
                 var userProfile = JsonConvert.DeserializeObject<ProfileDto>(jsonData);
-
-
-                // ✅ Step 1: Pass role to view
-                ViewBag.UserRole = HttpContext.Session.GetString("UserRole");
 
                 return View(userProfile);
             }
@@ -194,7 +193,8 @@ namespace YourMvcApp.Controllers
             if (userId == null || userId == 0)
                 return Json(new { success = false, message = "User not logged in." });
 
-            var response = await _httpClient.GetAsync($"User/GetProfile/{userId}");
+            var response = await _httpClient.SendAsync(
+                CreateApiRequest(HttpMethod.Get, $"User/GetProfile/{userId}"));
 
             if (response.IsSuccessStatusCode)
             {
@@ -221,12 +221,18 @@ namespace YourMvcApp.Controllers
             try
             {
                 var jsonContent = new StringContent(JsonConvert.SerializeObject(model), Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("User/UpdateProfile", jsonContent);
+                var response = await _httpClient.SendAsync(
+                    CreateApiRequest(HttpMethod.Post, "User/UpdateProfile", jsonContent));
 
                 var responseContent = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
+                {
+                    if (!string.IsNullOrWhiteSpace(model.FullName))
+                        HttpContext.Session.SetString("UserFullName", model.FullName);
+
                     return Json(new { success = true, message = "Profile updated successfully!" });
+                }
                 else
                     return Json(new { success = false, message = "Failed to update profile.", details = responseContent });
             }

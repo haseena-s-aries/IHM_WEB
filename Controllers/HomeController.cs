@@ -303,6 +303,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
 
             List<ASCENT.Models.VesselSummaryDto> fleetSummary = new();
             string? fleetErrorMessage = null;
+            var totalVessels = 0;
             var vesselResponse = await client.GetAsync("vessels");
             var vesselBody = await vesselResponse.Content.ReadAsStringAsync();
 
@@ -310,6 +311,8 @@ namespace Health_Matrix_Consuming_Side.Controllers
             {
                 var vessels = JsonConvert.DeserializeObject<List<VesselDto>>(vesselBody)
                     ?? new List<VesselDto>();
+
+                totalVessels = vessels.Count;
 
                 fleetSummary = vessels
                     .OrderByDescending(vessel => vessel.Id)
@@ -348,6 +351,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
                 SurveySummary = surveySummary,
                 ManageableProjects = manageableProjects,
                 TotalUsers = totalUsers,
+                TotalVessels = totalVessels,
                 FleetSummary = fleetSummary,
                 FleetErrorMessage = fleetErrorMessage
             };

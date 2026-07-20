@@ -15,6 +15,7 @@ namespace Survery_Certification_App_Consume.Models
         public SurveySummaryDto SurveySummary { get; set; } = new();
         public List<UpcomingDeadlineDto> UpcomingDeadlines { get; set; } = new();
         public int TotalUsers { get; set; }
+        public int TotalVessels { get; set; }
         public List<ASCENT.Models.VesselSummaryDto> FleetSummary { get; set; } = new();
         public string? FleetErrorMessage { get; set; }
     }

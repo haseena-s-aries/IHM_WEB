@@ -157,33 +157,6 @@
         letter-spacing: -.03em;
     }
 
-    .hero p {
-        margin: 0 0 18px;
-        color: rgba(255, 255, 255, .82);
-        font-weight: 700;
-    }
-
-    .status-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 13px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, .14);
-        border: 1px solid rgba(255, 255, 255, .18);
-        font-size: 11px;
-        font-weight: 900;
-        text-transform: uppercase;
-    }
-
-    .status-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 999px;
-        background: #22c55e;
-        box-shadow: 0 0 0 6px rgba(34, 197, 94, .16);
-    }
-
     .hero-avatar {
         width: 76px;
         height: 76px;
@@ -452,6 +425,9 @@
     <div class="top-bar">
         <div class="top-title">Surveyor Dashboard</div>
         <div class="top-actions">
+            <a class="icon-button" href="@Url.Action("Index", "Auth")" title="Profile">
+                <i class="fa-solid fa-user-circle"></i>
+            </a>
             <a class="icon-button" href="@Url.Action("Logout", "Home")" title="Sign out">
                 <i class="fa-solid fa-right-from-bracket"></i>
             </a>
@@ -463,11 +439,6 @@
             <div class="hero-content">
                 <div class="eyebrow">Marine Operations</div>
                 <h1>Welcome, @surveyorName</h1>
-                <p>System Status: Online</p>
-                <div class="status-chip">
-                    <span class="status-dot"></span>
-                    System Online
-                </div>
             </div>
             <div class="hero-avatar">
                 <i class="fa-solid fa-user-astronaut"></i>

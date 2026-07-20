@@ -6,7 +6,9 @@
     var counts = Model.CertificateCounts;
     var surveys = Model.SurveySummary;
     var pendingCount = Model.PendingUsers.Count;
-    var displayName = Context.Session.GetString("UserEmail") ?? "admin@local.com";
+    var displayName = Context.Session.GetString("UserFullName")
+        ?? Context.Session.GetString("UserEmail")
+        ?? "User";
     string Initial(string? value) => string.IsNullOrWhiteSpace(value) ? "?" : value.Trim()[..1].ToUpperInvariant();
     var userRole = Context.Session.GetString("UserRole") ?? "";
     var isAdmin = string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase);
@@ -113,6 +115,7 @@
                 }
                 <a href="@Url.Action("SavedReports", "Home")"><i class="fa-solid fa-file-lines"></i><span>Reports</span></a>
                 <a href="@Url.Action("Index", "Vessel")"><i class="fa-solid fa-ship"></i><span>Vessels</span></a>
+                <a href="@Url.Action("Index", "Auth")"><i class="fa-solid fa-user-circle"></i><span>Profile</span></a>
 
             </nav>
 
@@ -120,7 +123,7 @@
             <div class="side-actions">
                 <div class="sidebar-profile">
                     <span class="avatar">@Initial(displayName)</span>
-                    <span><strong>@profileTitle</strong><small>@displayName</small></span>
+                    <span><strong>@displayName</strong><small>@profileTitle</small></span>
                 </div>
                 <a class="logout" href="@Url.Action("Logout", "Home")"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out</a>
             </div>
@@ -183,7 +186,7 @@
                         <span class="metric-icon"><i class="fa-solid fa-ship"></i></span>
                         <div>
                             <small>Vessels</small>
-                            <strong>@(Model.FleetSummary?.Count ?? 0)</strong>
+                            <strong>@Model.TotalVessels</strong>
                             <span>Created vessels</span>
                         </div>
                     </article>
