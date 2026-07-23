@@ -536,6 +536,7 @@
                             <div class="modal-body">
                                 <input type="hidden" name="jobId" value="@job.Id" />
                                 <input type="hidden" name="SurveyType" value="@Model.SurveyType" />
+                                <input type="hidden" name="SurveyDate" value="@(job.SurveyDate?.ToString("yyyy-MM-dd"))" />
                                 @if (hasIhmCompletionFilter)
                                 {
                                     <input type="hidden" name="ihmCompletionFilter" value="@Model.IhmCompletionFilter" />
@@ -716,7 +717,7 @@
                     attachments.TryGetValue("common", out var commonAttachment);
                     <div class="modal fade" id="layoutModal-@job.Id" tabindex="-1">
                         <div class="modal-dialog modal-dialog-centered">
-                            <form class="modal-content area-layout-form" method="post" enctype="multipart/form-data" action="/SurveyJobs/UploadIhmAreaLayout">
+                            <form class="modal-content area-layout-form" method="post" enctype="multipart/form-data" action="/SurveyJobs/UploadIhmAreaLayout" data-job-id="@job.Id" data-layout-loaded="false">
                                 <div class="modal-header">
                                     <div>
                                         <h5 class="modal-title"><i class="fa-regular fa-map me-2"></i>Upload Layout Images</h5>
@@ -937,6 +938,14 @@
             });
         });
 
+        document.querySelectorAll(".area-layout-form").forEach(form => {
+            const modal = form.closest(".modal");
+            if (!modal) return;
+
+            modal.addEventListener("show.bs.modal", function () {
+                loadLayoutOptions(form);
+            });
+        });
 
         document.querySelectorAll(".area-layout-select").forEach(select => {
             select.addEventListener("change", function () {
@@ -988,6 +997,7 @@
             const empty = form.querySelector(".attachment-empty");
             const link = form.querySelector(".attachment-link");
             const badge = details.querySelector(".badge");
+            if (!option) return;
             const fileName = option.dataset.fileName;
             const filePath = option.dataset.filePath;
 
@@ -1007,6 +1017,90 @@
                     ? "No Common Layout uploaded."
                     : "No specific attachment uploaded. Flutter will use Common Layout.";
             }
+        }
+
+        async function loadLayoutOptions(form) {
+            if (form.dataset.layoutLoaded === "true" || form.dataset.layoutLoading === "true") {
+                return;
+            }
+
+            const jobId = form.dataset.jobId;
+            const select = form.querySelector(".area-layout-select");
+            const fileInput = form.querySelector(".layout-file-input");
+            const hint = form.querySelector(".area-location-hint");
+            const previousValue = select.value || "common";
+
+            form.dataset.layoutLoading = "true";
+            select.disabled = true;
+            fileInput.disabled = true;
+            hint.textContent = "Loading saved areas and layout attachments...";
+
+            try {
+                const response = await fetch(`/SurveyJobs/IhmLayoutOptions?jobId=${encodeURIComponent(jobId)}`, {
+                    headers: { "Accept": "application/json" }
+                });
+
+                if (!response.ok) {
+                    throw new Error("Unable to load layout options.");
+                }
+
+                const data = await response.json();
+                const areas = data.areas || data.Areas || [];
+                const attachments = data.attachments || data.Attachments || [];
+                const attachmentMap = new Map();
+
+                attachments.forEach(item => {
+                    const target = String(item.target || item.Target || "");
+                    if (target) attachmentMap.set(target, item);
+                });
+
+                const commonAttachment = attachmentMap.get("common") || {};
+                select.innerHTML = "";
+                select.appendChild(createLayoutOption(
+                    "common",
+                    "Common Layout - fallback for every location",
+                    "",
+                    commonAttachment.originalFileName || commonAttachment.OriginalFileName,
+                    commonAttachment.filePath || commonAttachment.FilePath
+                ));
+
+                areas.forEach(area => {
+                    const areaId = String(area.id || area.Id);
+                    const attachment = attachmentMap.get(areaId) || {};
+                    select.appendChild(createLayoutOption(
+                        areaId,
+                        area.areaName || area.AreaName || "Survey area",
+                        area.locationSummary || area.LocationSummary || "",
+                        attachment.originalFileName || attachment.OriginalFileName,
+                        attachment.filePath || attachment.FilePath
+                    ));
+                });
+
+                select.appendChild(createLayoutOption("new", "+ Create another area", "", "", ""));
+                select.value = Array.from(select.options).some(option => option.value === previousValue)
+                    ? previousValue
+                    : "common";
+
+                form.dataset.layoutLoaded = "true";
+                select.dispatchEvent(new Event("change"));
+            } catch (error) {
+                hint.textContent = error.message || "Unable to load layout options.";
+                updateAttachment(form, select.options[select.selectedIndex]);
+            } finally {
+                form.dataset.layoutLoading = "false";
+                select.disabled = false;
+                fileInput.disabled = false;
+            }
+        }
+
+        function createLayoutOption(value, label, locations, fileName, filePath) {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = label;
+            option.dataset.locations = locations || "";
+            option.dataset.fileName = fileName || "";
+            option.dataset.filePath = filePath || "";
+            return option;
         }
 
     </script>

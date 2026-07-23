@@ -2,6 +2,7 @@
 using Newtonsoft.Json;
 using Survery_Certification_App_Consume.Filters;
 using Survery_Certification_App_Consume.Models;
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
 namespace Survery_Certification_App_Consume.Controllers
@@ -39,6 +40,7 @@ namespace Survery_Certification_App_Consume.Controllers
 
             try
             {
+                var loadTimer = Stopwatch.StartNew();
                 var client = CreateApiClient();
 
                 var apiModuleType = surveyType == "IHM Survey" ? "IhmSurvey" : "ExSurvey";
@@ -53,48 +55,24 @@ namespace Survery_Certification_App_Consume.Controllers
 
                 model.Jobs = await GetAsync<List<SurveyJobDto>>(client, jobsUrl) ?? new();
 
-                if (surveyType == "IHM Survey")
-                {
-                    var ihmLoadTasks = model.Jobs.Select(async job =>
-                    {
-                        var areasTask = GetAsync<List<IhmAreaOptionDto>>(
-                            client,
-                            $"ihm-survey/jobs/{job.Id}/areas-with-checkpoints");
-
-                        var attachmentsTask = GetAsync<List<IhmLayoutAttachmentDto>>(
-                            client,
-                            $"ihm-survey/jobs/{job.Id}/layout-attachments");
-
-                        await Task.WhenAll(areasTask, attachmentsTask);
-
-                        return new
-                        {
-                            JobId = job.Id,
-                            Areas = areasTask.Result ?? new List<IhmAreaOptionDto>(),
-                            Attachments = attachmentsTask.Result ?? new List<IhmLayoutAttachmentDto>()
-                        };
-                    });
-
-                    var ihmLoadResults = await Task.WhenAll(ihmLoadTasks);
-
-                    foreach (var result in ihmLoadResults)
-                    {
-                        model.AreasByJob[result.JobId] = result.Areas;
-                        model.LayoutAttachmentsByJob[result.JobId] = result.Attachments
-                            .GroupBy(x => x.Target)
-                            .ToDictionary(x => x.Key, x => x.First());
-                    }
-                }
-
                 if (model.IsAdmin)
                 {
                     model.Vessels = await GetAsync<List<VesselDto>>(client, "vessels") ?? new();
                     model.Surveyors = await GetAsync<List<SurveyorOptionDto>>(client, "User/surveyors") ?? new();
                     model.Managers = await GetAsync<List<SurveyorOptionDto>>(client, "User/managers") ?? new();
                 }
+
+                loadTimer.Stop();
+                _logger.LogInformation(
+                    "Survey jobs page loaded. SurveyType={SurveyType}, Jobs={JobCount}, IsAdmin={IsAdmin}, ElapsedMs={ElapsedMs}",
+                    surveyType,
+                    model.Jobs.Count,
+                    model.IsAdmin,
+                    loadTimer.ElapsedMilliseconds);
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to build survey jobs page. SurveyType={SurveyType}", surveyType);
                 model.ErrorMessage = ex.Message;
             }
 
@@ -279,7 +257,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 ViewBag.Job = job;
                 ViewBag.JobId = jobId;
                 ViewBag.IhmCompletionFilter = ihmCompletionFilter;
-                ViewBag.ReturnUrl = SafeIhmJobReturnUrl(returnUrl, jobId, ihmCompletionFilter);
+                ViewBag.ReturnUrl = BuildIhmJobReturnUrl(jobId, ihmCompletionFilter);
                 return View(areas);
             }
             catch (Exception ex)
@@ -920,7 +898,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 var body = await response.Content.ReadAsStringAsync();
                 if (!response.IsSuccessStatusCode)
                 {
-                    TempData["ErrorMessage"] = "Edit job failed: " + body;
+                    TempData["ErrorMessage"] = "Edit job failed: " + ExtractApiErrorMessage(body);
                     return RedirectToAction(returnAction, new { ihmCompletionFilter });
                 }
 
@@ -990,7 +968,7 @@ namespace Survery_Certification_App_Consume.Controllers
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    TempData["ErrorMessage"] = "Delete failed: " + body;
+                    TempData["ErrorMessage"] = "Delete failed: " + ExtractApiErrorMessage(body);
                     return RedirectToAction(returnAction, new { ihmCompletionFilter });
                 }
 
@@ -1001,6 +979,37 @@ namespace Survery_Certification_App_Consume.Controllers
             {
                 TempData["ErrorMessage"] = "Delete failed: " + ex.Message;
                 return RedirectToAction(returnAction, new { ihmCompletionFilter });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> IhmLayoutOptions(int jobId)
+        {
+            if (jobId <= 0)
+                return BadRequest(new { message = "Invalid survey job selected." });
+
+            try
+            {
+                var client = CreateApiClient();
+                var areasTask = GetAsync<List<IhmAreaOptionDto>>(
+                    client,
+                    $"ihm-survey/jobs/{jobId}/areas-with-checkpoints");
+                var attachmentsTask = GetAsync<List<IhmLayoutAttachmentDto>>(
+                    client,
+                    $"ihm-survey/jobs/{jobId}/layout-attachments");
+
+                await Task.WhenAll(areasTask, attachmentsTask);
+
+                return Json(new
+                {
+                    areas = areasTask.Result ?? new List<IhmAreaOptionDto>(),
+                    attachments = attachmentsTask.Result ?? new List<IhmLayoutAttachmentDto>()
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to load IHM layout options for job {JobId}", jobId);
+                return StatusCode(500, new { message = "Failed to load layout options." });
             }
         }
 
@@ -1253,6 +1262,30 @@ namespace Survery_Certification_App_Consume.Controllers
             }
             catch
             {
+            }
+
+            return body;
+        }
+
+        private static string ExtractApiErrorMessage(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body))
+                return "No error details returned by API.";
+
+            try
+            {
+                var token = Newtonsoft.Json.Linq.JToken.Parse(body);
+                var message = token["message"]?.ToString()
+                    ?? token["Message"]?.ToString()
+                    ?? token["title"]?.ToString()
+                    ?? token["Title"]?.ToString();
+
+                if (!string.IsNullOrWhiteSpace(message))
+                    return message;
+            }
+            catch
+            {
+                // The API may return plain text.
             }
 
             return body;

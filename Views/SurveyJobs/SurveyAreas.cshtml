@@ -345,7 +345,7 @@
 
 <body>
     <header class="appbar">
-        <a class="back-btn" href="@returnUrl" data-fast-back>
+        <a class="back-btn" href="@returnUrl">
             <i class="fa-solid fa-chevron-left"></i>
         </a>
         <h1 class="title">Survey Areas</h1>
@@ -425,22 +425,5 @@
             }
         </div>
     </main>
-    <script>
-        document.querySelector('[data-fast-back]')?.addEventListener('click', function (event) {
-            if (window.history.length <= 1) {
-                return;
-            }
-
-            event.preventDefault();
-            const fallbackUrl = this.href;
-            window.history.back();
-
-            window.setTimeout(function () {
-                if (!document.hidden && location.href !== fallbackUrl) {
-                    location.href = fallbackUrl;
-                }
-            }, 350);
-        });
-    </script>
 </body>
 </html>

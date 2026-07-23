@@ -57,6 +57,89 @@ namespace Survery_Certification_App_Consume.Models
         public string? DownloadUrl { get; set; }
     }
 
+    public class ClientDashboardViewModel
+    {
+        public ClientDashboardKpiViewModel Kpis { get; set; } = new();
+        public List<ClientJobProgressViewModel> AssignedJobs { get; set; } = new();
+        public ClientHazardousMaterialSummaryViewModel HazardousMaterials { get; set; } = new();
+        public List<ClientAssignedReportViewModel> AssignedReports { get; set; } = new();
+    }
+
+    public class ClientJobSummaryViewModel
+    {
+        public ClientJobProgressViewModel Job { get; set; } = new();
+        public ClientHazardousMaterialSummaryViewModel HazardousMaterials { get; set; } = new();
+        public List<ClientSurveyActivityViewModel> SurveyDetails { get; set; } = new();
+    }
+
+    public class ClientDashboardKpiViewModel
+    {
+        public int AllAssignedJobs { get; set; }
+        public int CompletedJobs { get; set; }
+        public int InProgressJobs { get; set; }
+        public int PendingJobs { get; set; }
+        public int AssignedReports { get; set; }
+        public int AreasCovered { get; set; }
+    }
+
+    public class ClientJobProgressViewModel
+    {
+        public int JobId { get; set; }
+        public string JobNumber { get; set; } = string.Empty;
+        public string? VesselName { get; set; }
+        public string? Imo { get; set; }
+        public DateTime? SurveyDate { get; set; }
+        public string? SurveyorName { get; set; }
+        public string CurrentStatus { get; set; } = "Not Started";
+        public decimal CompletionPercentage { get; set; }
+        public int TotalAreas { get; set; }
+        public int CompletedAreas { get; set; }
+        public int PendingAreas { get; set; }
+        public int TotalCheckpoints { get; set; }
+        public int CompletedCheckpoints { get; set; }
+    }
+
+    public class ClientHazardousMaterialSummaryViewModel
+    {
+        public int TotalHazardousMaterialRecords { get; set; }
+        public int VisualSamplesCount { get; set; }
+        public int PhysicalSamplesCount { get; set; }
+        public int PositiveFindings { get; set; }
+        public int NegativeFindings { get; set; }
+        public int PendingLabResults { get; set; }
+        public int CompletedLabResults { get; set; }
+    }
+
+    public class ClientSurveyActivityViewModel
+    {
+        public string AreaName { get; set; } = string.Empty;
+        public int CheckpointsCompleted { get; set; }
+        public string? Remarks { get; set; }
+        public string? Location { get; set; }
+        public string? SampleNumber { get; set; }
+        public string? VisualSampleType { get; set; }
+        public int SurveyPhotosCount { get; set; }
+        public DateTime? LastUpdatedDate { get; set; }
+        public string? SurveyorName { get; set; }
+    }
+
+    public class ClientAssignedReportViewModel
+    {
+        public int AssignmentId { get; set; }
+        public int ReportId { get; set; }
+        public int? SurveyJobId { get; set; }
+        public string ReportType { get; set; } = string.Empty;
+        public string? Title { get; set; }
+        public string? VesselName { get; set; }
+        public string? Reference { get; set; }
+        public string? Status { get; set; }
+        public string? CreatedBy { get; set; }
+        public DateTime AssignedAt { get; set; }
+        public bool HasFile { get; set; }
+        public string? ViewUrl { get; set; }
+        public string? DownloadUrl { get; set; }
+    }
+
     public class SurveySummaryDto
     {
         public int TotalSurveyJobs { get; set; }

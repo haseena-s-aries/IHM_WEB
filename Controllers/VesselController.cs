@@ -63,7 +63,7 @@ namespace Survery_Certification_App_Consume.Controllers
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    TempData["ErrorMessage"] = "Create vessel failed: " + body;
+                    TempData["ErrorMessage"] = "Create vessel failed: " + ExtractApiErrorMessage(body);
                     return RedirectToAction(nameof(Index));
                 }
 
@@ -104,7 +104,7 @@ namespace Survery_Certification_App_Consume.Controllers
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    TempData["ErrorMessage"] = "Update vessel failed: " + body;
+                    TempData["ErrorMessage"] = "Update vessel failed: " + ExtractApiErrorMessage(body);
                     return RedirectToAction(nameof(Index));
                 }
 
@@ -129,11 +129,11 @@ namespace Survery_Certification_App_Consume.Controllers
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    TempData["ErrorMessage"] = "Deactivate vessel failed: " + body;
+                    TempData["ErrorMessage"] = "Delete vessel failed: " + ExtractApiErrorMessage(body);
                     return RedirectToAction(nameof(Index));
                 }
 
-                TempData["SuccessMessage"] = "Vessel deactivated successfully.";
+                TempData["SuccessMessage"] = "Vessel deleted successfully.";
                 return RedirectToAction(nameof(Index));
             }
             catch (Exception ex)
@@ -152,6 +152,30 @@ namespace Survery_Certification_App_Consume.Controllers
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
 
             return client;
+        }
+
+        private static string ExtractApiErrorMessage(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body))
+                return "No error details returned by API.";
+
+            try
+            {
+                var token = Newtonsoft.Json.Linq.JToken.Parse(body);
+                var message = token["message"]?.ToString()
+                    ?? token["Message"]?.ToString()
+                    ?? token["title"]?.ToString()
+                    ?? token["Title"]?.ToString();
+
+                if (!string.IsNullOrWhiteSpace(message))
+                    return message;
+            }
+            catch
+            {
+                // The API may return plain text.
+            }
+
+            return body;
         }
     }
 }

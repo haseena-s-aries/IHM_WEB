@@ -552,6 +552,10 @@ namespace Survery_Certification_App_Consume.Models
 
         public string? JobNumber { get; set; }
 
+        public string? VesselName { get; set; }
+
+        public string? ImoNumber { get; set; }
+
         public string? ClientName { get; set; }
 
         public string? AuditPort { get; set; }

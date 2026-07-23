@@ -15,11 +15,13 @@ namespace Survey_Certification_App.Models
         public int SubmittedSurveyJobs { get; set; }
         public int LiveJobs { get; set; }
         public int CompletedJobs { get; set; }
+        public int DueTodayJobs { get; set; }
     }
 
     public class SurveyorDashboardSummaryDto
     {
         public int LiveJobs { get; set; }
         public int CompletedJobs { get; set; }
+        public int DueTodayJobs { get; set; }
     }
 }

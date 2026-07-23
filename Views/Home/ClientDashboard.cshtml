@@ -1,0 +1,617 @@
+@model ClientDashboardViewModel
+
+@{
+    Layout = null;
+    var dashboard = Model ?? new ClientDashboardViewModel();
+
+    string DateLabel(DateTime? value) =>
+        value.HasValue ? value.Value.ToLocalTime().ToString("dd MMM yyyy") : "Not selected";
+
+    string DateTimeLabel(DateTime? value) =>
+        value.HasValue ? value.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt") : "-";
+
+    string TextOrDash(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    string TypeLabel(string? type) =>
+        (type ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "ihm" => "IHM Report",
+            "exsurvey" => "EX-Survey Report",
+            _ => "Report"
+        };
+
+    string StatusClass(string? status) =>
+        (status ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "completed" => "status-completed",
+            "pending" => "status-pending",
+            "in progress" => "status-progress",
+            _ => "status-muted"
+        };
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Client Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        :root {
+            --bg: #f6f8fb;
+            --card: #ffffff;
+            --ink: #102033;
+            --muted: #64748b;
+            --line: #dbe4f0;
+            --blue: #2563eb;
+            --green: #16a34a;
+            --amber: #d97706;
+            --red: #dc2626;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: "Segoe UI", Arial, sans-serif;
+        }
+
+        .topbar {
+            min-height: 64px;
+            padding: 14px clamp(16px, 4vw, 36px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            background: #0f2747;
+            color: #fff;
+        }
+
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
+        }
+
+        .nav {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .nav a {
+            color: #fff;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 12px;
+            border-radius: 8px;
+            background: rgba(255,255,255,.10);
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .page {
+            width: 100%;
+            margin: 0;
+            padding: 24px clamp(16px, 3vw, 36px) 40px;
+        }
+
+        .hero {
+            padding: 24px;
+            background: linear-gradient(135deg, #12345b, #2563eb);
+            color: #fff;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            align-items: flex-end;
+        }
+
+        .hero h1 { margin: 4px 0 8px; font-size: clamp(26px, 4vw, 40px); }
+        .hero p { margin: 0; color: rgba(255,255,255,.82); max-width: 720px; }
+        .eyebrow { text-transform: uppercase; letter-spacing: .08em; font-size: 12px; font-weight: 800; opacity: .8; }
+
+        .section-title {
+            margin: 28px 0 12px;
+            font-size: 20px;
+        }
+
+        .kpi-grid, .hazard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+        }
+
+        .kpi, .hazard, .job-card, .reports-panel {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(15, 39, 71, .06);
+        }
+
+        .kpi, .hazard {
+            padding: 16px;
+            min-height: 112px;
+        }
+
+        .kpi i, .hazard i { color: var(--blue); }
+        .kpi strong, .hazard strong { display: block; margin-top: 10px; font-size: 28px; }
+        .kpi span, .hazard span { color: var(--muted); font-weight: 700; font-size: 13px; }
+
+        .job-grid {
+            display: grid;
+            gap: 14px;
+        }
+
+        .job-card { padding: 18px; }
+        .job-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .job-title { margin: 0 0 4px; font-size: 18px; }
+        .job-sub { color: var(--muted); font-size: 13px; }
+        .status {
+            display: inline-flex;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-weight: 800;
+            font-size: 12px;
+        }
+        .status-completed { color: #166534; background: #dcfce7; }
+        .status-pending { color: #92400e; background: #fef3c7; }
+        .status-progress { color: #1d4ed8; background: #dbeafe; }
+        .status-muted { color: #475569; background: #e2e8f0; }
+
+        .progress {
+            margin: 14px 0;
+            height: 10px;
+            background: #e5edf7;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        .progress span {
+            display: block;
+            height: 100%;
+            background: var(--blue);
+        }
+
+        .job-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .meta {
+            padding: 10px;
+            background: #f8fafc;
+            border: 1px solid #e7edf5;
+            border-radius: 8px;
+        }
+        .meta span { display: block; color: var(--muted); font-size: 12px; font-weight: 700; }
+        .meta strong { display: block; margin-top: 4px; }
+
+        .reports-panel { overflow: hidden; }
+        .reports-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .reports-table th, .reports-table td {
+            padding: 13px;
+            border-bottom: 1px solid var(--line);
+            text-align: left;
+            vertical-align: top;
+        }
+        .reports-table th { background: #f8fafc; font-size: 12px; text-transform: uppercase; color: var(--muted); }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .action {
+            border: 0;
+            cursor: pointer;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            color: #fff;
+            background: var(--blue);
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 13px;
+        }
+        .action.secondary { background: #0f766e; }
+        .action.summary { background: #334155; }
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: stretch;
+            justify-content: flex-end;
+            background: rgba(15, 23, 42, .52);
+            z-index: 50;
+        }
+
+        .modal-backdrop.open { display: flex; }
+
+        .summary-panel {
+            width: min(760px, 100%);
+            height: 100%;
+            overflow: auto;
+            background: var(--bg);
+            padding: 22px;
+            box-shadow: -18px 0 40px rgba(15, 23, 42, .22);
+        }
+
+        .summary-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .summary-head h2 { margin: 0 0 4px; }
+
+        .close-summary {
+            border: 0;
+            background: #e2e8f0;
+            color: var(--ink);
+            width: 38px;
+            height: 38px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .summary-section {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+
+        .summary-section h3 { margin: 0 0 12px; font-size: 17px; }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+        }
+
+        .summary-item {
+            padding: 10px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        .summary-item span {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .summary-item strong {
+            display: block;
+            margin-top: 4px;
+            overflow-wrap: anywhere;
+        }
+
+        .detail-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .detail-card {
+            border: 1px solid var(--line);
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .detail-card h4 { margin: 0 0 8px; }
+        .detail-card p { margin: 4px 0; color: var(--muted); }
+
+        .empty {
+            padding: 22px;
+            background: var(--card);
+            border: 1px dashed var(--line);
+            border-radius: 8px;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        .load-error {
+            margin-bottom: 16px;
+            padding: 12px 14px;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            border-radius: 8px;
+            font-weight: 700;
+        }
+
+        @@media (max-width: 720px) {
+            .topbar, .hero { align-items: flex-start; flex-direction: column; }
+            .reports-panel { overflow-x: auto; }
+            .reports-table { min-width: 900px; }
+        }
+    </style>
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">
+            <i class="fa-solid fa-file-shield"></i>
+            <span>Client Dashboard</span>
+        </div>
+        <nav class="nav" aria-label="Client navigation">
+            <a href="@Url.Action("AssignedReports", "Home")"><i class="fa-solid fa-folder-open"></i>Assigned Reports</a>
+            <a href="@Url.Action("Index", "Auth")"><i class="fa-solid fa-user-circle"></i>Profile</a>
+            <a href="@Url.Action("Logout", "Home")"><i class="fa-solid fa-arrow-right-from-bracket"></i>Sign Out</a>
+        </nav>
+    </header>
+
+    <main class="page">
+        <section class="hero">
+            <div>
+                <span class="eyebrow">Read-only survey progress</span>
+                <h1>Assigned Survey Overview</h1>
+                <p>Track survey progress, hazardous material findings, and assigned reports.</p>
+            </div>
+        </section>
+
+        @if (ViewBag.LoadError != null)
+        {
+            <div class="load-error">@ViewBag.LoadError</div>
+        }
+
+        <section class="kpi-grid" aria-label="Client dashboard KPIs">
+            <div class="kpi"><i class="fa-solid fa-briefcase"></i><strong>@dashboard.Kpis.AllAssignedJobs</strong><span>All Assigned Jobs</span></div>
+            <div class="kpi"><i class="fa-solid fa-circle-check"></i><strong>@dashboard.Kpis.CompletedJobs</strong><span>Completed Jobs</span></div>
+            <div class="kpi"><i class="fa-solid fa-spinner"></i><strong>@dashboard.Kpis.InProgressJobs</strong><span>In Progress Jobs</span></div>
+            <div class="kpi"><i class="fa-regular fa-clock"></i><strong>@dashboard.Kpis.PendingJobs</strong><span>Pending Jobs</span></div>
+            <div class="kpi"><i class="fa-solid fa-file-lines"></i><strong>@dashboard.Kpis.AssignedReports</strong><span>Assigned Reports</span></div>
+            <div class="kpi"><i class="fa-solid fa-layer-group"></i><strong>@dashboard.Kpis.AreasCovered</strong><span>Areas Covered</span></div>
+        </section>
+
+        <h2 class="section-title">Survey Progress Summary</h2>
+        @if (!dashboard.AssignedJobs.Any())
+        {
+            <div class="empty">No survey jobs have been assigned to you.</div>
+        }
+        else
+        {
+            <section class="job-grid">
+                @foreach (var job in dashboard.AssignedJobs)
+                {
+                    <article class="job-card">
+                        <div class="job-head">
+                            <div>
+                                <h3 class="job-title">@TextOrDash(job.JobNumber)</h3>
+                                <div class="job-sub">@TextOrDash(job.VesselName) &middot; IMO @TextOrDash(job.Imo)</div>
+                            </div>
+                            <span class="status @StatusClass(job.CurrentStatus)">@job.CurrentStatus</span>
+                        </div>
+                        <div class="progress" aria-label="Completion @job.CompletionPercentage percent">
+                            <span style="width:@Math.Clamp(job.CompletionPercentage, 0, 100)%"></span>
+                        </div>
+                        <div class="job-meta">
+                            <div class="meta"><span>Completion</span><strong>@job.CompletionPercentage.ToString("0.##")%</strong></div>
+                            <div class="meta"><span>Survey Date</span><strong>@DateLabel(job.SurveyDate)</strong></div>
+                            <div class="meta"><span>Surveyor</span><strong>@TextOrDash(job.SurveyorName)</strong></div>
+                            <div class="meta"><span>Areas</span><strong>@job.CompletedAreas / @job.TotalAreas</strong></div>
+                            <div class="meta"><span>Pending Areas</span><strong>@job.PendingAreas</strong></div>
+                            <div class="meta"><span>Checkpoints</span><strong>@job.CompletedCheckpoints / @job.TotalCheckpoints</strong></div>
+                        </div>
+                    </article>
+                }
+            </section>
+        }
+
+        <h2 class="section-title">Hazardous Materials Summary</h2>
+        <section class="hazard-grid">
+            <div class="hazard"><i class="fa-solid fa-triangle-exclamation"></i><strong>@dashboard.HazardousMaterials.TotalHazardousMaterialRecords</strong><span>Total hazardous material records</span></div>
+            <div class="hazard"><i class="fa-regular fa-eye"></i><strong>@dashboard.HazardousMaterials.VisualSamplesCount</strong><span>Visual samples count</span></div>
+            <div class="hazard"><i class="fa-solid fa-flask"></i><strong>@dashboard.HazardousMaterials.PhysicalSamplesCount</strong><span>Physical samples count</span></div>
+            <div class="hazard"><i class="fa-solid fa-plus"></i><strong>@dashboard.HazardousMaterials.PositiveFindings</strong><span>material is present</span></div>
+            <div class="hazard"><i class="fa-solid fa-minus"></i><strong>@dashboard.HazardousMaterials.NegativeFindings</strong><span>material is not present</span></div>
+            <div class="hazard"><i class="fa-regular fa-hourglass-half"></i><strong>@dashboard.HazardousMaterials.PendingLabResults</strong><span>Sample Required</span></div>
+            <div class="hazard"><i class="fa-solid fa-vial-circle-check"></i><strong>@dashboard.HazardousMaterials.CompletedLabResults</strong><span>Completed lab results</span></div>
+        </section>
+        <h2 class="section-title">Assigned Reports</h2>
+        @if (!dashboard.AssignedReports.Any())
+        {
+            <div class="empty">No reports have been assigned to you.</div>
+        }
+        else
+        {
+            <section class="reports-panel">
+                <table class="reports-table">
+                    <thead>
+                        <tr>
+                            <th>Report Type</th>
+                            <th>Vessel / Job</th>
+                            <th>Status</th>
+                            <th>Created By</th>
+                            <th>Assigned Date</th>
+                            <th>Summary</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var report in dashboard.AssignedReports)
+                        {
+                            <tr>
+                                <td>@TypeLabel(report.ReportType)</td>
+                                <td>
+                                    <strong>@TextOrDash(report.VesselName)</strong><br />
+                                    <span>@TextOrDash(report.Reference)</span>
+                                </td>
+                                <td>@TextOrDash(report.Status)</td>
+                                <td>@TextOrDash(report.CreatedBy)</td>
+                                <td>@DateTimeLabel(report.AssignedAt)</td>
+                                <td>
+                                    <button class="action summary" type="button" data-summary-job-id="@(report.SurveyJobId ?? report.ReportId)">
+                                        <i class="fa-solid fa-magnifying-glass"></i>
+                                        View Survey Summary
+                                    </button>
+                                </td>
+                                <td>
+                                    <div class="actions">
+                                        <a class="action" target="_blank" rel="noopener" href="@Url.Action("SavedReportFile", "Home", new { type = report.ReportType, id = report.ReportId })">View</a>
+                                        <a class="action secondary" href="@Url.Action("SavedReportFile", "Home", new { type = report.ReportType, id = report.ReportId, download = true })">Download</a>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </section>
+        }
+    </main>
+    <div class="modal-backdrop" id="summaryModal" aria-hidden="true">
+        <aside class="summary-panel" role="dialog" aria-modal="true" aria-labelledby="summaryTitle">
+            <div class="summary-head">
+                <div>
+                    <h2 id="summaryTitle">Survey Summary</h2>
+                    <p id="summarySubtitle">Read-only job details</p>
+                </div>
+                <button class="close-summary" type="button" data-close-summary aria-label="Close summary">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="summaryContent" class="summary-content">
+                <div class="empty">Loading survey summary...</div>
+            </div>
+        </aside>
+    </div>
+    <script>
+        const summaryModal = document.getElementById('summaryModal');
+        const summaryContent = document.getElementById('summaryContent');
+        const summarySubtitle = document.getElementById('summarySubtitle');
+        const summaryUrl = '@Url.Action("ClientJobSummary", "Home")';
+
+        function esc(value) {
+            return String(value ?? '-')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function dateLabel(value, withTime) {
+            if (!value) return '-';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return '-';
+            return date.toLocaleString(undefined, {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {})
+            });
+        }
+
+        function metric(label, value) {
+            return `<div class="summary-item"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`;
+        }
+
+        function renderSummary(data) {
+            const job = data.job || data.Job || {};
+            const hazard = data.hazardousMaterials || data.HazardousMaterials || {};
+            const details = data.surveyDetails || data.SurveyDetails || [];
+            summarySubtitle.textContent = `${job.jobNumber || job.JobNumber || 'Job'} - ${job.vesselName || job.VesselName || 'Vessel'}`;
+
+            const completion = job.completionPercentage ?? job.CompletionPercentage ?? 0;
+            const jobHtml = `
+                <section class="summary-section">
+                    <h3>Job Progress</h3>
+                    <div class="summary-grid">
+                        ${metric('Job number', job.jobNumber ?? job.JobNumber)}
+                        ${metric('Vessel name', job.vesselName ?? job.VesselName)}
+                        ${metric('IMO', job.imo ?? job.Imo)}
+                        ${metric('Survey date', dateLabel(job.surveyDate ?? job.SurveyDate, false))}
+                        ${metric('Surveyor name', job.surveyorName ?? job.SurveyorName)}
+                        ${metric('Current status', job.currentStatus ?? job.CurrentStatus)}
+                        ${metric('Completion', `${Number(completion).toFixed(1)}%`)}
+                        ${metric('Areas', `${job.completedAreas ?? job.CompletedAreas ?? 0} / ${job.totalAreas ?? job.TotalAreas ?? 0}`)}
+                        ${metric('Checkpoints', `${job.completedCheckpoints ?? job.CompletedCheckpoints ?? 0} / ${job.totalCheckpoints ?? job.TotalCheckpoints ?? 0}`)}
+                    </div>
+                </section>`;
+
+            const hazardHtml = `
+                <section class="summary-section">
+                    <h3>Hazardous Materials Summary</h3>
+                    <div class="summary-grid">
+                        ${metric('Total hazardous material records', hazard.totalHazardousMaterialRecords ?? hazard.TotalHazardousMaterialRecords ?? 0)}
+                        ${metric('Visual count', hazard.visualSamplesCount ?? hazard.VisualSamplesCount ?? 0)}
+                        ${metric('Physical sample count', hazard.physicalSamplesCount ?? hazard.PhysicalSamplesCount ?? 0)}
+                        ${metric('Positive findings', hazard.positiveFindings ?? hazard.PositiveFindings ?? 0)}
+                        ${metric('Negative findings', hazard.negativeFindings ?? hazard.NegativeFindings ?? 0)}
+                        ${metric('Pending lab results', hazard.pendingLabResults ?? hazard.PendingLabResults ?? 0)}
+                        ${metric('Completed lab results', hazard.completedLabResults ?? hazard.CompletedLabResults ?? 0)}
+                    </div>
+                </section>`;
+
+            const detailsHtml = details.length === 0
+                ? '<div class="empty">No survey work details are available yet.</div>'
+                : `<div class="detail-list">${details.map(item => `
+                    <article class="detail-card">
+                        <h4>${esc(item.areaName ?? item.AreaName)}</h4>
+                        <p><strong>Checkpoint:</strong> ${esc(item.sampleNumber ?? item.SampleNumber)} &middot; ${esc(item.visualSampleType ?? item.VisualSampleType)}</p>
+                        <p><strong>Location:</strong> ${esc(item.location ?? item.Location)}</p>
+                        <p><strong>Remarks:</strong> ${esc(item.remarks ?? item.Remarks)}</p>
+                        <p><strong>Photos:</strong> ${esc(item.surveyPhotosCount ?? item.SurveyPhotosCount ?? 0)} &middot; <strong>Surveyor:</strong> ${esc(item.surveyorName ?? item.SurveyorName)} &middot; <strong>Updated:</strong> ${esc(dateLabel(item.lastUpdatedDate ?? item.LastUpdatedDate, true))}</p>
+                    </article>`).join('')}</div>`;
+
+            summaryContent.innerHTML = `${jobHtml}${hazardHtml}<section class="summary-section"><h3>Survey Details</h3>${detailsHtml}</section>`;
+        }
+
+        async function openSummary(jobId) {
+            summaryModal.classList.add('open');
+            summaryModal.setAttribute('aria-hidden', 'false');
+            summarySubtitle.textContent = 'Loading...';
+            summaryContent.innerHTML = '<div class="empty">Loading survey summary...</div>';
+            try {
+                const response = await fetch(`${summaryUrl}?jobId=${encodeURIComponent(jobId)}`, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) {
+                    throw new Error(response.status === 403 ? 'You are not authorized to view this survey summary.' : 'Survey summary could not be loaded.');
+                }
+                renderSummary(await response.json());
+            } catch (error) {
+                summarySubtitle.textContent = 'Unable to load summary';
+                summaryContent.innerHTML = `<div class="empty">${esc(error.message || 'Survey summary could not be loaded.')}</div>`;
+            }
+        }
+
+        document.querySelectorAll('[data-summary-job-id]').forEach(button => {
+            button.addEventListener('click', () => openSummary(button.dataset.summaryJobId));
+        });
+
+        document.querySelector('[data-close-summary]')?.addEventListener('click', () => {
+            summaryModal.classList.remove('open');
+            summaryModal.setAttribute('aria-hidden', 'true');
+        });
+
+        summaryModal?.addEventListener('click', event => {
+            if (event.target === summaryModal) {
+                summaryModal.classList.remove('open');
+                summaryModal.setAttribute('aria-hidden', 'true');
+            }
+        });
+    </script>
+</body>
+</html>

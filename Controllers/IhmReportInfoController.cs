@@ -87,7 +87,7 @@ namespace Survery_Certification_App_Consume.Controllers
                     model.OhsPeople?.Count ?? 0,
                     model.OhsRiskAssessmentRows?.Count ?? 0
                 );
-                var error = await SaveAll(model);
+                var error = await SaveAll(model, ignoreMissingVessel: true);
                 if (error != null)
                 {
                     _logger.LogWarning(
@@ -431,7 +431,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 attachment.OriginalFileName);
         }
 
-        private async Task<string?> SaveAll(IhmReportInfoViewModel model)
+        private async Task<string?> SaveAll(IhmReportInfoViewModel model, bool ignoreMissingVessel = false)
         {
             NormalizeCollections(model);
             var client = CreateApiClient();
@@ -443,7 +443,20 @@ namespace Survery_Certification_App_Consume.Controllers
                     JsonContent(model.ToVesselRequest()));
 
                 if (!vesselResponse.IsSuccessStatusCode)
-                    return await ReadError(vesselResponse, "Unable to save vessel information.");
+                {
+                    if (ignoreMissingVessel && (int)vesselResponse.StatusCode == StatusCodes.Status404NotFound)
+                    {
+                        _logger.LogWarning(
+                            "Vessel {VesselId} was not found while saving IHM report for job {JobId}. Continuing with survey job vessel details.",
+                            model.VesselId.Value,
+                            model.JobId);
+                        model.VesselId = null;
+                    }
+                    else
+                    {
+                        return await ReadError(vesselResponse, "Unable to save vessel information.");
+                    }
+                }
             }
 
             var reportResponse = await client.PostAsync(
@@ -487,8 +500,12 @@ namespace Survery_Certification_App_Consume.Controllers
                 {
                     JobId = jobId,
                     VesselId = vessel.Id > 0 ? vessel.Id : null,
-                    VesselName = vessel.VesselName,
-                    ImoNumber = vessel.ImoNumber,
+                    VesselName = !string.IsNullOrWhiteSpace(vessel.VesselName)
+                        ? vessel.VesselName
+                        : job.VesselName,
+                    ImoNumber = !string.IsNullOrWhiteSpace(vessel.ImoNumber)
+                        ? vessel.ImoNumber
+                        : job.ImoNumber,
                     OfficialNumber = vessel.OfficialNumber,
                     VesselType = vessel.VesselType,
                     Flag = vessel.Flag,
@@ -623,7 +640,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 var model = new IhmReportInfoViewModel
                 {
                     JobId = jobId,
-                    VesselId = job.VesselId,
+                    VesselId = vessel?.Id,
                     VesselName = vessel?.VesselName ?? job.VesselName,
                     ImoNumber = vessel?.ImoNumber ?? job.ImoNumber,
                     OfficialNumber = vessel?.OfficialNumber,

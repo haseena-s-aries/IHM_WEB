@@ -143,6 +143,7 @@ namespace Health_Matrix_Consuming_Side.Controllers
                             ?? new SurveyorDashboardSummaryDto();
                         model.LiveJobs = summary.LiveJobs;
                         model.CompletedJobs = summary.CompletedJobs;
+                        model.DueTodayJobs = summary.DueTodayJobs;
                     }
                     else
                     {
@@ -509,58 +510,48 @@ namespace Health_Matrix_Consuming_Side.Controllers
 
             var client = _clientFactory.CreateClient("ApiClient");
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
-            var response = await client.GetAsync("report-assignments/my-reports");
+            var response = await client.GetAsync("client-dashboard/summary");
 
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
-                var assignedReports = JsonConvert.DeserializeObject<List<AssignedReportViewModel>>(json)
-                    ?? new List<AssignedReportViewModel>();
+                var dashboard = JsonConvert.DeserializeObject<ClientDashboardViewModel>(json)
+                    ?? new ClientDashboardViewModel();
 
-                var reports = assignedReports.Select(report => new SavedReportViewModel
-                {
-                    Id = report.ReportId,
-                    ReportType = report.ReportType,
-                    Title = report.Title,
-                    VesselName = report.VesselName,
-                    Reference = report.Reference,
-                    Status = report.Status,
-                    CreatedBy = report.CreatedBy,
-                    SavedAt = report.AssignedAt
-                }).ToList();
-
-                return View("SavedReports", reports);
+                return View("ClientDashboard", dashboard);
             }
 
             var primaryStatus = response.StatusCode;
             var primaryBody = await response.Content.ReadAsStringAsync();
             _logger.LogWarning(
-                "Assigned reports API returned {StatusCode}: {Body}",
+                "Client dashboard API returned {StatusCode}: {Body}",
                 primaryStatus,
                 primaryBody);
 
-            // Fallback for older/running API builds. This endpoint also returns Client-assigned reports only.
-            var fallbackResponse = await client.GetAsync("AdminDashboard/saved-reports");
-            if (fallbackResponse.IsSuccessStatusCode)
-            {
-                var fallbackJson = await fallbackResponse.Content.ReadAsStringAsync();
-                var fallbackReports = JsonConvert.DeserializeObject<List<SavedReportViewModel>>(fallbackJson)
-                    ?? new List<SavedReportViewModel>();
-
-                return View("SavedReports", fallbackReports);
-            }
-
-            var fallbackBody = await fallbackResponse.Content.ReadAsStringAsync();
-            _logger.LogWarning(
-                "Assigned reports fallback API returned {StatusCode}: {Body}",
-                fallbackResponse.StatusCode,
-                fallbackBody);
-
             ViewBag.LoadError = primaryStatus == System.Net.HttpStatusCode.Forbidden
-                ? "Your Client account is not authorized for assigned reports. Please confirm the user is approved as Client."
-                : $"Assigned reports could not be loaded. API returned {(int)primaryStatus} from assigned reports and {(int)fallbackResponse.StatusCode} from saved reports.";
+                ? "Your Client account is not authorized for the Client dashboard. Please confirm the user is approved as Client."
+                : $"Client dashboard could not be loaded. API returned {(int)primaryStatus}.";
 
-            return View("SavedReports", new List<SavedReportViewModel>());
+            return View("ClientDashboard", new ClientDashboardViewModel());
+        }
+
+        [HttpGet]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        public async Task<IActionResult> ClientJobSummary(int jobId)
+        {
+            if (!IsClientRole(HttpContext.Session.GetString("UserRole")) &&
+                !IsClientRole(HttpContext.Session.GetString("RoleName")))
+                return Forbid();
+
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (string.IsNullOrWhiteSpace(jwt))
+                return Unauthorized();
+
+            var client = _clientFactory.CreateClient("ApiClient");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+            var response = await client.GetAsync($"client-dashboard/jobs/{jobId}/summary");
+            var body = await response.Content.ReadAsStringAsync();
+            return JsonProxyResult(response, body);
         }
 
         [HttpGet]
