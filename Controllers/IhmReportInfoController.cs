@@ -444,13 +444,16 @@ namespace Survery_Certification_App_Consume.Controllers
 
                 if (!vesselResponse.IsSuccessStatusCode)
                 {
-                    if (ignoreMissingVessel && (int)vesselResponse.StatusCode == StatusCodes.Status404NotFound)
+                    if (ShouldContinueAfterVesselSaveFailure(vesselResponse, ignoreMissingVessel))
                     {
                         _logger.LogWarning(
-                            "Vessel {VesselId} was not found while saving IHM report for job {JobId}. Continuing with survey job vessel details.",
+                            "Vessel {VesselId} could not be updated while saving IHM report for job {JobId}. StatusCode={StatusCode}. Continuing with report information save.",
                             model.VesselId.Value,
-                            model.JobId);
-                        model.VesselId = null;
+                            model.JobId,
+                            (int)vesselResponse.StatusCode);
+
+                        if ((int)vesselResponse.StatusCode == StatusCodes.Status404NotFound)
+                            model.VesselId = null;
                     }
                     else
                     {
@@ -466,6 +469,23 @@ namespace Survery_Certification_App_Consume.Controllers
             return reportResponse.IsSuccessStatusCode
                 ? null
                 : await ReadError(reportResponse, "Unable to save report information.");
+        }
+
+        private bool ShouldContinueAfterVesselSaveFailure(
+            HttpResponseMessage response,
+            bool ignoreMissingVessel)
+        {
+            var statusCode = (int)response.StatusCode;
+            var isManager = string.Equals(
+                HttpContext.Session.GetString("UserRole"),
+                "Manager",
+                StringComparison.OrdinalIgnoreCase);
+
+            if (isManager && (statusCode == StatusCodes.Status403Forbidden ||
+                              statusCode == StatusCodes.Status404NotFound))
+                return true;
+
+            return ignoreMissingVessel && statusCode == StatusCodes.Status404NotFound;
         }
 
         private async Task<IhmReportInfoViewModel?> LoadModel(int jobId)
