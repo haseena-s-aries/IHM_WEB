@@ -10,7 +10,7 @@
 
     var liveJobs = Model?.LiveJobs ?? 0;
     var completedJobs = Model?.CompletedJobs ?? 0;
-    var dueTodayJobs = Model?.DueTodayJobs ?? 0;
+ 
     var totalAssigned = liveJobs + completedJobs;
     var successRate = totalAssigned == 0 ? 0 : (int)Math.Round((completedJobs * 100.0) / totalAssigned);
     var liveUrl = Url.Action("Ihm", "SurveyJobs", new { ihmCompletionFilter = "live" }) ?? "/SurveyJobs/Ihm";
@@ -274,7 +274,7 @@
 
     .overview-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 14px;
     }
 
@@ -490,12 +490,7 @@
                 <div class="mini-title">Pending Jobs</div>
                 <div class="mini-sub">Waiting to Start</div>
             </div>
-            <div class="small-kpi">
-                <div class="mini-icon purple"><i class="fa-regular fa-calendar"></i></div>
-                <div class="mini-count">@dueTodayJobs</div>
-                <div class="mini-title">Due Today</div>
-                <div class="mini-sub">Deadline Today</div>
-            </div>
+            
         </section>
 
         <h2 class="section-title">Performance</h2>

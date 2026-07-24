@@ -114,6 +114,10 @@
         public string OriginalFileName { get; set; } = "";
         public string FilePath { get; set; } = "";
         public DateTime? UploadedAt { get; set; }
+        public bool ShowInAppendixThree { get; set; }
+        public int AppendixThreeSortOrder { get; set; }
+        public string? AppendixThreeEditedFilePath { get; set; }
+
     }
 
     public class SurveyJobDto

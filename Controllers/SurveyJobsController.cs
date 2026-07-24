@@ -136,6 +136,7 @@ namespace Survery_Certification_App_Consume.Controllers
 
             return View(model);
         }
+      
         public async Task<IActionResult> Work(int jobId, string surveyType = "IHM Survey", string? ihmCompletionFilter = null)
         {
             try
@@ -716,6 +717,85 @@ namespace Survery_Certification_App_Consume.Controllers
                 Response.StatusCode = 500;
                 return Json(new { message = ex.Message });
             }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveAppendixThreeSelection(
+    int checkpointId,
+    [FromBody] AppendixThreeSelectionRequest request)
+        {
+            var client = CreateApiClient();
+
+            var response = await client.PostAsJsonAsync(
+                $"ihm-survey/checkpoints/{checkpointId}/appendix-three-selection",
+                request);
+
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(body);
+            }
+
+            return Content(body, "application/json");
+        }
+
+        public class AppendixThreeSelectionRequest
+        {
+            public List<int> PhotoIds { get; set; } = new();
+        }
+        [HttpPost]
+        public async Task<IActionResult> RotateAppendixThreeImage(int photoId)
+        {
+            var client = CreateApiClient();
+
+            var response = await client.PostAsync(
+                $"ihm-survey/sampling-photos/{photoId}/appendix-three-rotate",
+                null);
+
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(body);
+            }
+
+            return Content(body, "application/json");
+        }
+        [HttpPost]
+        public async Task<IActionResult> SaveAppendixThreeEditedImage(
+    int photoId,
+    IFormFile file,
+    [FromForm] int width,
+    [FromForm] int height)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("Edited image is required.");
+
+            var client = CreateApiClient();
+
+            using var content = new MultipartFormDataContent();
+            await using var stream = file.OpenReadStream();
+
+            content.Add(new StreamContent(stream), "file", file.FileName);
+            content.Add(new StringContent(width.ToString()), "width");
+            content.Add(new StringContent(height.ToString()), "height");
+
+            var response = await client.PostAsync(
+                $"ihm-survey/sampling-photos/{photoId}/appendix-three-edit",
+                content);
+
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(body);
+            }
+
+            return Content(body, "application/json");
         }
         public async Task<IActionResult> ProjectInfo(int jobId, string? ihmCompletionFilter = null, string? returnUrl = null)
         {

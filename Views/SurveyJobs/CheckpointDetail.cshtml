@@ -641,7 +641,8 @@
             .photo-card img {
                 width: 100%;
                 height: 100%;
-                object-fit: cover;
+                object-fit: contain;
+                background: #eef4fb;
                 display: block;
             }
 
@@ -657,6 +658,42 @@
                 background: #eef4fb;
             }
 
+        .appendix-three-select {
+            position: absolute;
+            left: 8px;
+            top: 8px;
+            z-index: 3;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 9px;
+            border-radius: 999px;
+            background: rgba(0,0,0,.62);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+            .appendix-three-select input {
+                width: 16px;
+                height: 16px;
+                accent-color: #00d4aa;
+            }
+
+        .edit-photo {
+            position: absolute;
+            left: 8px;
+            bottom: 8px;
+            z-index: 3;
+            border: 0;
+            border-radius: 999px;
+            background: rgba(0,0,0,.62);
+            color: #fff;
+            padding: 7px 12px;
+            font-size: 11px;
+            font-weight: 900;
+        }
         .delete-photo {
             position: absolute;
             top: 8px;
@@ -1637,9 +1674,13 @@
             renderPhotos(photos);
             grid.dataset.loaded = "true";
         }
-
+        let currentPhotos = [];
         function renderPhotos(photos) {
             const grid = document.getElementById("photoGrid");
+                    currentPhotos = [...photos].sort((a, b) =>
+            Number(getValue(a, "id", "Id")) - Number(getValue(b, "id", "Id"))
+        );
+        photos = currentPhotos;
             const empty = document.getElementById("photoEmpty");
             grid.innerHTML = "";
             empty.style.display = photos.length ? "none" : "block";
@@ -1649,12 +1690,49 @@
                 if (!path) return;
                 const card = document.createElement("div");
                 card.className = "photo-card";
-                card.innerHTML = `<img src="${normalizeUrl(path)}" alt="Checkpoint image" onerror="this.parentElement.classList.add('image-error'); this.remove();" />
+                const selected = getValue(photo, "showInAppendixThree", "ShowInAppendixThree") === true;
+                     const editedPath = getValue(photo, "appendixThreeEditedFilePath", "AppendixThreeEditedFilePath");
+        const displayPath = editedPath ? editedPath : path;
+
+                card.innerHTML = `
+                    <img src="${normalizeUrl(displayPath)}" alt="Checkpoint image" onerror="this.parentElement.classList.add('image-error'); this.remove();" />
+            <label class="appendix-three-select">
+            <input type="checkbox" class="appendix-three-check" data-photo-id="${id}" ${selected ? "checked" : ""} />
+            Appendix 3
+        </label>
+        ${selected ? `<button class="edit-photo" type="button" onclick="this.disabled=true; openAppendixThreeEditor(${id}).finally(() => this.disabled=false)">Rotate</button>` : ""}
                     <button class="delete-photo" type="button" onclick="deletePhoto(${id})"><i class="fa-solid fa-trash"></i></button>`;
                 grid.appendChild(card);
             });
         }
 
+                document.addEventListener("change", async event => {
+            if (!event.target.classList.contains("appendix-three-check")) return;
+
+            const checked = Array.from(document.querySelectorAll(".appendix-three-check:checked"));
+            if (checked.length > 2) {
+                event.target.checked = false;
+                alert("Only 2 images can be selected for Appendix 3.");
+                return;
+            }
+
+            const photoIds = checked.map(x => Number(x.dataset.photoId));
+
+            const response = await fetch(`/SurveyJobs/SaveAppendixThreeSelection?checkpointId=${checkpointContext.checkpointId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ photoIds })
+            });
+
+                    if (!response.ok) {
+            alert(await response.text() || "Selection save failed.");
+            return;
+        }
+
+        const updatedPhotos = await response.json();
+        renderPhotos(updatedPhotos);
+        document.getElementById("photoGrid").dataset.loaded = "true";
+        });
         document.getElementById("photoInput").addEventListener("change", async event => {
             const files = Array.from(event.target.files || []);
             if (!files.length) return;
@@ -1679,7 +1757,42 @@
                 event.target.value = "";
             }
         });
+                 async function openAppendixThreeEditor(photoId) {
+            const response = await fetch(`/SurveyJobs/RotateAppendixThreeImage?photoId=${photoId}`, {
+                method: "POST"
+            });
 
+            if (!response.ok) {
+                alert(await response.text() || "Image rotate failed.");
+                return;
+            }
+
+            const saved = await response.json();
+
+            const index = currentPhotos.findIndex(x => Number(getValue(x, "id", "Id")) === Number(photoId));
+            if (index >= 0) currentPhotos[index] = saved;
+
+            renderPhotos(currentPhotos);
+        }
+
+                function loadImageFromUrl(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+
+                img.onload = () => {
+                    if ((img.naturalWidth || img.width) && (img.naturalHeight || img.height)) {
+                        resolve(img);
+                    } else {
+                        reject(new Error("Image loaded without dimensions."));
+                    }
+                };
+
+                img.onerror = () => reject(new Error("Unable to load image for rotate."));
+
+                const separator = url.includes("?") ? "&" : "?";
+                img.src = `${url}${separator}_=${Date.now()}`;
+            });
+        }
         async function deletePhoto(photoId) {
             if (!confirm("Delete this checkpoint image?")) return;
             const response = await fetch(`/SurveyJobs/DeleteCheckpointPhoto?photoId=${photoId}`, { method: "POST" });
