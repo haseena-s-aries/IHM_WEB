@@ -267,7 +267,7 @@
 
             @if (Model.IsAdmin)
             {
-                <button class="new-btn" data-bs-toggle="modal" data-bs-target="#createJobModal">
+                <button type="button" class="new-btn" data-bs-toggle="modal" data-bs-target="#createJobModal">
                     <i class="fa-solid fa-plus"></i> New Job
                 </button>
             }
@@ -1140,9 +1140,9 @@
                 form.addEventListener("submit", function () {
                     document.body.classList.add("page-busy");
 
-                    form.querySelectorAll("button, input, select, textarea").forEach(x => {
-                        if (x.type !== "hidden") x.disabled = true;
-                    });
+                                form.querySelectorAll("button").forEach(x => {
+                x.disabled = true;
+            });
 
                     const submitButton = form.querySelector('button[type="submit"]');
                     if (submitButton) {

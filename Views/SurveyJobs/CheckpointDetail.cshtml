@@ -681,19 +681,37 @@
                 accent-color: #00d4aa;
             }
 
-        .edit-photo {
+        .rotate-photo {
             position: absolute;
             left: 8px;
             bottom: 8px;
-            z-index: 3;
+            width: 44px;
+            height: 44px;
             border: 0;
-            border-radius: 999px;
-            background: rgba(0,0,0,.62);
+            border-radius: 50%;
+            background: rgba(0,0,0,.60);
             color: #fff;
-            padding: 7px 12px;
-            font-size: 11px;
-            font-weight: 900;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: .2s;
+            z-index: 3;
         }
+
+            .rotate-photo:hover {
+                background: rgba(0,0,0,.78);
+                transform: scale(1.08);
+            }
+
+            .rotate-photo i {
+                font-size: 18px;
+            }
+
+            .rotate-photo:disabled {
+                opacity: .7;
+                cursor: wait;
+            }
         .delete-photo {
             position: absolute;
             top: 8px;
@@ -819,62 +837,12 @@
                 </div>
 
                 <h3 class="section-label">Audit Results</h3>
-                <div class="audit-chip @(auditComplete ? "" : "pending")">
-                    <i class="fa-solid @(auditComplete ? "fa-circle-check" : "fa-clock")"></i>
-                    <div>
-                        <strong id="auditResultLabel">@auditResult.Replace("Not", "Not ").Replace("SampleRequired", "Sample Required")</strong>
-                        <small>@auditStatusText</small>
-                    </div>
-                </div>
+                
 
                 <div class="card-box">
                     <div class="info-row"><div class="info-label"><i class="fa-regular fa-file-lines"></i>Document Analysis</div><div class="info-value">@Val(Model.DocumentAnalysisResult)</div></div>
                     <div class="info-row"><div class="info-label"><i class="fa-regular fa-square-check"></i>Result of Check</div><div class="info-value">@Val(Model.CheckResult)</div></div>
-                    <div class="field-row">
-                        <div class="info-label"><i class="fa-solid fa-clipboard-check"></i>Audit Result</div>
-                        <select class="field" name="AuditResult" id="auditResult">
-                            @if (auditResult == "Pending")
-                            {
-                                <option value="Pending" selected>Pending</option>
-                            }
-                            else
-                            {
-                                <option value="Pending">Pending</option>
-                            }
-                            @if (auditResult == "Present")
-                            {
-                                <option value="Present" selected>Present</option>
-                            }
-                            else
-                            {
-                                <option value="Present">Present</option>
-                            }
-                            @if (auditResult == "NotPresent")
-                            {
-                                <option value="NotPresent" selected>Not Present</option>
-                            }
-                            else
-                            {
-                                <option value="NotPresent">Not Present</option>
-                            }
-                            @if (auditResult == "NotApplicable")
-                            {
-                                <option value="NotApplicable" selected>Not Applicable</option>
-                            }
-                            else
-                            {
-                                <option value="NotApplicable">Not Applicable</option>
-                            }
-                            @if (auditResult == "SampleRequired")
-                            {
-                                <option value="SampleRequired" selected>Sample Required</option>
-                            }
-                            else
-                            {
-                                <option value="SampleRequired">Sample Required</option>
-                            }
-                        </select>
-                    </div>
+                    
                 </div>
 
                 <h3 class="section-label">Flags & Remarks</h3>
@@ -1698,9 +1666,15 @@
                     <img src="${normalizeUrl(displayPath)}" alt="Checkpoint image" onerror="this.parentElement.classList.add('image-error'); this.remove();" />
             <label class="appendix-three-select">
             <input type="checkbox" class="appendix-three-check" data-photo-id="${id}" ${selected ? "checked" : ""} />
-            Appendix 3
+            
         </label>
-        ${selected ? `<button class="edit-photo" type="button" onclick="this.disabled=true; openAppendixThreeEditor(${id}).finally(() => this.disabled=false)">Rotate</button>` : ""}
+                ${selected ? `
+        <button class="rotate-photo"
+                type="button"
+                title="Rotate Image"
+                onclick="this.disabled=true; openAppendixThreeEditor(${id}).finally(() => this.disabled=false)">
+            <i class="fa-solid fa-rotate-right"></i>
+        </button>` : ""}
                     <button class="delete-photo" type="button" onclick="deletePhoto(${id})"><i class="fa-solid fa-trash"></i></button>`;
                 grid.appendChild(card);
             });
