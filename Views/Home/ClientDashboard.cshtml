@@ -342,6 +342,40 @@
             font-weight: 700;
         }
 
+        .icon-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: nowrap;
+        }
+
+        .client-action-icon {
+            width: 36px;
+            height: 36px;
+            border: 1px solid #dbe3ef;
+            border-radius: 9px;
+            background: #fff;
+            color: #334155;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+            .client-action-icon:hover {
+                border-color: #2869ed;
+                color: #2869ed;
+            }
+
+        .remark-textarea {
+            width: 100%;
+            resize: vertical;
+            border: 1px solid #dbe3ef;
+            border-radius: 12px;
+            padding: 12px;
+        }
+
         @@media (max-width: 720px) {
             .topbar, .hero { align-items: flex-start; flex-direction: column; }
             .reports-panel { overflow-x: auto; }
@@ -440,25 +474,22 @@
                 <table class="reports-table">
                     <thead>
                         <tr>
-                            <th>Report Type</th>
-                            <th>Vessel / Job</th>
-                            <th>Status</th>
-                            <th>Created By</th>
+                            <th>Vessel Name</th>
+                            <th>Job Number</th>
+                            <th>Rev</th>
+                            <th>Prepared By</th>
                             <th>Assigned Date</th>
                             <th>Summary</th>
-                            <th>Actions</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var report in dashboard.AssignedReports)
                         {
                             <tr>
-                                <td>@TypeLabel(report.ReportType)</td>
-                                <td>
-                                    <strong>@TextOrDash(report.VesselName)</strong><br />
-                                    <span>@TextOrDash(report.Reference)</span>
-                                </td>
-                                <td>@TextOrDash(report.Status)</td>
+                                <td><strong>@TextOrDash(report.VesselName)</strong></td>
+                                <td>@TextOrDash(report.Reference)</td>
+                                <td>@TextOrDash(report.RevisionNo)</td>
                                 <td>@TextOrDash(report.CreatedBy)</td>
                                 <td>@DateTimeLabel(report.AssignedAt)</td>
                                 <td>
@@ -468,9 +499,28 @@
                                     </button>
                                 </td>
                                 <td>
-                                    <div class="actions">
-                                        <a class="action" target="_blank" rel="noopener" href="@Url.Action("SavedReportFile", "Home", new { type = report.ReportType, id = report.ReportId })">View</a>
-                                        <a class="action secondary" href="@Url.Action("SavedReportFile", "Home", new { type = report.ReportType, id = report.ReportId, download = true })">Download</a>
+                                    <div class="actions icon-actions">
+                                        <a class="client-action-icon"
+                                           title="View PDF"
+                                           target="_blank"
+                                           rel="noopener"
+                                           href="@Url.Action("SavedReportFile", "Home", new { type = report.ReportType, id = report.ReportId })">
+                                            <i class="fa-regular fa-file-pdf"></i>
+                                        </a>
+
+                                        <a class="client-action-icon"
+                                           title="Download"
+                                           href="@Url.Action("SavedReportFile", "Home", new { type = report.ReportType, id = report.ReportId, download = true })">
+                                            <i class="fa-solid fa-download"></i>
+                                        </a>
+
+                                        <button class="client-action-icon report-remark-btn"
+                                                type="button"
+                                                title="Send Remark"
+                                                data-report-type="@report.ReportType"
+                                                data-report-id="@report.ReportId">
+                                            <i class="fa-regular fa-comment-dots"></i>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -480,6 +530,27 @@
             </section>
         }
     </main>
+    <div class="modal-backdrop" id="remarkModal" aria-hidden="true">
+        <aside class="summary-panel" role="dialog" aria-modal="true">
+            <div class="summary-head">
+                <div>
+                    <h2>Send Remark</h2>
+                    <p>Write your remark for this report.</p>
+                </div>
+                <button class="close-summary" type="button" data-close-remark>
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="summary-content">
+                <textarea id="reportRemarkText" rows="6" class="remark-textarea"
+                          placeholder="Type remark..."></textarea>
+                <button type="button" class="action" id="sendReportRemarkBtn">
+                    Send Remark
+                </button>
+            </div>
+        </aside>
+    </div>
     <div class="modal-backdrop" id="summaryModal" aria-hidden="true">
         <aside class="summary-panel" role="dialog" aria-modal="true" aria-labelledby="summaryTitle">
             <div class="summary-head">
@@ -497,6 +568,84 @@
         </aside>
     </div>
     <script>
+                const remarkModal = document.getElementById('remarkModal');
+        const remarkText = document.getElementById('reportRemarkText');
+        const sendRemarkBtn = document.getElementById('sendReportRemarkBtn');
+        let remarkContext = null;
+
+        document.querySelectorAll('.report-remark-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                remarkContext = {
+                    reportType: button.dataset.reportType,
+                    reportId: Number(button.dataset.reportId || 0)
+                };
+
+                if (remarkText) remarkText.value = '';
+                remarkModal?.classList.add('open');
+                remarkModal?.setAttribute('aria-hidden', 'false');
+            });
+        });
+
+        document.querySelector('[data-close-remark]')?.addEventListener('click', () => {
+            remarkModal?.classList.remove('open');
+            remarkModal?.setAttribute('aria-hidden', 'true');
+        });
+
+        remarkModal?.addEventListener('click', event => {
+            if (event.target === remarkModal) {
+                remarkModal.classList.remove('open');
+                remarkModal.setAttribute('aria-hidden', 'true');
+            }
+        });
+
+        sendRemarkBtn?.addEventListener('click', async () => {
+            const remark = remarkText?.value.trim() || '';
+
+            if (!remarkContext?.reportId || !remarkContext.reportType) {
+                alert('Report details unavailable.');
+                return;
+            }
+
+            if (!remark) {
+                alert('Please type a remark.');
+                return;
+            }
+
+            sendRemarkBtn.disabled = true;
+            sendRemarkBtn.textContent = 'Sending...';
+
+            try {
+                const response = await fetch('/Home/SendReportRemark', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        reportType: remarkContext.reportType,
+                        reportId: remarkContext.reportId,
+                        remark
+                    })
+                });
+
+                const text = await response.text();
+                let payload = {};
+                try { payload = text ? JSON.parse(text) : {}; } catch { payload = { message: text }; }
+
+                if (!response.ok) {
+                    throw new Error(payload.message || payload.Message || 'Unable to send remark.');
+                }
+
+                alert(payload.message || payload.Message || 'Remark sent successfully.');
+                remarkModal?.classList.remove('open');
+                remarkModal?.setAttribute('aria-hidden', 'true');
+            } catch (error) {
+                alert(error.message || 'Unable to send remark.');
+            } finally {
+                sendRemarkBtn.disabled = false;
+                sendRemarkBtn.textContent = 'Send Remark';
+            }
+        });
         const summaryModal = document.getElementById('summaryModal');
         const summaryContent = document.getElementById('summaryContent');
         const summarySubtitle = document.getElementById('summarySubtitle');

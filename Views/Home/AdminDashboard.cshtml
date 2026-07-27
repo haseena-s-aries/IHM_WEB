@@ -28,6 +28,7 @@
     var canSeeUsers = !isClient;
     var canApproveUsers = isAdmin || Model.ManageableProjects.Any();
     var profileTitle = isAdmin ? "Administrator" : "Manager";
+    var canSeeClientRemarks = isAdmin || (!isClient && canSeeIhm);
     var ihmJobs = canSeeIhm ? surveys.IhmSurveyJobs : 0;
     var ihmReportCount = Model.SavedReports.Count(x =>
     string.Equals(x.ReportType, "ihm", StringComparison.OrdinalIgnoreCase));
@@ -114,6 +115,14 @@
                     <a href="@Url.Action("UsageAnalytics", "Home")"><i class="fa-solid fa-chart-line"></i> Usage Analytics</a>
                 }
                 <a href="@Url.Action("SavedReports", "Home")"><i class="fa-solid fa-file-lines"></i><span>Reports</span></a>
+                @if (canSeeClientRemarks)
+                {
+                    <a href="@Url.Action("ClientReportRemarks", "Home")">
+                        <i class="fa-regular fa-comments"></i>
+                        <span>Client Remarks</span>
+                        <b id="clientRemarkUnreadBadge" hidden></b>
+                    </a>
+                }
                 <a href="@Url.Action("Index", "Vessel")"><i class="fa-solid fa-ship"></i><span>Vessels</span></a>
                 <a href="@Url.Action("Index", "Auth")"><i class="fa-solid fa-user-circle"></i><span>Profile</span></a>
 
@@ -500,7 +509,31 @@
     </div>
 
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        async function loadClientRemarkUnreadCount() {
+            const badge = document.getElementById("clientRemarkUnreadBadge");
+            if (!badge) return;
 
+            try {
+                const response = await fetch("@Url.Action("ClientReportRemarkUnreadCount", "Home")", {
+                    headers: { "Accept": "application/json" }
+                });
+
+                if (!response.ok) return;
+
+                const payload = await response.json();
+                const count = Number(payload.count || payload.Count || 0);
+
+                badge.hidden = count <= 0;
+                badge.textContent = count > 9 ? "9+" : count.toString();
+            } catch {
+                badge.hidden = true;
+            }
+        }
+
+        loadClientRemarkUnreadCount();
+        setInterval(loadClientRemarkUnreadCount, 30000);
+    </script>
     <script src="~/js/admin-dashboard.js" asp-append-version="true"></script>
 </body>
 </html>

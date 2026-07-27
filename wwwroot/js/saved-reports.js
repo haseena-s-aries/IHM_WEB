@@ -304,5 +304,159 @@
         }
     });
 
+    // ---------- Send-to-client MODAL (IHM action-icon flow) ----------
+    const sendModal = document.getElementById("sendReportModal");
+    if (sendModal) {
+        const modalSearch = sendModal.querySelector(".client-search");
+        const modalSelect = sendModal.querySelector(".client-select");
+        const modalSendBtn = sendModal.querySelector(".send-modal-send");
+        const modalAssigned = sendModal.querySelector(".assigned-clients");
+
+        let modalContext = null;
+
+        function closeSendModal() {
+            sendModal.hidden = true;
+            modalContext = null;
+            modalSearch.value = "";
+        }
+
+        async function refreshModal() {
+            if (!modalContext) return;
+            try {
+                const clients = await loadClients(modalContext.projectType, modalSearch.value);
+                renderClientOptions(modalSelect, clients);
+
+                const assignments = await loadAssignments(modalContext.reportType, modalContext.reportId);
+                renderAssignments(modalAssigned, assignments);
+            } catch (error) {
+                modalSelect.innerHTML = '<option value="">Unable to load Client users</option>';
+                modalAssigned.textContent = error.message || "Unable to load assignments.";
+            }
+        }
+
+        async function openSendModal(btn) {
+            modalContext = {
+                reportType: btn.dataset.reportType,
+                reportId: btn.dataset.reportId,
+                projectType: btn.dataset.projectType
+            };
+            sendModal.hidden = false;
+            modalSearch.value = "";
+            modalSelect.innerHTML = '<option value="">Loading...</option>';
+            modalAssigned.textContent = "Loading assigned clients...";
+            await refreshModal();
+        }
+
+        document.addEventListener("click", async event => {
+            const trigger = event.target.closest(".send-icon-btn");
+            if (trigger) {
+                await openSendModal(trigger);
+                return;
+            }
+
+            if (event.target === sendModal || event.target.closest(".send-modal-close")) {
+                closeSendModal();
+                return;
+            }
+
+            if (event.target.closest(".send-modal-send")) {
+                const clientUserId = Number(modalSelect.value || 0);
+                if (!modalContext || !clientUserId) {
+                    alert("Please select a Client user.");
+                    return;
+                }
+
+                modalSendBtn.disabled = true;
+                modalSendBtn.textContent = "Sending...";
+                try {
+                    const response = await fetch("/Home/AssignReportToClient", {
+                        method: "POST",
+                        headers: { "Accept": "application/json", "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            reportType: modalContext.reportType,
+                            reportId: Number(modalContext.reportId),
+                            surveyJobId: Number(modalContext.reportId),
+                            clientUserId
+                        })
+                    });
+                    const payload = await readJson(response);
+                    if (!response.ok) throw new Error(messageFrom(payload, "Unable to send report."));
+                    await refreshModal();
+                    alert(messageFrom(payload, "Report assigned successfully."));
+                } catch (error) {
+                    alert(error.message || "Unable to send report.");
+                } finally {
+                    modalSendBtn.disabled = false;
+                    modalSendBtn.textContent = "Send";
+                }
+                return;
+            }
+
+            const revokeBtn = event.target.closest(".revoke-assignment");
+            if (revokeBtn && sendModal.contains(revokeBtn)) {
+                const assignmentId = revokeBtn.dataset.assignmentId;
+                if (!assignmentId) return;
+                revokeBtn.disabled = true;
+                try {
+                    const response = await fetch(`/Home/RevokeReportAssignment?assignmentId=${encodeURIComponent(assignmentId)}`, {
+                        method: "POST",
+                        headers: { "Accept": "application/json" }
+                    });
+                    const payload = await readJson(response);
+                    if (!response.ok) throw new Error(messageFrom(payload, "Unable to remove assignment."));
+                    await refreshModal();
+                } catch (error) {
+                    alert(error.message || "Unable to remove assignment.");
+                    revokeBtn.disabled = false;
+                }
+            }
+        });
+
+        modalSearch.addEventListener("input", () => {
+            clearTimeout(modalSearch._timer);
+            modalSearch._timer = setTimeout(refreshModal, 300);
+        });
+
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape" && !sendModal.hidden) closeSendModal();
+        });
+    }
+
+    // ---------- Delete report ----------
+    document.addEventListener("click", async event => {
+        const deleteBtn = event.target.closest(".delete-report-btn");
+        if (!deleteBtn) return;
+
+        const type = deleteBtn.dataset.reportType;
+        const id = deleteBtn.dataset.reportId;
+        if (!confirm("Delete this report? This cannot be undone.")) return;
+
+        deleteBtn.disabled = true;
+        try {
+            const response = await fetch(`/Home/DeleteSavedReport?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`, {
+                method: "POST",
+                headers: { "Accept": "application/json" }
+            });
+            const payload = await readJson(response);
+            if (!response.ok) throw new Error(messageFrom(payload, "Unable to delete report."));
+            deleteBtn.closest(".report-row")?.remove();
+        } catch (error) {
+            alert(error.message || "Unable to delete report.");
+            deleteBtn.disabled = false;
+        }
+    });
+
+    // ---------- Prepared On -> local timezone ----------
+    document.querySelectorAll(".prepared-on[data-utc]").forEach(el => {
+        const utc = el.getAttribute("data-utc");
+        if (!utc) return;
+        const d = new Date(utc);
+        if (isNaN(d)) return;
+        el.textContent = d.toLocaleString(undefined, {
+            day: "2-digit", month: "short", year: "numeric",
+            hour: "2-digit", minute: "2-digit", hour12: true
+        });
+    });
+
     filterReports();
 })();

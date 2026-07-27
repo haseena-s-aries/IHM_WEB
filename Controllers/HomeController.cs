@@ -473,6 +473,108 @@ namespace Health_Matrix_Consuming_Side.Controllers
         [HttpGet]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public Task<IActionResult> AssignedReports() => ClientDashboard();
+        [HttpPost]
+        public async Task<IActionResult> SendReportRemark([FromBody] SendReportRemarkRequest request)
+        {
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (string.IsNullOrWhiteSpace(jwt))
+                return Unauthorized();
+
+            if (string.IsNullOrWhiteSpace(request.Remark))
+                return BadRequest(new { message = "Please type a remark." });
+
+            var client = _clientFactory.CreateClient("ApiClient");
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", jwt);
+
+            var payload = JsonConvert.SerializeObject(request);
+
+            var response = await client.PostAsync(
+                "report-remarks",
+                new StringContent(payload, Encoding.UTF8, "application/json"));
+
+            var body = await response.Content.ReadAsStringAsync();
+            return JsonProxyResult(response, body);
+        }
+        [HttpGet]
+        [BlockClientAccess]
+        public async Task<IActionResult> ClientReportRemarkUnreadCount()
+        {
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (string.IsNullOrWhiteSpace(jwt))
+                return Unauthorized();
+
+            var client = _clientFactory.CreateClient("ApiClient");
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", jwt);
+
+            var response = await client.GetAsync("report-remarks/unread-count");
+            var body = await response.Content.ReadAsStringAsync();
+
+            return JsonProxyResult(response, body);
+        }
+
+        [HttpPost]
+        [BlockClientAccess]
+        public async Task<IActionResult> MarkClientReportRemarksRead()
+        {
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (string.IsNullOrWhiteSpace(jwt))
+                return Unauthorized();
+
+            var client = _clientFactory.CreateClient("ApiClient");
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", jwt);
+
+            var response = await client.PostAsync(
+                "report-remarks/mark-read",
+                new StringContent("{}", Encoding.UTF8, "application/json"));
+
+            var body = await response.Content.ReadAsStringAsync();
+
+            return JsonProxyResult(response, body);
+        }
+        [HttpGet]
+        [BlockClientAccess]
+        public async Task<IActionResult> ClientReportRemarks()
+        {
+            var userRole = HttpContext.Session.GetString("UserRole") ?? string.Empty;
+            var projectName = HttpContext.Session.GetString("ProjectName") ?? string.Empty;
+            var projectIdText = HttpContext.Session.GetString("ProjectId");
+            var projectId = int.TryParse(projectIdText, out var parsedProjectId) ? parsedProjectId : 0;
+
+            var isAdmin = string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase);
+            var isManager = string.Equals(userRole, "Manager", StringComparison.OrdinalIgnoreCase);
+
+            var canSeeClientRemarks =
+                isAdmin ||
+                (isManager &&
+                 (projectId == 1 ||
+                  string.Equals(projectName.Trim(), "IHM", StringComparison.OrdinalIgnoreCase)));
+
+            if (!canSeeClientRemarks)
+                return Forbid();
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (string.IsNullOrWhiteSpace(jwt))
+                return RedirectToAction("Login", "Auth");
+
+            var client = _clientFactory.CreateClient("ApiClient");
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", jwt);
+
+            var response = await client.GetAsync("report-remarks");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return View(new List<ClientReportRemarkViewModel>());
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            var remarks = JsonConvert.DeserializeObject<List<ClientReportRemarkViewModel>>(json)
+                ?? new List<ClientReportRemarkViewModel>();
+
+            return View(remarks);
+        }
 
         [HttpGet]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
@@ -638,7 +740,24 @@ namespace Health_Matrix_Consuming_Side.Controllers
                 Content = string.IsNullOrWhiteSpace(body) ? "{}" : body
             };
         }
+        [HttpPost]
+        [BlockClientAccess]
+        public async Task<IActionResult> DeleteSavedReport(string type, int id)
+        {
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (string.IsNullOrWhiteSpace(jwt))
+                return Unauthorized();
 
+            var client = _clientFactory.CreateClient("ApiClient");
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", jwt);
+
+            var response = await client.DeleteAsync(
+                $"AdminDashboard/saved-reports/{Uri.EscapeDataString(type ?? string.Empty)}/{id}");
+
+            var body = await response.Content.ReadAsStringAsync();
+            return JsonProxyResult(response, body);
+        }
 
         [HttpGet]
         public async Task<IActionResult> SavedReportFile(string type, int id, bool download = false)
@@ -1253,7 +1372,12 @@ namespace Health_Matrix_Consuming_Side.Controllers
 
 
     }
-
+    public sealed class SendReportRemarkRequest
+    {
+        public string ReportType { get; set; } = string.Empty;
+        public int ReportId { get; set; }
+        public string Remark { get; set; } = string.Empty;
+    }
     public sealed class AssignReportToClientRequest
     {
         public string ReportType { get; set; } = string.Empty;

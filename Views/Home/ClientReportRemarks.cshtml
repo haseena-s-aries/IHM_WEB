@@ -1,0 +1,137 @@
+﻿@model List<ClientReportRemarkViewModel>
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Client Remarks</title>
+    <link rel="stylesheet" href="~/css/saved-reports.css" asp-append-version="true" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+    <main class="reports-page">
+        <section class="reports-hero">
+            <div>
+                <span class="eyebrow">Client feedback</span>
+                <h1>Client Remarks</h1>
+                <p>Remarks submitted by clients for assigned reports.</p>
+            </div>
+            <a class="back-link" href="@Url.Action("AdminDashboard", "Home")">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span>Dashboard</span>
+            </a>
+        </section>
+
+        @if (ViewBag.LoadError != null)
+        {
+            <div class="load-error">@ViewBag.LoadError</div>
+        }
+
+        <div class="report-table-wrap" style="margin-top:22px;">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Vessel Name</th>
+                        <th>Job Number</th>
+                        <th>Rev</th>
+                        <th>Client</th>
+                        <th>Remark</th>
+                        <th>Submitted On</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model == null || !Model.Any())
+                    {
+                        <tr>
+                            <td colspan="6" style="text-align:center;color:#718096;padding:28px;">
+                                No client remarks received yet.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td><strong>@(item.VesselName ?? "-")</strong></td>
+                                <td>@(item.JobNumber ?? "-")</td>
+                                <td>@(item.RevisionNo ?? "-")</td>
+                                <td>
+                                    <strong>@(item.ClientName ?? "Client")</strong>
+                                    <small>@item.ClientEmail</small>
+                                </td>
+                                <td>
+                                    <button type="button"
+                                            class="action-icon remark-view-btn"
+                                            data-remark="@System.Net.WebUtility.HtmlEncode(item.Remark)"
+                                            title="View remark">
+                                        <i class="fa-regular fa-eye"></i>
+                                    </button>
+                                </td>
+                                <td>
+                                    <span class="prepared-on" data-utc="@DateTime.SpecifyKind(item.CreatedAtUtc, DateTimeKind.Utc).ToString("o")">
+                                        @item.CreatedAtUtc.ToString("dd MMM yyyy, hh:mm tt")
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="send-modal-overlay" id="remarkViewModal" hidden>
+            <div class="send-modal">
+                <div class="send-modal-head">
+                    <h3>Client Remark</h3>
+                    <button type="button" class="send-modal-close" id="closeRemarkView">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="send-modal-body">
+                    <p id="remarkViewText" style="white-space:pre-wrap;line-height:1.6;margin:0;color:#435169;"></p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+                fetch("@Url.Action("MarkClientReportRemarksRead", "Home")", {
+            method: "POST",
+            headers: { "Accept": "application/json" }
+        });
+                const remarkViewModal = document.getElementById("remarkViewModal");
+        const remarkViewText = document.getElementById("remarkViewText");
+
+        document.querySelectorAll(".remark-view-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                remarkViewText.textContent = btn.dataset.remark || "";
+                remarkViewModal.hidden = false;
+            });
+        });
+
+        document.getElementById("closeRemarkView")?.addEventListener("click", () => {
+            remarkViewModal.hidden = true;
+        });
+
+        remarkViewModal?.addEventListener("click", event => {
+            if (event.target === remarkViewModal) {
+                remarkViewModal.hidden = true;
+            }
+        });
+        document.querySelectorAll(".prepared-on[data-utc]").forEach(el => {
+            const d = new Date(el.dataset.utc);
+            if (!isNaN(d)) {
+                el.textContent = d.toLocaleString(undefined, {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit"
+                });
+            }
+        });
+    </script>
+</body>
+</html>

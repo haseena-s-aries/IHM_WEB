@@ -18,69 +18,84 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
-    <div class="container mt-4">
-        <h2 class="text-center mb-4">Profile</h2>
-        <button type="button" class="btn btn-secondary" onclick="goBack()">Back</button>
-
-
-        <table class="table table-bordered table-hover text-center">
-            <thead class="table-dark">
-                <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="userTableBody">
-                <tr>
-                    <td>@profileName</td>
-                    <td>@profileEmail</td>
-                    <td>@profileRole</td>
-                    <td>
-                        <button class="btn btn-warning btn-sm"
-                                onclick="editUser(@profileId, @Html.Raw(Js(profileName)), @Html.Raw(Js(profileEmail)), @Html.Raw(Js(profileRole)))">
-                            Edit
-                        </button>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Edit User Modal -->
-    <div class="modal fade" id="editUserModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">Edit Profile</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="container py-5">
+        <div class="mx-auto" style="max-width:720px;">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div>
+                    <div class="text-uppercase text-primary fw-bold small">Account</div>
+                    <h2 class="mb-0">My Profile</h2>
                 </div>
-                <div class="modal-body">
-                    <form id="editUserForm">
-                        <input type="hidden" id="editUserId" name="Id">
+                <button type="button" class="btn btn-outline-secondary" onclick="goBack()">
+                    Back
+                </button>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center gap-3 mb-4">
+                        <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center"
+                             style="width:58px;height:58px;font-size:24px;font-weight:800;">
+                            @profileName.Substring(0, 1).ToUpper()
+                        </div>
+                        <div>
+                            <h5 class="mb-1">@profileName</h5>
+                            <div class="text-muted small">@profileRole</div>
+                        </div>
+                    </div>
+
+                    <form id="profileForm">
+                        <input type="hidden" id="profileUserId" value="@profileId" />
 
                         <div class="mb-3">
-                            <label class="form-label">Name:</label>
-                            <input type="text" id="editUserName" name="FullName" class="form-control" >
+                            <label class="form-label fw-bold">Name</label>
+                            <input id="profileNameInput"
+                                   class="form-control form-control-lg"
+                                   value="@profileName"
+                                   readonly />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Email:</label>
-                            <input type="email" readonly id="editUserEmail" name="Email" class="form-control" >
+                            <label class="form-label fw-bold">Email</label>
+                            <input id="profileEmailInput"
+                                   class="form-control"
+                                   value="@profileEmail"
+                                   readonly />
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Role:</label>
-                            <input type="text" readonly id="editUserRole" name="Role" class="form-control" >
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Role</label>
+                            <input id="profileRoleInput"
+                                   class="form-control"
+                                   value="@profileRole"
+                                   readonly />
                         </div>
 
-                        <button type="button" class="btn btn-primary" onclick="updateUser()">Save Changes</button>
+                        <div class="d-flex gap-2">
+                            <button id="editProfileBtn"
+                                    type="button"
+                                    class="btn btn-warning">
+                                Edit 
+                            </button>
+
+                            <button id="saveProfileBtn"
+                                    type="button"
+                                    class="btn btn-primary d-none">
+                                Save Changes
+                            </button>
+
+                            <button id="cancelProfileBtn"
+                                    type="button"
+                                    class="btn btn-light d-none">
+                                Cancel
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
         </div>
     </div>
+
+   
 
     <script>
         function goBack() {
@@ -97,55 +112,38 @@
         }
     }
 
-    $(document).ready(function () {
-        fetchUserProfile();
-    });
+            const originalName = @Html.Raw(Js(profileName));
 
-        function fetchUserProfile() {
-            $.ajax({
-                url: "/Auth/GetProfile",
-                type: "GET",
-                dataType: "json",
-                success: function (response) {
-                    if (response.success) {
-                        var user = response.data;
-                        var userId = user.userId || user.UserId || user.id || user.Id || 0;
-                        var fullName = user.fullName || user.FullName || "";
-                        var email = user.email || user.Email || "";
-                        var role = user.role || user.Role || "";
-                        var row = `
-                            <tr>
-                                <td>${fullName}</td>
-                                <td>${email}</td>
-                                <td>${role}</td>
-                                <td>
-                                    <button class="btn btn-warning btn-sm" onclick="editUser('${userId}', '${fullName}', '${email}', '${role}')">
-                                        Edit
-                                    </button>
-                                </td>
-                            </tr>`;
-                        $("#userTableBody").html(row);
-                    } else {
-                        alert(response.message);
-                    }
-                },
-                error: function () {
-                    alert("Error fetching user data.");
-                }
-            });
-        }
-        function editUser(id, name, email, role) {
-               $("#editUserId").val(id);
-               $("#editUserName").val(name);
-               $("#editUserEmail").val(email);
-               $("#editUserRole").val(role);
-               $("#editUserModal").modal("show");
-           }
+        document.getElementById("editProfileBtn")?.addEventListener("click", function () {
+            const nameInput = document.getElementById("profileNameInput");
+            nameInput.removeAttribute("readonly");
+            nameInput.focus();
+            nameInput.select();
 
-                      function updateUser() {
-            var fullName = $("#editUserName").val();
-            var email = $("#editUserEmail").val();
-            var role = $("#editUserRole").val();
+            document.getElementById("editProfileBtn").classList.add("d-none");
+            document.getElementById("saveProfileBtn").classList.remove("d-none");
+            document.getElementById("cancelProfileBtn").classList.remove("d-none");
+        });
+
+        document.getElementById("cancelProfileBtn")?.addEventListener("click", function () {
+            const nameInput = document.getElementById("profileNameInput");
+            nameInput.value = originalName;
+            nameInput.setAttribute("readonly", "readonly");
+
+            document.getElementById("editProfileBtn").classList.remove("d-none");
+            document.getElementById("saveProfileBtn").classList.add("d-none");
+            document.getElementById("cancelProfileBtn").classList.add("d-none");
+        });
+
+        document.getElementById("saveProfileBtn")?.addEventListener("click", function () {
+            const fullName = document.getElementById("profileNameInput").value.trim();
+            const email = document.getElementById("profileEmailInput").value;
+            const role = document.getElementById("profileRoleInput").value;
+
+            if (!fullName) {
+                alert("Name is required.");
+                return;
+            }
 
             $.ajax({
                 url: "/Auth/UpdateProfile",
@@ -157,17 +155,19 @@
                     role: role
                 }),
                 success: function (response) {
-                    alert(response.message);
-                    $("#editUserModal").modal("hide");
+                    alert(response.message || "Profile updated successfully.");
                     location.reload();
                 },
                 error: function (xhr) {
-                    var res = JSON.parse(xhr.responseText);
-                    alert("Error: " + res.message + "\n" + (res.errors || []).join(', '));
+                    let message = "Profile update failed.";
+                    try {
+                        const res = JSON.parse(xhr.responseText);
+                        message = res.message || res.Message || message;
+                    } catch {}
+                    alert(message);
                 }
             });
-        }
-
+        });
 
     </script>
 

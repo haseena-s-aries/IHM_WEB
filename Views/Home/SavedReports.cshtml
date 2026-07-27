@@ -330,18 +330,14 @@ var visibleCategories =
 
                     <input id="reportSearch"
                            type="search"
-                           placeholder="Search vessel, job, report type, created by or date..."
+                           placeholder="Search vessel, job number , job..."
                            autocomplete="off" />
                 </label>
 
                 @if (!isClient)
                 {
                     <div class="type-filters">
-                        <button class="active"
-                                type="button"
-                                data-type="">
-                            All
-                        </button>
+                        
 
                         @if (showAuras)
                         {
@@ -363,10 +359,7 @@ var visibleCategories =
 
                         @if (showIhm)
                         {
-                            <button type="button"
-                                    data-type="ihm">
-                                IHM
-                            </button>
+                           
                         }
 
                         @if (showEx)
@@ -553,194 +546,130 @@ var visibleCategories =
                     <div class="section-heading">
                         <div>
                             <span class="eyebrow">IHM Reports</span>
-
-                            <h2>
-                                IHM Survey/Job Reports
-                            </h2>
+                            <h2>IHM Survey/Job Reports</h2>
                         </div>
                     </div>
 
                     <div class="report-table-wrap">
-                        <table class="report-table report-table-with-send@(clientTableClass)">
+                        <table class="report-table@(clientTableClass)">
                             <colgroup>
-                                @if (showReportStatus)
-                                {
-                                    <col class="status-col" />
-                                }
-                                <col class="report-info-col" />
-                                <col class="report-type-col" />
-                                <col class="report-user-col" />
-                                <col class="report-date-col" />
-                                <col class="send-report-col" />
+                                <col class="report-vessel-col" />
+                                <col class="report-jobno-col" />
+                                <col class="report-rev-col" />
+                                <col class="report-preparedon-col" />
+                                <col class="report-preparedby-col" />
                                 <col class="actions-col" />
                             </colgroup>
 
                             <thead>
                                 <tr>
-                                    @if (showReportStatus)
-                                    {
-                                        <th>Status</th>
-                                    }
-                                    <th>Vessel / Job</th>
-                                    <th>Report Type</th>
-                                    <th>Created By</th>
-                                    <th>Created Date</th>
-                                    @if (canSendReports)
-                                    {
-                                        <th>Send Report</th>
-                                    }
-                                    <th>Actions</th>
+                                    <th>Vessel Name</th>
+                                    <th>Job Number</th>
+                                    <th>Rev</th>
+                                    <th>Prepared On</th>
+                                    <th>Prepared By</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
 
                             <tbody>
                                 @foreach (var report in ihmReports)
                                 {
-                                    var type =
-                                        NormalizeType(report.ReportType);
+                                    var type = NormalizeType(report.ReportType);
+                                    var typeLabel = TypeLabel(report.ReportType);
 
-                                    var typeLabel =
-                                        TypeLabel(report.ReportType);
+                                    var vessel = string.IsNullOrWhiteSpace(report.VesselName)
+                                    ? "Vessel not specified"
+                                    : report.VesselName;
 
-                                    var vessel =
-                                        string.IsNullOrWhiteSpace(report.VesselName)
-                                            ? "Vessel not specified"
-                                            : report.VesselName;
-
-                                    var title =
-                                        string.IsNullOrWhiteSpace(report.Title)
-                                            ? $"{typeLabel} Report"
-                                            : report.Title;
-
-                                    var reference =
-                                        string.IsNullOrWhiteSpace(report.Reference)
-                                            ? "No job/reference"
-                                            : report.Reference;
-
-                                    var status =
-                                        string.IsNullOrWhiteSpace(report.Status)
-                                            ? "Saved"
-                                            : report.Status;
+                                    var jobNumber = string.IsNullOrWhiteSpace(report.Reference)
+                                    ? "-"
+                                    : report.Reference;
 
                                     var createdBy = CreatedByLabel(report);
 
-                                    var date = DateLabel(report);
+                                    var utcTicks = report.SavedAt.HasValue
+                                    ? report.SavedAt.Value.ToUniversalTime().ToString("o")
+                                    : (report.SavedDate.HasValue ? report.SavedDate.Value.ToString("o") : "");
 
-                                    var searchText =
-                                        (showReportStatus
-                                            ? $"{vessel} {title} {reference} {typeLabel} {createdBy} {status} {date}"
-                                            : $"{vessel} {title} {reference} {typeLabel} {createdBy} {date}")
-                                            .ToLowerInvariant();
+                                    var searchText = $"{vessel} {jobNumber} {createdBy}".ToLowerInvariant();
 
                                     var editUrl = Url.Action(
-                                        "EditSavedPdf",
-                                        "Home",
-                                        new
-                                        {
-                                            type = report.ReportType,
-                                            id = report.Id,
-                                            title
-                                        });
+                                    "EditSavedPdf",
+                                    "Home",
+                                    new
+                                    {
+                                        type = report.ReportType,
+                                        id = report.Id,
+                                        title = report.Title
+                                    });
 
                                     <tr class="report-row"
                                         data-type="@type"
                                         data-search="@searchText">
 
-                                        @if (showReportStatus)
-                                        {
-                                            <td>
-                                                <span class="status-pill">
-                                                    @status
-                                                </span>
-                                            </td>
-                                        }
-
+                                        <td><strong>@vessel</strong></td>
+                                        <td>@jobNumber</td>
+                                        <td>@(string.IsNullOrWhiteSpace(report.RevisionNo) ? "-" : report.RevisionNo)</td>
                                         <td>
-                                            <strong>@vessel</strong>
-                                            <small>@title</small>
-                                            <em>@reference</em>
-                                        </td>
-
-                                        <td>
-                                            <span class="type-badge">
-                                                @typeLabel
+                                            <span class="prepared-on" data-utc="@utcTicks">
+                                                @DateLabel(report)
                                             </span>
                                         </td>
-
                                         <td>@createdBy</td>
 
-                                        <td>@date</td>
-
-                                        @if (canSendReports)
-                                        {
-                                            <td>
-                                                <div class="report-send"
-                                                     data-report-type="@type"
-                                                     data-report-id="@report.Id"
-                                                    data-project-type="ihm">
-                                                    <div class="send-row">
-                                                        <input class="client-search"
-                                                               type="search"
-                                                               placeholder="Search Client name or email" />
-                                                        <select class="client-select">
-                                                            <option value="">Select Client</option>
-                                                        </select>
-                                                        <button type="button" class="send-report-btn">
-                                                            Send
-                                                        </button>
-                                                    </div>
-                                                    <div class="assigned-clients">
-                                                        Loading assigned clients...
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        }
-
                                         <td>
-                                            <div class="report-actions">
+                                            <div class="report-actions ihm-actions">
+                                                <a class="action-icon view-report"
+                                                   target="_blank"
+                                                   rel="noopener"
+                                                   data-tooltip="View PDF"
+                                                   title="View PDF"
+                                                   href="@Url.Action("SavedReportFile", "Home", new { type = report.ReportType, id = report.Id })">
+                                                    <i class="fa-regular fa-file-pdf"></i>
+                                                </a>
 
                                                 @if (canEditReports)
                                                 {
-                                                    <a class="edit-report"
-                                                       href="@editUrl">
+                                                    <a class="action-icon edit-existing-report"
+                                                       data-tooltip="Edit Existing"
+                                                       title="Edit Existing"
+                                                       href="/IhmReportInfo/Index?jobId=@report.Id">
                                                         <i class="fa-regular fa-pen-to-square"></i>
-                                                        Edit
+                                                    </a>
+
+                                                    <a class="action-icon preview-edit-report"
+                                                       data-tooltip="Preview & Edit"
+                                                       title="Preview & Edit"
+                                                       href="@editUrl">
+                                                        <i class="fa-solid fa-list-check"></i>
                                                     </a>
                                                 }
 
-                                                <a class="view-report"
-                                                   target="_blank"
-                                                   rel="noopener"
-                                                   href="@Url.Action(
-                                                       "SavedReportFile",
-                                                       "Home",
-                                                       new
-                                                       {
-                                                           type = report.ReportType,
-                                                           id = report.Id
-                                                       })">
+                                                @if (canSendReports)
+                                                {
+                                                    <button type="button"
+                                                            class="action-icon send-icon-btn"
+                                                            data-tooltip="Send Report"
+                                                            title="Send Report"
+                                                            data-report-type="@type"
+                                                            data-report-id="@report.Id"
+                                                            data-project-type="ihm">
+                                                        <i class="fa-solid fa-paper-plane"></i>
+                                                    </button>
+                                                }
 
-                                                    <i class="fa-regular fa-eye"></i>
-                                                    View
-                                                </a>
-
-                                                <a class="download-report"
-                                                   target="_blank"
-                                                   rel="noopener"
-                                                   href="@Url.Action(
-                                                       "SavedReportFile",
-                                                       "Home",
-                                                       new
-                                                       {
-                                                           type = report.ReportType,
-                                                           id = report.Id,
-                                                           download = true
-                                                       })">
-
-                                                    <i class="fa-solid fa-download"></i>
-                                                    Download
-                                                </a>
-
+                                                @if (canEditReports)
+                                                {
+                                                    <button type="button"
+                                                            class="action-icon delete-report-btn"
+                                                            data-tooltip="Delete"
+                                                            title="Delete"
+                                                            data-report-type="@type"
+                                                            data-report-id="@report.Id">
+                                                        <i class="fa-regular fa-trash-can"></i>
+                                                    </button>
+                                                }
                                             </div>
                                         </td>
                                     </tr>
@@ -751,7 +680,6 @@ var visibleCategories =
                     </div>
                 </section>
             }
-
             @if (showEx)
             {
                 <section class="reports-section @(isClient || (!showAuras && !showIhm) ? "active" : "")"
@@ -916,6 +844,33 @@ var visibleCategories =
         }
 
     </main>
+
+    <div id="sendReportModal" class="send-modal-overlay" hidden>
+        <div class="send-modal">
+            <div class="send-modal-head">
+                <h3>Send Report to Client</h3>
+                <button type="button" class="send-modal-close" aria-label="Close">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="send-modal-body">
+                <label class="report-search send-modal-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="search" class="client-search" placeholder="Search Client name or email" />
+                </label>
+
+                <select class="client-select send-modal-select" size="6"></select>
+
+                <button type="button" class="send-modal-send">Send</button>
+
+                <div class="send-modal-assigned">
+                    <span class="send-modal-assigned-label">Already sent to:</span>
+                    <div class="assigned-clients"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="~/js/saved-reports.js"
             asp-append-version="true"></script>

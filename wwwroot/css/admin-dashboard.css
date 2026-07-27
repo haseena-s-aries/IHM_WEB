@@ -983,4 +983,22 @@ a {
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+    .side-nav a b#clientRemarkUnreadBadge {
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 999px;
+        background: #ef4444;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 800;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: auto;
+    }
+
+        .side-nav a b#clientRemarkUnreadBadge[hidden] {
+            display: none;
+        }
 }

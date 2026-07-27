@@ -34,6 +34,7 @@ namespace Survery_Certification_App_Consume.Models
         public string? VesselName { get; set; }
         public string? Reference { get; set; }
         public string? Status { get; set; }
+        public string? RevisionNo { get; set; }
         public string? CreatedBy { get; set; }
         public int? CreatedByUserId { get; set; }
         public DateOnly? SavedDate { get; set; }
@@ -50,6 +51,7 @@ namespace Survery_Certification_App_Consume.Models
         public string? VesselName { get; set; }
         public string? Reference { get; set; }
         public string? Status { get; set; }
+        public string? RevisionNo { get; set; }
         public string? CreatedBy { get; set; }
         public DateTime AssignedAt { get; set; }
         public bool HasFile { get; set; }
@@ -133,6 +135,7 @@ namespace Survery_Certification_App_Consume.Models
         public string? VesselName { get; set; }
         public string? Reference { get; set; }
         public string? Status { get; set; }
+        public string? RevisionNo { get; set; }
         public string? CreatedBy { get; set; }
         public DateTime AssignedAt { get; set; }
         public bool HasFile { get; set; }
@@ -169,7 +172,19 @@ namespace Survery_Certification_App_Consume.Models
         public string Label { get; set; } = string.Empty;
         public int Count { get; set; }
     }
-
+    public class ClientReportRemarkViewModel
+    {
+        public int Id { get; set; }
+        public string ReportType { get; set; } = string.Empty;
+        public int ReportId { get; set; }
+        public string? VesselName { get; set; }
+        public string? JobNumber { get; set; }
+        public string? RevisionNo { get; set; }
+        public string? ClientName { get; set; }
+        public string? ClientEmail { get; set; }
+        public string Remark { get; set; } = string.Empty;
+        public DateTime CreatedAtUtc { get; set; }
+    }
 
 
 }
