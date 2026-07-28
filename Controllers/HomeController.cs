@@ -2,6 +2,7 @@
 using Newtonsoft.Json;
 using Survery_Certification_App_Consume.Filters;
 using Survery_Certification_App_Consume.Models;
+using Survery_Certification_App_Consume.Services;
 using Survey_Certification_App.DTOS;
 using Survey_Certification_App.Models;
 using System.Diagnostics;
@@ -16,13 +17,19 @@ namespace Health_Matrix_Consuming_Side.Controllers
         private readonly ILogger<HomeController> _logger;
         private readonly HttpClient _client;
         private readonly IHttpClientFactory _clientFactory; // Declare the IHttpClientFactory
+        private readonly WebLogoutService _logoutService;
 
         private readonly string _apiBaseUrl;
 
-        public HomeController(ILogger<HomeController> logger, IConfiguration config, IHttpClientFactory clientFactory)
+        public HomeController(
+            ILogger<HomeController> logger,
+            IConfiguration config,
+            IHttpClientFactory clientFactory,
+            WebLogoutService logoutService)
         {
             _logger = logger;
             _clientFactory = clientFactory;
+            _logoutService = logoutService;
 
             _apiBaseUrl = config["ApiBaseUrl"] + "User";
 
@@ -1312,15 +1319,10 @@ namespace Health_Matrix_Consuming_Side.Controllers
         {
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
-        public IActionResult Logout()
+        public async Task<IActionResult> Logout()
         {
-            HttpContext.Session.Clear();
-
-            Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
-            Response.Headers["Pragma"] = "no-cache";
-            Response.Headers["Expires"] = "0";
-
-            return RedirectToAction("Login", "Auth");
+            await _logoutService.LogoutAsync(HttpContext);
+            return View();
         }
 
         public IActionResult TowageDemo()

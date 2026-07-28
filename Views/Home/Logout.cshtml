@@ -1,0 +1,36 @@
+@{
+    Layout = null;
+    var loginUrl = Url.Action("Login", "Auth") ?? "/Auth/Login";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Signing out...</title>
+</head>
+<body>
+    <script>
+        (function () {
+            try { localStorage.clear(); } catch (_) { }
+            try { sessionStorage.clear(); } catch (_) { }
+            try {
+                document.cookie.split(";").forEach(function (cookie) {
+                    var name = cookie.split("=")[0].trim();
+                    if (name) {
+                        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+                    }
+                });
+            } catch (_) { }
+
+            window.location.replace("@loginUrl");
+        })();
+    </script>
+    <noscript>
+        <meta http-equiv="refresh" content="0;url=@loginUrl" />
+    </noscript>
+</body>
+</html>

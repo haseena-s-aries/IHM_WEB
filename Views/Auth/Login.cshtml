@@ -4,6 +4,23 @@
     ViewData["Title"] = "Login";
 }
 
+<script>
+    (function () {
+        try { localStorage.clear(); } catch (_) { }
+        try { sessionStorage.clear(); } catch (_) { }
+        try {
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, document.title, window.location.href);
+            }
+        } catch (_) { }
+        window.addEventListener("pageshow", function (event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+    })();
+</script>
+
 <div class="d-flex justify-content-center align-items-center vh-100">
     <div class="card shadow-lg p-4" style="width: 400px;">
         <h2 class="text-center mb-4">Login</h2>

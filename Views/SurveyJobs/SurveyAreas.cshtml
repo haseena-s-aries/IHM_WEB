@@ -54,6 +54,17 @@
             z-index: 100;
         }
 
+        .logout-link {
+            margin-left: auto;
+            color: #d63b4b;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
         .back-btn {
             width: 40px;
             height: 40px;
@@ -349,6 +360,10 @@
             <i class="fa-solid fa-chevron-left"></i>
         </a>
         <h1 class="title">Survey Areas</h1>
+        <a class="logout-link" href="@Url.Action("Logout", "Home")">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            <span>Sign Out</span>
+        </a>
     </header>
 
     <main class="page">

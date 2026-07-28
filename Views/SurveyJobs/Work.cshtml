@@ -89,6 +89,17 @@
             line-height: 1.1;
         }
 
+        .logout-link {
+            margin-left: auto;
+            color: #d63b4b;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
         .content {
             width: 100%;
             padding: 14px;
@@ -111,12 +122,14 @@
         }
 
         .nav-card {
-            height: 75px;
+            min-height: 82px;
             background: #fff;
             border: 1px solid #d7e6f3;
             border-radius: 12px;
-            display: grid;
-            place-items: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
             text-align: center;
             text-decoration: none;
             color: #102033;
@@ -136,8 +149,9 @@
             border-radius: 50%;
             display: grid;
             place-items: center;
-            margin-bottom: 6px;
+            margin: 0 auto 6px;
             font-size: 13px;
+            flex: 0 0 auto;
         }
 
         .blue-soft {
@@ -446,6 +460,10 @@
             <p class="header-title">@Model.JobNumber | @(Model.VesselName ?? "Test Vessel")</p>
             <p class="header-sub">@surveyType</p>
         </div>
+        <a class="logout-link" href="@Url.Action("Logout", "Home")">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            <span>Sign Out</span>
+        </a>
     </header>
 
     <main class="content">

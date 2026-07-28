@@ -1,15 +1,22 @@
 ﻿using Survery_Certification_App_Consume.Services;
+using Survery_Certification_App_Consume.Filters;
 using System.Net.Http.Headers;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddScoped<AuthSessionFilter>();
+
 // MVC
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews(options =>
+{
+    options.Filters.Add<AuthSessionFilter>();
+});
 
 // HttpClient factory
 builder.Services.AddHttpClient();                     // general pool
 builder.Services.AddHttpClient<ProfileServices>();
 builder.Services.AddSingleton<AuthService>();
+builder.Services.AddScoped<WebLogoutService>();
 //builder.Services.AddHttpClient<AuthController>();
 
 

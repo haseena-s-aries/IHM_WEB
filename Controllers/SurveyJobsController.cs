@@ -589,7 +589,7 @@ namespace Survery_Certification_App_Consume.Controllers
                     samplingCheck = request.SamplingCheck,
                     visualCheck = request.VisualCheck,
                     checkResult = request.CheckResult,
-                    result = ToCheckpointResultValue(request.AuditResult),
+                    auditStatus = ToCheckpointAuditStatusValue(request.AuditStatus ?? request.AuditResult),
                     isPchm = request.IsPchm,
                     remarks = request.Remarks,
                     locationRemarks = request.LocationRemarks,
@@ -619,6 +619,15 @@ namespace Survery_Certification_App_Consume.Controllers
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = "Unable to save checkpoint: " + ex.Message;
+            }
+
+            if (request.ReturnToAreaList)
+            {
+                return RedirectToAction("AreaCheckpoints", new
+                {
+                    jobId = request.JobId,
+                    areaId = request.AreaId
+                });
             }
 
             return RedirectToAction("CheckpointDetail", new
@@ -1071,25 +1080,27 @@ namespace Survery_Certification_App_Consume.Controllers
             try
             {
                 var client = CreateApiClient();
-                var areasTask = GetAsync<List<IhmAreaOptionDto>>(
-                    client,
-                    $"ihm-survey/jobs/{jobId}/areas-with-checkpoints");
-                var attachmentsTask = GetAsync<List<IhmLayoutAttachmentDto>>(
-                    client,
-                    $"ihm-survey/jobs/{jobId}/layout-attachments");
+                var response = await client.GetAsync($"ihm-survey/jobs/{jobId}/layout-options");
+                var responseBody = await response.Content.ReadAsStringAsync();
 
-                await Task.WhenAll(areasTask, attachmentsTask);
-
-                return Json(new
+                if (!response.IsSuccessStatusCode)
                 {
-                    areas = areasTask.Result ?? new List<IhmAreaOptionDto>(),
-                    attachments = attachmentsTask.Result ?? new List<IhmLayoutAttachmentDto>()
-                });
+                    _logger.LogWarning(
+                        "IHM layout options load failed for job {JobId}. Status: {Status}. Body: {Body}",
+                        jobId,
+                        (int)response.StatusCode,
+                        responseBody);
+                    return StatusCode(
+                        (int)response.StatusCode,
+                        new { message = ExtractApiErrorMessage(responseBody) });
+                }
+
+                return Content(responseBody, "application/json");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to load IHM layout options for job {JobId}", jobId);
-                return StatusCode(500, new { message = "Failed to load layout options." });
+                return StatusCode(500, new { message = ex.Message });
             }
         }
 
@@ -1214,7 +1225,14 @@ namespace Survery_Certification_App_Consume.Controllers
                 }
                 else if (layoutTarget != "common")
                 {
-                    areaId = int.Parse(layoutTarget);
+                    var normalizedTarget = (layoutTarget ?? "").Trim();
+                    if (normalizedTarget.StartsWith("area:", StringComparison.OrdinalIgnoreCase))
+                        normalizedTarget = normalizedTarget["area:".Length..];
+
+                    if (!int.TryParse(normalizedTarget, out var parsedAreaId) || parsedAreaId <= 0)
+                        throw new InvalidOperationException("Select a valid survey area for this layout.");
+
+                    areaId = parsedAreaId;
                 }
 
                 var file = files.First(x => x.Length > 0);
@@ -1432,14 +1450,12 @@ namespace Survery_Certification_App_Consume.Controllers
 
             return decimal.TryParse(value, out var result) ? result : null;
         }
-        private static int ToCheckpointResultValue(string? result)
+        private static int ToCheckpointAuditStatusValue(string? status)
         {
-            return (result ?? "").Trim().ToLowerInvariant().Replace(" ", "").Replace("_", "").Replace("-", "") switch
+            return (status ?? "").Trim().ToLowerInvariant().Replace(" ", "").Replace("_", "").Replace("-", "") switch
             {
-                "present" or "2" => 2,
-                "notpresent" or "3" => 3,
-                "notapplicable" or "4" => 4,
-                "samplerequired" or "5" => 5,
+                "inprogress" or "2" => 2,
+                "done" or "3" => 3,
                 _ => 1
             };
         }
@@ -1490,8 +1506,10 @@ namespace Survery_Certification_App_Consume.Controllers
         public string? VisualCheck { get; set; }
         public string? CheckResult { get; set; }
         public string? AuditResult { get; set; }
+        public string? AuditStatus { get; set; }
         public bool IsPchm { get; set; }
         public string? Remarks { get; set; }
         public string? LocationRemarks { get; set; }
+        public bool ReturnToAreaList { get; set; }
     }
 }

@@ -22,6 +22,16 @@
     }));
 
     string Val(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+    string AuditStatusValue(string? value)
+    {
+        var normalized = (value ?? "").Trim().ToLowerInvariant().Replace(" ", "").Replace("_", "").Replace("-", "");
+        return normalized switch
+        {
+            "inprogress" or "2" => "InProgress",
+            "done" or "3" or "completed" or "audited" => "Done",
+            _ => "Pending"
+        };
+    }
 }
 
 <!DOCTYPE html>
@@ -56,6 +66,17 @@
             padding: 0 18px;
             background: #f5f8fd;
             border-bottom: 1px solid #d8e3ee;
+        }
+
+        .logout-link {
+            margin-left: auto;
+            color: #d63b4b;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .back-btn {
@@ -427,6 +448,30 @@
             color: #607d9a;
         }
 
+        .audit-status-form {
+            margin: 0;
+            min-width: 145px;
+        }
+
+        .audit-status-select {
+            width: 100%;
+            min-height: 32px;
+            border: 1px solid #c4d3e4;
+            border-radius: 9px;
+            background: #ffffff;
+            color: #4d6d8d;
+            font-size: 12px;
+            font-weight: 800;
+            padding: 4px 28px 4px 9px;
+            cursor: pointer;
+        }
+
+        .audit-status-select:focus {
+            border-color: #3d7eea;
+            box-shadow: 0 0 0 3px rgba(61, 126, 234, .15);
+            outline: none;
+        }
+
 
         /* BREAKPOINTS */
 
@@ -494,6 +539,10 @@
             <h1 class="title">@Model.AreaName</h1>
             <p class="sub">@(Model.Checkpoints?.Count ?? 0) checkpoints</p>
         </div>
+        <a class="logout-link" href="@Url.Action("Logout", "Home")">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            <span>Sign Out</span>
+        </a>
     </header>
 
     <main class="page">
@@ -511,7 +560,7 @@
 
                 var code = Val(checkpoint.SampleNo ?? checkpoint.Location);
                 var surveyStatus = checkpoint.IsAudited ? "Surveyed" : "Not surveyed yet";
-                var result = Val(checkpoint.Result ?? checkpoint.CheckResult);
+                var auditStatus = AuditStatusValue(checkpoint.AuditStatus);
 
                 <article class="cp-card" onclick="window.location.href='/SurveyJobs/CheckpointDetail?jobId=@jobId&areaId=@Model.Id&checkpointId=@checkpoint.Id'">
                     <div class="cp-head">
@@ -566,7 +615,37 @@
                                 <i class="fa-solid fa-user-check"></i>
                                 @surveyStatus
                             </div>
-                            <div class="result-text">Result: @result</div>
+                            <form class="audit-status-form" method="post" action="/SurveyJobs/SaveCheckpointAudit" onclick="event.stopPropagation();">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="JobId" value="@jobId" />
+                                <input type="hidden" name="AreaId" value="@Model.Id" />
+                                <input type="hidden" name="CheckpointId" value="@checkpoint.Id" />
+                                <input type="hidden" name="SampleNo" value="@checkpoint.SampleNo" />
+                                <input type="hidden" name="Description" value="@checkpoint.Description" />
+                                <input type="hidden" name="TableType" value="@checkpoint.TableType" />
+                                <input type="hidden" name="Location" value="@checkpoint.Location" />
+                                <input type="hidden" name="EquipmentName" value="@checkpoint.EquipmentName" />
+                                <input type="hidden" name="Component" value="@checkpoint.Component" />
+                                <input type="hidden" name="MaterialCategory" value="@checkpoint.MaterialCategory" />
+                                <input type="hidden" name="HazardousMaterial" value="@checkpoint.HazardousMaterial" />
+                                <input type="hidden" name="QuantityUnitKg" value="@checkpoint.QuantityUnitKg" />
+                                <input type="hidden" name="QuantityNo" value="@checkpoint.QuantityNo" />
+                                <input type="hidden" name="QuantityTotalKg" value="@checkpoint.QuantityTotalKg" />
+                                <input type="hidden" name="ManufacturerBrandName" value="@checkpoint.ManufacturerBrandName" />
+                                <input type="hidden" name="DocumentAnalysisResult" value="@checkpoint.DocumentAnalysisResult" />
+                                <input type="hidden" name="SamplingCheck" value="@checkpoint.SamplingCheck" />
+                                <input type="hidden" name="VisualCheck" value="@checkpoint.VisualCheck" />
+                                <input type="hidden" name="CheckResult" value="@checkpoint.CheckResult" />
+                                <input type="hidden" name="IsPchm" value="@(checkpoint.IsPchm ? "true" : "false")" />
+                                <input type="hidden" name="Remarks" value="@checkpoint.Remarks" />
+                                <input type="hidden" name="LocationRemarks" value="@checkpoint.LocationRemarks" />
+                                <input type="hidden" name="ReturnToAreaList" value="true" />
+                                <select name="AuditStatus" class="audit-status-select" aria-label="Audit Result" onchange="event.stopPropagation(); this.form.submit();">
+                                    <option value="Pending" selected="@(auditStatus == "Pending")">Pending</option>
+                                    <option value="InProgress" selected="@(auditStatus == "InProgress")">In Progress</option>
+                                    <option value="Done" selected="@(auditStatus == "Done")">Done</option>
+                                </select>
+                            </form>
                         </div>
 
                     </div>

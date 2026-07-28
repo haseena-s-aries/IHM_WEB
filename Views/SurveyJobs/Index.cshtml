@@ -741,14 +741,13 @@
                                         @foreach (var area in areas)
                                         {
                                             attachments.TryGetValue(area.Id.ToString(), out var areaAttachment);
-                                            <option value="@area.Id"
+                                            <option value="area:@area.Id"
                                                     data-locations="@area.LocationSummary"
                                                     data-file-name="@areaAttachment?.OriginalFileName"
                                                     data-file-path="@areaAttachment?.FilePath">
                                                 @area.AreaName
                                             </option>
                                         }
-                                        <option value="new">+ Create another area</option>
                                     </select>
                                     <div class="form-text area-location-hint">
                                         Common is shown only where no specific area layout is uploaded.
@@ -1020,7 +1019,7 @@
         }
 
         async function loadLayoutOptions(form) {
-            if (form.dataset.layoutLoaded === "true" || form.dataset.layoutLoading === "true") {
+            if (form.dataset.layoutLoading === "true") {
                 return;
             }
 
@@ -1029,22 +1028,31 @@
             const fileInput = form.querySelector(".layout-file-input");
             const hint = form.querySelector(".area-location-hint");
             const previousValue = select.value || "common";
+            const requestUrl = `/SurveyJobs/IhmLayoutOptions?jobId=${encodeURIComponent(jobId)}`;
 
             form.dataset.layoutLoading = "true";
             select.disabled = true;
             fileInput.disabled = true;
-            hint.textContent = "Loading saved areas and layout attachments...";
+            hint.textContent = "Loading layout options...";
 
             try {
-                const response = await fetch(`/SurveyJobs/IhmLayoutOptions?jobId=${encodeURIComponent(jobId)}`, {
+                debugLayoutOptions("request", { jobId, url: requestUrl });
+                const response = await fetch(requestUrl, {
                     headers: { "Accept": "application/json" }
+                });
+                const responseText = await response.text();
+                debugLayoutOptions("response", {
+                    jobId,
+                    url: requestUrl,
+                    status: response.status,
+                    body: responseText
                 });
 
                 if (!response.ok) {
-                    throw new Error("Unable to load layout options.");
+                    throw new Error(readLayoutError(responseText) || `Unable to load layout options. (${response.status})`);
                 }
 
-                const data = await response.json();
+                const data = responseText ? JSON.parse(responseText) : {};
                 const areas = data.areas || data.Areas || [];
                 const attachments = data.attachments || data.Attachments || [];
                 const attachmentMap = new Map();
@@ -1054,37 +1062,53 @@
                     if (target) attachmentMap.set(target, item);
                 });
 
-                const commonAttachment = attachmentMap.get("common") || {};
+                const commonLayout = data.commonLayout || data.CommonLayout || {};
+                const commonAttachment = attachmentMap.get("common") || commonLayout || {};
                 select.innerHTML = "";
                 select.appendChild(createLayoutOption(
-                    "common",
-                    "Common Layout - fallback for every location",
+                    commonLayout.value || commonLayout.Value || "common",
+                    commonLayout.label || commonLayout.Label || "Common Layout - fallback for every location",
                     "",
                     commonAttachment.originalFileName || commonAttachment.OriginalFileName,
                     commonAttachment.filePath || commonAttachment.FilePath
                 ));
 
                 areas.forEach(area => {
-                    const areaId = String(area.id || area.Id);
-                    const attachment = attachmentMap.get(areaId) || {};
+                    const areaId = String(area.id || area.Id || "").trim();
+                    const areaValue = area.value || area.Value || (areaId ? `area:${areaId}` : "");
+                    if (!areaValue) return;
+                    const attachment = attachmentMap.get(areaId) || area || {};
                     select.appendChild(createLayoutOption(
-                        areaId,
-                        area.areaName || area.AreaName || "Survey area",
+                        areaValue,
+                        area.label || area.Label || area.areaName || area.AreaName || "Survey area",
                         area.locationSummary || area.LocationSummary || "",
                         attachment.originalFileName || attachment.OriginalFileName,
                         attachment.filePath || attachment.FilePath
                     ));
                 });
 
-                select.appendChild(createLayoutOption("new", "+ Create another area", "", "", ""));
                 select.value = Array.from(select.options).some(option => option.value === previousValue)
                     ? previousValue
                     : "common";
 
                 form.dataset.layoutLoaded = "true";
                 select.dispatchEvent(new Event("change"));
+                if (!areas.length) {
+                    hint.textContent = "No survey areas found. Upload the checklist Excel first.";
+                }
             } catch (error) {
-                hint.textContent = error.message || "Unable to load layout options.";
+                form.dataset.layoutLoaded = "false";
+                hint.innerHTML = "";
+                const message = document.createElement("span");
+                message.textContent = error.message || "Unable to load layout options.";
+                hint.appendChild(message);
+                hint.appendChild(document.createTextNode(" "));
+                const retry = document.createElement("button");
+                retry.type = "button";
+                retry.className = "btn btn-link btn-sm p-0 align-baseline layout-options-retry";
+                retry.textContent = "Retry";
+                retry.addEventListener("click", () => loadLayoutOptions(form));
+                hint.appendChild(retry);
                 updateAttachment(form, select.options[select.selectedIndex]);
             } finally {
                 form.dataset.layoutLoading = "false";
@@ -1101,6 +1125,23 @@
             option.dataset.fileName = fileName || "";
             option.dataset.filePath = filePath || "";
             return option;
+        }
+
+        function readLayoutError(responseText) {
+            if (!responseText) return "";
+            try {
+                const data = JSON.parse(responseText);
+                return data.message || data.Message || data.error || data.Error || responseText;
+            } catch {
+                return responseText;
+            }
+        }
+
+        function debugLayoutOptions(stage, data) {
+            const isDev = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+            if (isDev && window.console) {
+                console.debug(`[IHM layout options] ${stage}`, data);
+            }
         }
 
     </script>

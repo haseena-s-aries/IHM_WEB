@@ -75,6 +75,7 @@
         public string? VisualCheck { get; set; }
         public string? CheckResult { get; set; }
         public string? Result { get; set; }
+        public string? AuditStatus { get; set; }
         public string? DocumentAnalysisResult { get; set; }
         public string? MaterialCategory { get; set; }
         public string? HazardousMaterial { get; set; }
@@ -88,9 +89,7 @@
         public bool IsVisual => string.Equals(VisualCheck, "V", StringComparison.OrdinalIgnoreCase);
         public bool IsSample => string.Equals(SamplingCheck, "S", StringComparison.OrdinalIgnoreCase);
 
-        public bool IsAudited =>
-            IsCompletedAuditValue(Result) ||
-            IsCompletedAuditValue(CheckResult);
+        public bool IsAudited => IsCompletedAuditValue(AuditStatus);
 
         private static bool IsCompletedAuditValue(string? value)
         {
@@ -101,8 +100,7 @@
                 .Replace("_", "")
                 .Replace("-", "");
 
-            return normalized is "present" or "notpresent" or "notapplicable" or "samplerequired" or
-                "2" or "3" or "4" or "5" or "audited" or "completed";
+            return normalized is "done" or "3" or "audited" or "completed";
         }
     }
 

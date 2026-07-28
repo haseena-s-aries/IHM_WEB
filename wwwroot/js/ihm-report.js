@@ -1083,6 +1083,13 @@
             return;
         }
 
+        let pdfWindow = window.open("about:blank", "_blank");
+        if (pdfWindow) {
+            pdfWindow.opener = null;
+            pdfWindow.document.title = "Generating IHM Report";
+            pdfWindow.document.body.innerHTML = "<p style=\"font-family:Segoe UI,Arial,sans-serif;padding:24px;\">Generating report...</p>";
+        }
+
         Object.keys(collections).forEach(reindexCollection);
         reindexPeople();
 
@@ -1101,6 +1108,7 @@
         const handlePdfError = (error) => {
             setProgress("PDF generation failed.", 100);
             unlockPageForPdfGeneration();
+            if (pdfWindow && !pdfWindow.closed) pdfWindow.close();
             alert(error.message || "PDF generation failed.");
         };
 
@@ -1152,7 +1160,12 @@
 
                 if (status === "completed") {
                     setProgress("PDF completed. Opening report...", 100);
-                    window.location.href = pdfUrl;
+                    if (pdfWindow && !pdfWindow.closed) {
+                        pdfWindow.location.href = pdfUrl;
+                    } else {
+                        window.open(pdfUrl, "_blank", "noopener,noreferrer");
+                    }
+                    unlockPageForPdfGeneration();
                     return;
                 }
 

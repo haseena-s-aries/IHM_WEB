@@ -21,23 +21,19 @@
 
     string Val(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
     string Raw(string? value) => value?.Trim() ?? "";
-    string NormalizeResult(string? value)
+    string NormalizeAuditStatus(string? value)
     {
         var clean = (value ?? "").Trim().ToLowerInvariant().Replace(" ", "").Replace("_", "").Replace("-", "");
         return clean switch
         {
-            "present" or "2" => "Present",
-            "notpresent" or "3" => "NotPresent",
-            "notapplicable" or "4" => "NotApplicable",
-            "samplerequired" or "5" => "SampleRequired",
+            "inprogress" or "2" => "InProgress",
+            "done" or "3" => "Done",
             _ => "Pending"
         };
     }
 
     var sampleLabel = Val(Model.SampleNo ?? Model.Location);
-    var auditResult = NormalizeResult(Model.Result ?? Model.CheckResult);
-    var auditComplete = auditResult != "Pending";
-    var auditStatusText = auditComplete ? "Saved and completed" : "Pending";
+    var auditStatus = NormalizeAuditStatus(Model.AuditStatus);
     var layoutPath = layouts.FirstOrDefault(x =>
         string.Equals(x.Target, areaId.ToString(), StringComparison.OrdinalIgnoreCase) ||
         string.Equals(x.Target, areaName, StringComparison.OrdinalIgnoreCase))?.FilePath
@@ -76,6 +72,16 @@
             position: sticky;
             top: 0;
             z-index: 50;
+        }
+
+        .logout-link {
+            color: #d63b4b;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .back-btn {
@@ -785,6 +791,10 @@
             <i class="fa-solid fa-floppy-disk"></i>
             <span>Save</span>
         </button>
+        <a class="logout-link" href="@Url.Action("Logout", "Home")">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            <span>Sign Out</span>
+        </a>
     </header>
 
     <nav class="tabs" aria-label="Checkpoint tabs">
@@ -824,6 +834,7 @@
             <input type="hidden" name="SamplingCheck" value="@Raw(Model.SamplingCheck)" />
             <input type="hidden" name="VisualCheck" value="@Raw(Model.VisualCheck)" />
             <input type="hidden" name="CheckResult" value="@Raw(Model.CheckResult)" />
+            <input type="hidden" name="AuditResult" value="@auditStatus" />
 
             <section id="detailsPanel" class="tab-panel active">
                 <h3 class="section-label">Checkpoint Info</h3>
@@ -842,7 +853,6 @@
                 <div class="card-box">
                     <div class="info-row"><div class="info-label"><i class="fa-regular fa-file-lines"></i>Document Analysis</div><div class="info-value">@Val(Model.DocumentAnalysisResult)</div></div>
                     <div class="info-row"><div class="info-label"><i class="fa-regular fa-square-check"></i>Result of Check</div><div class="info-value">@Val(Model.CheckResult)</div></div>
-                    
                 </div>
 
                 <h3 class="section-label">Flags & Remarks</h3>
