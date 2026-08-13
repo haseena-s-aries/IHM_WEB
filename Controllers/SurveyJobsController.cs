@@ -1194,70 +1194,102 @@ namespace Survery_Certification_App_Consume.Controllers
 
         [HttpPost]
         public async Task<IActionResult> UploadIhmAreaLayout(
-            int jobId, string layoutTarget, string? newAreaName, List<IFormFile> files, string? ihmCompletionFilter = null)
+    int jobId,
+    List<string> layoutTargets,
+    List<string> newAreaNames,
+    List<IFormFile> files,
+    string? ihmCompletionFilter = null)
         {
             if (files == null || files.Count == 0 || files.All(x => x.Length == 0))
             {
-                TempData["ErrorMessage"] = "Please select one layout image or PDF file.";
+                TempData["ErrorMessage"] = "Please add at least one layout file.";
+                return RedirectToAction("Ihm", new { ihmCompletionFilter });
+            }
+
+            if (layoutTargets == null || layoutTargets.Count != files.Count)
+            {
+                TempData["ErrorMessage"] = "Layout upload list is invalid. Please add the files again.";
                 return RedirectToAction("Ihm", new { ihmCompletionFilter });
             }
 
             try
             {
                 var client = CreateApiClient();
-                int? areaId = null;
-                if (layoutTarget == "new")
+                var uploadedCount = 0;
+
+                for (var i = 0; i < files.Count; i++)
                 {
-                    if (string.IsNullOrWhiteSpace(newAreaName))
-                        throw new InvalidOperationException("Enter the new area name.");
+                    var file = files[i];
+                    if (file == null || file.Length == 0)
+                        continue;
 
-                    var response = await client.PostAsync(
-                        $"ihm-survey/jobs/{jobId}/areas",
-                        new StringContent(JsonConvert.SerializeObject(new
-                        {
-                            areaName = newAreaName.Trim(),
-                            description = "Created while uploading layouts",
-                            sortOrder = 999
-                        }), Encoding.UTF8, "application/json"));
-                    var body = await response.Content.ReadAsStringAsync();
-                    if (!response.IsSuccessStatusCode) throw new InvalidOperationException(body);
-                    areaId = JsonConvert.DeserializeObject<IhmAreaOptionDto>(body)?.Id;
-                }
-                else if (layoutTarget != "common")
-                {
-                    var normalizedTarget = (layoutTarget ?? "").Trim();
-                    if (normalizedTarget.StartsWith("area:", StringComparison.OrdinalIgnoreCase))
-                        normalizedTarget = normalizedTarget["area:".Length..];
+                    var layoutTarget = layoutTargets[i];
+                    var newAreaName = newAreaNames != null && i < newAreaNames.Count
+                        ? newAreaNames[i]
+                        : null;
 
-                    if (!int.TryParse(normalizedTarget, out var parsedAreaId) || parsedAreaId <= 0)
-                        throw new InvalidOperationException("Select a valid survey area for this layout.");
+                    int? areaId = null;
 
-                    areaId = parsedAreaId;
-                }
+                    if (layoutTarget == "new")
+                    {
+                        if (string.IsNullOrWhiteSpace(newAreaName))
+                            throw new InvalidOperationException($"Enter the new area name for {file.FileName}.");
 
-                var file = files.First(x => x.Length > 0);
-                {
+                        var response = await client.PostAsync(
+                            $"ihm-survey/jobs/{jobId}/areas",
+                            new StringContent(JsonConvert.SerializeObject(new
+                            {
+                                areaName = newAreaName.Trim(),
+                                description = "Created while uploading layouts",
+                                sortOrder = 999
+                            }), Encoding.UTF8, "application/json"));
+
+                        var body = await response.Content.ReadAsStringAsync();
+                        if (!response.IsSuccessStatusCode)
+                            throw new InvalidOperationException(ExtractApiErrorMessage(body));
+
+                        areaId = JsonConvert.DeserializeObject<IhmAreaOptionDto>(body)?.Id;
+                    }
+                    else if (layoutTarget != "common")
+                    {
+                        var normalizedTarget = (layoutTarget ?? "").Trim();
+                        if (normalizedTarget.StartsWith("area:", StringComparison.OrdinalIgnoreCase))
+                            normalizedTarget = normalizedTarget["area:".Length..];
+
+                        if (!int.TryParse(normalizedTarget, out var parsedAreaId) || parsedAreaId <= 0)
+                            throw new InvalidOperationException($"Select a valid survey area for {file.FileName}.");
+
+                        areaId = parsedAreaId;
+                    }
+
                     var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
                     if (extension is not (".jpg" or ".jpeg" or ".png" or ".webp" or ".pdf"))
                         throw new InvalidOperationException("Only JPG, PNG, WEBP images and PDF files are supported.");
 
                     using var content = new MultipartFormDataContent();
-                    content.Add(new StringContent(
-                        (HttpContext.Session.GetInt32("UserId") ?? 0).ToString()),
-                        "uploadedByUserId");
+                    content.Add(new StringContent((HttpContext.Session.GetInt32("UserId") ?? 0).ToString()), "uploadedByUserId");
+
                     await using var stream = file.OpenReadStream();
                     content.Add(new StreamContent(stream), "file", file.FileName);
 
                     var endpoint = areaId.HasValue
                         ? $"ihm-survey/jobs/{jobId}/areas/{areaId}/layout"
                         : $"ihm-survey/jobs/{jobId}/ga-layout";
+
                     var uploadResponse = await client.PostAsync(endpoint, content);
                     if (!uploadResponse.IsSuccessStatusCode)
+                    {
+                        var errorBody = await uploadResponse.Content.ReadAsStringAsync();
                         throw new InvalidOperationException(
-                            await uploadResponse.Content.ReadAsStringAsync());
+                            string.IsNullOrWhiteSpace(errorBody)
+                                ? $"Upload failed for {file.FileName}. API returned {(int)uploadResponse.StatusCode} {uploadResponse.ReasonPhrase}."
+                                : ExtractApiErrorMessage(errorBody));
+                    }
+
+                    uploadedCount++;
                 }
 
-                TempData["SuccessMessage"] = "Layout attachment uploaded successfully.";
+                TempData["SuccessMessage"] = $"{uploadedCount} layout file(s) uploaded successfully.";
             }
             catch (Exception ex)
             {
@@ -1266,7 +1298,6 @@ namespace Survery_Certification_App_Consume.Controllers
 
             return RedirectToAction("Ihm", new { ihmCompletionFilter });
         }
-
         private async Task AssignSurveyorsInternal(HttpClient client, int jobId, int? primaryId, int? secondaryId)
         {
             var payload = new

@@ -760,8 +760,20 @@
 
                                     <div class="mt-3">
                                         <label class="form-label fw-bold">Layout file *</label>
-                                        <input class="form-control layout-file-input" type="file" name="files" accept=".jpg,.jpeg,.png,.webp,.pdf" required />
-                                        <div class="form-text">Uploading a new image or PDF replaces the current attachment for this selection.</div>
+                                        <div class="d-flex gap-2 align-items-stretch">
+                                            <input class="form-control layout-file-input flex-grow-1" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" />
+                                            <button class="btn btn-outline-primary layout-add-to-list flex-shrink-0" type="button">
+                                                <i class="fa-solid fa-plus me-1"></i>Add to list
+                                            </button>
+                                        </div>
+                                        <div class="form-text">This file will appear only inside the selected survey area.</div>
+                                        <div class="form-text">Adding a new image or PDF replaces only the current attachment for that same Common/area selection.</div>
+                                    </div>
+
+                                    <div class="pending-layout-uploads mt-4">
+                                        <div class="small text-uppercase fw-bold text-secondary mb-2">Pending uploads</div>
+                                        <div class="pending-empty text-muted small">No layout files selected yet.</div>
+                                        <div class="pending-list d-grid gap-2"></div>
                                     </div>
 
                                     <div class="current-layout-attachment mt-3 p-3 border rounded">
@@ -776,7 +788,9 @@
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-cloud-arrow-up me-1"></i>Upload Images</button>
+                                    <button type="submit" class="btn btn-primary layout-upload-submit" disabled>
+                                        <i class="fa-solid fa-cloud-arrow-up me-1"></i>Upload Images
+                                    </button>
                                 </div>
                             </form>
                         </div>
@@ -937,13 +951,23 @@
             });
         });
 
-        document.querySelectorAll(".area-layout-form").forEach(form => {
+                document.querySelectorAll(".area-layout-form").forEach(form => {
             const modal = form.closest(".modal");
             if (!modal) return;
 
             modal.addEventListener("show.bs.modal", function () {
                 loadLayoutOptions(form);
             });
+
+                    form.addEventListener("submit", function (event) {
+            if (!form.querySelector(".pending-layout-row")) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                alert("Please add at least one layout file to the pending list.");
+                updateLayoutUploadSubmitState(form);
+                return false;
+            }
+        });
         });
 
         document.querySelectorAll(".area-layout-select").forEach(select => {
@@ -973,24 +997,114 @@
 
             const form = select.closest(".area-layout-form");
             updateAttachment(form, select.options[select.selectedIndex]);
-            form.querySelector(".layout-file-input").addEventListener("change", function () {
-                if (!this.files.length) {
-                    updateAttachment(form, select.options[select.selectedIndex]);
-                    return;
-                }
-                const details = form.querySelector(".attachment-details");
-                const empty = form.querySelector(".attachment-empty");
-                const link = form.querySelector(".attachment-link");
-                empty.classList.add("d-none");
-                details.classList.remove("d-none");
-                details.classList.add("d-flex");
-                link.removeAttribute("href");
-                link.textContent = `${this.files[0].name} (pending upload)`;
-                details.querySelector(".badge").textContent = "Pending";
-                details.querySelector(".badge").className = "badge bg-warning text-dark";
-            });
+                    form.querySelector(".layout-add-to-list").addEventListener("click", function () {
+            addLayoutUploadToList(form);
         });
+        });
+                function updateLayoutUploadSubmitState(form) {
+            const submitButton = form.querySelector(".layout-upload-submit");
+            if (!submitButton) return;
 
+            submitButton.disabled = !form.querySelector(".pending-layout-row");
+        }
+                function addLayoutUploadToList(form) {
+            const select = form.querySelector(".area-layout-select");
+            const option = select.options[select.selectedIndex];
+            const fileInput = form.querySelector(".layout-file-input");
+            const newNameInput = form.querySelector(".new-area-fields input");
+            const pendingList = form.querySelector(".pending-list");
+            const pendingEmpty = form.querySelector(".pending-empty");
+
+            if (!option) {
+                alert("Please select a layout visibility.");
+                return;
+            }
+
+            if (select.value === "new" && !newNameInput.value.trim()) {
+                alert("Enter the new area name.");
+                newNameInput.focus();
+                return;
+            }
+
+            if (!fileInput.files.length) {
+                alert("Please choose a layout file.");
+                fileInput.focus();
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const target = select.value;
+            const targetLabel = option.textContent.trim();
+            const newAreaName = select.value === "new" ? newNameInput.value.trim() : "";
+
+            const duplicate = pendingList.querySelector(`[data-target="${CSS.escape(target)}"]`);
+            if (duplicate) {
+                duplicate.remove();
+            }
+
+            const row = document.createElement("div");
+            row.className = "pending-layout-row border rounded p-2 d-flex align-items-center justify-content-between gap-2";
+            row.dataset.target = target;
+
+            const text = document.createElement("div");
+            text.className = "min-w-0";
+            text.innerHTML = `
+                <div class="fw-semibold text-truncate">${escapeHtml(targetLabel)}</div>
+                <div class="small text-muted text-truncate">${escapeHtml(file.name)}</div>
+            `;
+
+            const removeBtn = document.createElement("button");
+            removeBtn.type = "button";
+            removeBtn.className = "btn btn-sm btn-outline-danger";
+            removeBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+            removeBtn.addEventListener("click", function () {
+                row.remove();
+                pendingEmpty.classList.toggle("d-none", pendingList.children.length > 0);
+                updateLayoutUploadSubmitState(form);
+            });
+
+            const targetInput = document.createElement("input");
+            targetInput.type = "hidden";
+            targetInput.name = "layoutTargets";
+            targetInput.value = target;
+
+            const newAreaInput = document.createElement("input");
+            newAreaInput.type = "hidden";
+            newAreaInput.name = "newAreaNames";
+            newAreaInput.value = newAreaName;
+
+            fileInput.name = "files";
+            fileInput.required = false;
+            fileInput.classList.add("d-none");
+
+            row.appendChild(text);
+            row.appendChild(removeBtn);
+            row.appendChild(targetInput);
+            row.appendChild(newAreaInput);
+            row.appendChild(fileInput);
+            pendingList.appendChild(row);
+
+            const replacement = document.createElement("input");
+            replacement.className = "form-control layout-file-input";
+            replacement.type = "file";
+            replacement.accept = ".jpg,.jpeg,.png,.webp,.pdf";
+
+            const addButton = form.querySelector(".layout-add-to-list");
+            addButton.parentElement.insertBefore(replacement, addButton);
+
+                    pendingEmpty.classList.add("d-none");
+        updateLayoutUploadSubmitState(form);
+        updateAttachment(form, option);
+        }
+
+        function escapeHtml(value) {
+            return String(value || "")
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
         function updateAttachment(form, option) {
             const details = form.querySelector(".attachment-details");
             const empty = form.querySelector(".attachment-empty");

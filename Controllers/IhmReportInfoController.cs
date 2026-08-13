@@ -330,7 +330,7 @@ namespace Survery_Certification_App_Consume.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [RequestSizeLimit(100_000_000)]
+      
         public async Task<IActionResult> UploadAppendices(
             int jobId,
             string appendixType,
