@@ -27,10 +27,16 @@
         var normalized = (value ?? "").Trim().ToLowerInvariant().Replace(" ", "").Replace("_", "").Replace("-", "");
         return normalized switch
         {
-            "inprogress" or "2" => "InProgress",
+            "inprogress" or "2" => "Pending",
             "done" or "3" or "completed" or "audited" => "Done",
             _ => "Pending"
         };
+    }
+    int SampleOrder(string? value)
+    {
+        var text = (value ?? "").Trim();
+        var digits = new string(text.Where(char.IsDigit).ToArray());
+        return int.TryParse(digits, out var number) ? number : int.MaxValue;
     }
 }
 
@@ -549,7 +555,11 @@
         <h2 class="section-title">Checkpoints</h2>
 
         <div class="grid">
-            @foreach (var checkpoint in Model.Checkpoints ?? new List<Survery_Certification_App_Consume.Models.IhmCheckpointOptionDto>())
+            @foreach (var checkpoint in (Model.Checkpoints ?? new List<Survery_Certification_App_Consume.Models.IhmCheckpointOptionDto>())
+                        .OrderBy(x => x.IsSample ? 0 : x.IsVisual ? 1 : 2)
+                        .ThenBy(x => SampleOrder(x.SampleNo))
+                        .ThenBy(x => x.SampleNo)
+                        .ThenBy(x => x.Location))
             {
                 var isVisual = checkpoint.IsVisual;
                 var isSample = checkpoint.IsSample;
@@ -642,7 +652,7 @@
                                 <input type="hidden" name="ReturnToAreaList" value="true" />
                                 <select name="AuditStatus" class="audit-status-select" aria-label="Audit Result" onchange="event.stopPropagation(); this.form.submit();">
                                     <option value="Pending" selected="@(auditStatus == "Pending")">Pending</option>
-                                    <option value="InProgress" selected="@(auditStatus == "InProgress")">In Progress</option>
+                                    
                                     <option value="Done" selected="@(auditStatus == "Done")">Done</option>
                                 </select>
                             </form>

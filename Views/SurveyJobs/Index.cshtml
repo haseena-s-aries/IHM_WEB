@@ -301,6 +301,20 @@
                 var jobOpenUrl = Model.IsAdmin
                     ? $"/SurveyJobs/ProjectInfo?jobId={job.Id}{ihmFilterQuery}"
                     : $"/SurveyJobs/Work?jobId={job.Id}&surveyType={Uri.EscapeDataString(Model.SurveyType)}{ihmFilterQuery}";
+                var jobModuleType = (job.ModuleType ?? "").Trim();
+                var jobSurveyType =
+                jobModuleType.Equals("IhmSurvey", StringComparison.OrdinalIgnoreCase) ||
+                jobModuleType.Equals("IHM Survey", StringComparison.OrdinalIgnoreCase) ||
+                jobModuleType.Equals("2", StringComparison.OrdinalIgnoreCase)
+                ? "IHM Survey"
+                : "EX Survey";
+
+                var jobSurveyFilterQuery =
+                jobSurveyType == "IHM Survey" && hasIhmCompletionFilter
+                ? ihmFilterQuery
+                : "";
+
+                var jobSurveyUrl = $"/SurveyJobs/Work?jobId={job.Id}&surveyType={Uri.EscapeDataString(jobSurveyType)}{jobSurveyFilterQuery}";
                 var surveyDateText = job.SurveyDate.HasValue
                     ? job.SurveyDate.Value.ToLocalTime().ToString("dd-MM-yyyy")
                     : "Not selected";
@@ -450,7 +464,7 @@
                         }
                         else
                         {
-                            <a class="action-btn blue" href="/SurveyJobs/Work?jobId=@job.Id&surveyType=@Uri.EscapeDataString(Model.SurveyType)@ihmFilterQuery">
+                            <a class="action-btn blue" href="@jobSurveyUrl">
                                 <i class="fa-solid fa-up-right-from-square"></i> Open
                             </a>
                         }
@@ -519,6 +533,9 @@
                             <button class="action-btn amber" type="button" data-bs-toggle="modal" data-bs-target="#layoutModal-@job.Id">
                                 <i class="fa-regular fa-map"></i> Upload Layouts
                             </button>
+                            <a class="action-btn blue" href="@jobSurveyUrl">
+                                <i class="fa-solid fa-clipboard-check"></i> Survey
+                            </a>
                         }
                     </div>
                 </article>
@@ -948,6 +965,11 @@
             const q = this.value.toLowerCase();
             document.querySelectorAll(".job-card").forEach(card => {
                 card.style.display = card.dataset.search.includes(q) ? "" : "none";
+            });
+        });
+                document.querySelectorAll(".job-card .actions a, .job-card .actions button, .job-card .actions label, .job-card .actions form").forEach(element => {
+            element.addEventListener("click", function (event) {
+                event.stopPropagation();
             });
         });
 

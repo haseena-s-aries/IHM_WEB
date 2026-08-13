@@ -13,6 +13,12 @@
     const companyResults = document.getElementById("companySearchResults");
 
     let companySearchTimer;
+    let autosaveTimer = null;
+    let autosaveInProgress = false;
+    let autosaveQueued = false;
+    let reportHasUnsavedChanges = false;
+    let reportSubmitInProgress = false;
+    let companySavePending = false;
 
     // ---------------------------------------------------------------
     // Static Aries office directory (wwwroot/data/aries-offices.json).
@@ -120,6 +126,24 @@
         }
 
         companyResults.hidden = true;
+
+        ["CompanyId", "CompanyName", "CompanyDisplayName", "CompanyAddress", "CompanyTel", "CompanyFax", "CompanyWebsite", "CompanyEmail", "CompanyLogoPath"].forEach(id => {
+            document.getElementById(id)?.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+
+        companySavePending = true;
+        reportHasUnsavedChanges = true;
+        clearTimeout(autosaveTimer);
+
+        autosaveReportNow()
+            .then(() => {
+                companySavePending = false;
+            })
+            .catch(error => {
+                companySavePending = true;
+                console.warn("IHM report company autosave failed", error);
+                alert("Company details are not saved yet. Please wait and try again.");
+            });
 
     }
 
@@ -720,26 +744,83 @@
         return data;
 
     }
-
-    async function saveCurrentReportBeforeReload() {
-
+    function buildReportSaveFormData() {
         Object.keys(collections).forEach(reindexCollection);
-
         reindexPeople();
 
         const data = new FormData(form);
 
-        // Remove attachment-only fields from the report save request.
-
         data.delete("files");
-
         data.delete("appendixType");
-
         data.delete("appendixName");
-
         data.delete("appendixNo");
-
         data.delete("appendixTitle");
+
+        return data;
+    }
+
+    function flushAutosaveBeforeLeaving() {
+        if (!form || !reportHasUnsavedChanges || reportSubmitInProgress || !config.saveUrl) return;
+
+        try {
+            const data = buildReportSaveFormData();
+
+            fetch(config.saveUrl, {
+                method: "POST",
+                body: data,
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                keepalive: true
+            }).catch(() => { });
+        } catch {
+        }
+    }
+    function scheduleReportAutosave() {
+        if (!form || reportSubmitInProgress) return;
+
+        reportHasUnsavedChanges = true;
+        autosaveQueued = true;
+
+        clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(() => {
+            autosaveReportNow().catch(error => {
+                console.warn("IHM report autosave failed", error);
+            });
+        }, 1200);
+    }
+
+    async function autosaveReportNow() {
+        if (!form || reportSubmitInProgress || !reportHasUnsavedChanges) return;
+
+        if (autosaveInProgress) {
+            autosaveQueued = true;
+            return;
+        }
+
+        autosaveInProgress = true;
+        autosaveQueued = false;
+
+        try {
+            await saveCurrentReportBeforeReload();
+            reportHasUnsavedChanges = false;
+        } finally {
+            autosaveInProgress = false;
+
+            if (autosaveQueued && reportHasUnsavedChanges && !reportSubmitInProgress) {
+                clearTimeout(autosaveTimer);
+                autosaveTimer = setTimeout(() => {
+                    autosaveReportNow().catch(error => {
+                        console.warn("IHM report autosave failed", error);
+                    });
+                }, 600);
+            }
+        }
+    }
+
+    async function saveCurrentReportBeforeReload() {
+
+        const data = buildReportSaveFormData();
 
         const response = await fetch(config.saveUrl, {
 
@@ -1024,7 +1105,135 @@
             });
 
     }
+    function markedItemName(item) {
+        return String(
+            item.sectionTypeText ||
+            item.SectionTypeText ||
+            item.sectionType ||
+            item.SectionType ||
+            ""
+        ).toLowerCase();
+    }
 
+    function markedItemStatus(item) {
+        const textStatus = item.statusText || item.StatusText;
+        if (textStatus) return String(textStatus).toLowerCase();
+
+        const status = item.status ?? item.Status ?? "";
+        if (String(status) === "2") return "completed";
+        if (String(status) === "1") return "processing";
+        if (String(status) === "3") return "failed";
+
+        return String(status).toLowerCase();
+    }
+    function normalizeMarkedSectionName(value) {
+        return String(value || "").replaceAll(" ", "").toLowerCase();
+    }
+
+    function getMarkedSectionLabel(item) {
+        const raw = item.sectionTypeText || item.SectionTypeText || item.sectionType || item.SectionType || "";
+        const clean = normalizeMarkedSectionName(raw);
+
+        if (clean.includes("appendix4")) return "Appendix 4";
+        if (clean.includes("hazardous")) return "Hazardous";
+        return raw || "Marked image";
+    }
+
+    function getMarkedStatusClass(status, hasPath) {
+        const clean = String(status || "").toLowerCase();
+
+        if (clean === "completed" && hasPath) return "ready";
+        if (clean === "processing" || clean === "pending" || clean === "queued") return "processing";
+        if (clean === "failed") return "failed";
+        return "missing";
+    }
+
+    function renderMarkedImageStatus(items) {
+        const container = document.getElementById("markedImageStatusItems");
+        if (!container) return;
+
+        const requiredSections = [
+            { key: "appendix4", label: "Appendix 4" },
+            { key: "hazardous", label: "Hazardous" }
+        ];
+
+        const parts = requiredSections.map(section => {
+            const item = (items || []).find(x => {
+                const name = normalizeMarkedSectionName(
+                    x.sectionTypeText || x.SectionTypeText || x.sectionType || x.SectionType
+                );
+                return name.includes(section.key);
+            });
+
+            if (!item) return `${section.label}: missing`;
+
+            const status = markedItemStatus(item);
+            const path = item.generatedImagePath || item.GeneratedImagePath || "";
+            const ready = status === "completed" && path;
+
+            return `${section.label}: ${ready ? "ready" : (status || "not ready")}`;
+        });
+
+        container.textContent = `Layout images - ${parts.join(" | ")}`;
+    }
+    async function refreshMarkedImageStatus() {
+        const container = document.getElementById("markedImageStatusItems");
+        if (!config.markedImageStatusUrl) return [];
+
+        if (container) {
+            container.textContent = "Layout images: checking...";
+        }
+
+        try {
+            const response = await fetch(config.markedImageStatusUrl, {
+                headers: {
+                    "Accept": "application/json",
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            });
+
+            if (!response.ok) {
+                if (container) container.textContent = "Unable to check marked image status.";
+                return [];
+            }
+
+            const data = await response.json();
+            const items = data.items || data.Items || [];
+            renderMarkedImageStatus(items);
+            return items;
+        } catch (error) {
+            if (container) container.textContent = "Unable to check marked image status.";
+            return [];
+        }
+    }
+
+    async function ensureMarkedImagesReadyBeforePdf() {
+        const items = await refreshMarkedImageStatus();
+
+        const required = ["appendix4", "hazardous"];
+        const notReady = required.filter(section => {
+            const item = items.find(x => {
+                const name = normalizeMarkedSectionName(
+                    x.sectionTypeText || x.SectionTypeText || x.sectionType || x.SectionType
+                );
+                return name.includes(section);
+            });
+
+            if (!item) return true;
+
+            const status = markedItemStatus(item);
+            const generatedPath = item.generatedImagePath || item.GeneratedImagePath;
+
+            return status !== "completed" || !generatedPath;
+        });
+
+        if (notReady.length) {
+            alert("Layout images are still not ready. Check the Report layout image status bar at the top, then refresh and try again.");
+            return false;
+        }
+
+        return true;
+    }
     async function readFetchError(response, fallback) {
 
         const text = await response.text();
@@ -1068,6 +1277,12 @@
 
     updateCompletion();
 
+    refreshMarkedImageStatus();
+
+    document.getElementById("refreshMarkedImageStatus")?.addEventListener("click", () => {
+        refreshMarkedImageStatus();
+    });
+
     document.getElementById("generatePdfButton")?.addEventListener("click", async event => {
 
         event.preventDefault();
@@ -1082,12 +1297,91 @@
             alert("The PDF generation route is unavailable. Refresh the page and try again.");
             return;
         }
-
+        const markedImagesReady = await ensureMarkedImagesReadyBeforePdf();
+        if (!markedImagesReady) return;
         let pdfWindow = window.open("about:blank", "_blank");
         if (pdfWindow) {
             pdfWindow.opener = null;
             pdfWindow.document.title = "Generating IHM Report";
-            pdfWindow.document.body.innerHTML = "<p style=\"font-family:Segoe UI,Arial,sans-serif;padding:24px;\">Generating report...</p>";
+            pdfWindow.document.body.innerHTML = `
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: #f4f7fb;
+            font-family: "Segoe UI", Arial, sans-serif;
+            color: #102033;
+        }
+
+        .pdf-loading-card {
+            width: min(420px, calc(100vw - 40px));
+            padding: 34px 30px;
+            border-radius: 18px;
+            background: #ffffff;
+            box-shadow: 0 20px 60px rgba(15, 35, 65, .18);
+            text-align: center;
+            border: 1px solid #dbe5f2;
+        }
+
+        .pdf-spinner {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 18px;
+            border-radius: 50%;
+            border: 5px solid #dbeafe;
+            border-top-color: #2563eb;
+            animation: pdfSpin .85s linear infinite;
+        }
+
+        .pdf-loading-card h1 {
+            margin: 0 0 8px;
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .pdf-loading-card p {
+            margin: 0;
+            color: #667085;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .pdf-loading-bar {
+            height: 6px;
+            margin-top: 22px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: #e5edf8;
+        }
+
+        .pdf-loading-bar span {
+            display: block;
+            width: 42%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #2563eb, #38bdf8);
+            animation: pdfBar 1.2s ease-in-out infinite;
+        }
+
+        @keyframes pdfSpin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pdfBar {
+            0% { transform: translateX(-110%); }
+            100% { transform: translateX(260%); }
+        }
+    </style>
+
+    <main class="pdf-loading-card">
+        <div class="pdf-spinner"></div>
+        <h1>Generating IHM Report</h1>
+        <p>Please keep this tab open. The PDF will appear here automatically when it is ready.</p>
+        <div class="pdf-loading-bar"><span></span></div>
+    </main>
+`;
         }
 
         Object.keys(collections).forEach(reindexCollection);
@@ -1185,8 +1479,44 @@
         }
 
     });
+    form?.addEventListener("input", event => {
+        const field = event.target;
+        if (!field || field.type === "file") return;
+        if (!field.name && !field.dataset.field) return;
+
+        scheduleReportAutosave();
+    });
+
+    form?.addEventListener("change", event => {
+        const field = event.target;
+        if (!field || field.type === "file") return;
+        if (!field.name && !field.dataset.field) return;
+
+        scheduleReportAutosave();
+    });
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") {
+            clearTimeout(autosaveTimer);
+            flushAutosaveBeforeLeaving();
+        }
+    });
+
+    window.addEventListener("pagehide", () => {
+        clearTimeout(autosaveTimer);
+        flushAutosaveBeforeLeaving();
+    });
+    window.addEventListener("beforeunload", event => {
+        if (!companySavePending) return;
+
+        event.preventDefault();
+        event.returnValue = "";
+    });
+  
 
     form?.addEventListener("submit", () => {
+        reportSubmitInProgress = true;
+        clearTimeout(autosaveTimer);
 
         Object.keys(collections).forEach(reindexCollection);
 

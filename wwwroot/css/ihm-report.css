@@ -1638,3 +1638,55 @@ button, input, textarea {
         opacity: .65;
         pointer-events: none;
     }
+.topbar-actions {
+    margin-left: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 7px;
+}
+
+.topbar-action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+    .topbar-action-buttons .button {
+        white-space: nowrap;
+    }
+
+.marked-image-status-bar.compact {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+    max-width: 520px;
+    color: #d8e7ff;
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+    .marked-image-status-bar.compact #markedImageStatusItems {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        opacity: .94;
+    }
+
+.marked-image-refresh {
+    width: 22px;
+    height: 22px;
+    border: 1px solid rgba(255, 255, 255, .25);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, .08);
+    color: #eaf3ff;
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+    flex: 0 0 auto;
+    font-size: 11px;
+}
+
+    .marked-image-refresh:hover {
+        background: rgba(255, 255, 255, .16);
+    }

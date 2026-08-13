@@ -38,15 +38,25 @@
                     </div>
                 </div>
                 <div class="topbar-actions">
-                    <button class="button ghost" type="button" data-bs-toggle="modal" data-bs-target="#reportFinderModal">
-                        <i class="fa-solid fa-copy"></i> Use previous report
-                    </button>
-                    <a class="button ghost" href="/IhmReportInfo/ViewPdf?jobId=@Model.JobId">
-                        <i class="fa-regular fa-eye"></i> Latest PDF
-                    </a>
+                    <div class="topbar-action-buttons">
+                        <button class="button ghost" type="button" data-bs-toggle="modal" data-bs-target="#reportFinderModal">
+                            <i class="fa-solid fa-copy"></i> Use previous report
+                        </button>
+                        <a class="button ghost" href="/IhmReportInfo/ViewPdf?jobId=@Model.JobId">
+                            <i class="fa-regular fa-eye"></i> Latest PDF
+                        </a>
+                    </div>
+
+                    <div id="markedImageStatusBar" class="marked-image-status-bar compact">
+                        <span id="markedImageStatusItems">Layout images: checking...</span>
+                        <button type="button" id="refreshMarkedImageStatus" class="marked-image-refresh" title="Refresh layout image status">
+                            <i class="fa-solid fa-rotate"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="progress-track"><span id="formProgress"></span></div>
+            
         </header>
 
         <div class="workspace">
@@ -439,38 +449,7 @@
                                 }
                             </div>
 
-                            <div class="table-block">
-                                <div class="table-toolbar">
-                                    <div><strong>Risk assessment table</strong><p>Record initial risk, controls and residual risk.</p></div>
-                                    <button class="mini-button add-row" type="button" data-collection="risk"><i class="fa-solid fa-plus"></i> Add risk</button>
-                                </div>
-                                <div class="data-table-wrap">
-                                    <table class="data-table risk-table">
-                                        <thead><tr><th>Activity</th><th>Hazard</th><th>Risks</th><th>P</th><th>S</th><th>R</th><th>ALARP</th><th>Control measures</th><th>P</th><th>S</th><th>R</th><th>ALARP</th><th>Responsible</th><th></th></tr></thead>
-                                        <tbody data-collection="risk" data-prefix="OhsRiskAssessmentRows">
-                                            @for (var i = 0; i < Model.OhsRiskAssessmentRows.Count; i++)
-                                            {
-                                                <tr>
-                                                    <td><input asp-for="OhsRiskAssessmentRows[i].Activity" data-field="Activity" /><input asp-for="OhsRiskAssessmentRows[i].SortOrder" data-field="SortOrder" type="hidden" /></td>
-                                                    <td><input asp-for="OhsRiskAssessmentRows[i].HazardDescription" data-field="HazardDescription" /></td>
-                                                    <td><input asp-for="OhsRiskAssessmentRows[i].Risks" data-field="Risks" /></td>
-                                                    <td><input asp-for="OhsRiskAssessmentRows[i].InitialRiskP" data-field="InitialRiskP" class="risk-score" /></td>
-                                                    <td><input asp-for="OhsRiskAssessmentRows[i].InitialRiskS" data-field="InitialRiskS" class="risk-score" /></td>
-                                                    <td><input asp-for="OhsRiskAssessmentRows[i].InitialRiskR" data-field="InitialRiskR" class="risk-score" /></td>
-                                                    <td><input asp-for="OhsRiskAssessmentRows[i].InitialAlarp" data-field="InitialAlarp" /></td>
-                                                    <td><textarea asp-for="OhsRiskAssessmentRows[i].ControlMeasures" data-field="ControlMeasures" rows="2"></textarea></td>
-                                                    <td><input asp-for="OhsRiskAssessmentRows[i].ResidualRiskP" data-field="ResidualRiskP" class="risk-score" /></td>
-                                                    <td><input asp-for="OhsRiskAssessmentRows[i].ResidualRiskS" data-field="ResidualRiskS" class="risk-score" /></td>
-                                                    <td><input asp-for="OhsRiskAssessmentRows[i].ResidualRiskR" data-field="ResidualRiskR" class="risk-score" /></td>
-                                                    <td><input asp-for="OhsRiskAssessmentRows[i].ResidualAlarp" data-field="ResidualAlarp" /></td>
-                                                    <td><input asp-for="OhsRiskAssessmentRows[i].ResponsiblePerson" data-field="ResponsiblePerson" /></td>
-                                                    <td><button class="remove-row" type="button"><i class="fa-regular fa-trash-can"></i></button></td>
-                                                </tr>
-                                            }
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
+                            
 
                             <div class="approval-grid">
                                 <div class="approval-card">
@@ -661,9 +640,7 @@
     <template id="structure-template">
         <tr><td class="row-number"></td><td><input data-field="EquipmentName" /></td><td><input data-field="Location" /></td><td><input data-field="MaterialClassification" /></td><td><input data-field="PartsWereUsed" /></td><td><input data-field="ApproximateQuantity" /></td><td><input data-field="Remarks" /></td><td><button class="remove-row" type="button"><i class="fa-regular fa-trash-can"></i></button></td></tr>
     </template>
-    <template id="risk-template">
-        <tr><td><input data-field="Activity" /><input data-field="SortOrder" type="hidden" /></td><td><input data-field="HazardDescription" /></td><td><input data-field="Risks" /></td><td><input data-field="InitialRiskP" class="risk-score" /></td><td><input data-field="InitialRiskS" class="risk-score" /></td><td><input data-field="InitialRiskR" class="risk-score" /></td><td><input data-field="InitialAlarp" /></td><td><textarea data-field="ControlMeasures" rows="2"></textarea></td><td><input data-field="ResidualRiskP" class="risk-score" /></td><td><input data-field="ResidualRiskS" class="risk-score" /></td><td><input data-field="ResidualRiskR" class="risk-score" /></td><td><input data-field="ResidualAlarp" /></td><td><input data-field="ResponsiblePerson" /></td><td><button class="remove-row" type="button"><i class="fa-regular fa-trash-can"></i></button></td></tr>
-    </template>
+  
     <template id="appendixPoints-template">
         <div class="appendix-point"><input data-field="Title" placeholder="Hazardous material" /><textarea data-field="Description" rows="2" placeholder="Result statement"></textarea><input data-field="SortOrder" type="hidden" /><button class="remove-row" type="button"><i class="fa-regular fa-trash-can"></i></button></div>
     </template>
@@ -678,6 +655,7 @@
             copyAppendicesUrl: '@Url.Action("CopyFromJob", "IhmReportInfo")',
             generatePdfUrl: '@Url.Action("GeneratePdf", "IhmReportInfo")',
             pdfStatusUrl: '@Url.Action("PdfStatus", "IhmReportInfo", new { jobId = Model.JobId })',
+            markedImageStatusUrl: '@Url.Action("GetMarkedImageStatus", "SurveyJobs", new { jobId = Model.JobId })',
             viewPdfUrl: '@Url.Action("ViewPdf", "IhmReportInfo", new { jobId = Model.JobId })',
             saveUrl: '@Url.Action("Save", "IhmReportInfo")',
             currentJobId: @Model.JobId
