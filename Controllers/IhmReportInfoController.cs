@@ -6,6 +6,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using Survery_Certification_App_Consume.Filters;
 
+
 namespace Survery_Certification_App_Consume.Controllers
 {
     [BlockClientAccess]
@@ -110,37 +111,7 @@ namespace Survery_Certification_App_Consume.Controllers
                     model.JobId
                 );
 
-                // Optional: ask backend to check/queue stale marked images, but do not wait.
-                try
-                {
-                    using var markedImageRequest = new HttpRequestMessage(
-                        HttpMethod.Post,
-                        $"ihm-survey/jobs/{model.JobId}/marked-images/regenerate"
-                    )
-                    {
-                        Content = new StringContent(
-                            "{\"force\":false}",
-                            Encoding.UTF8,
-                            "application/json"
-                        )
-                    };
-
-                    using var markedImageResponse = await client.SendAsync(markedImageRequest);
-
-                    _logger.LogInformation(
-                        "Marked image pre-generation check queued for job {JobId}. StatusCode={StatusCode}",
-                        model.JobId,
-                        (int)markedImageResponse.StatusCode
-                    );
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(
-                        ex,
-                        "Unable to queue marked image pre-generation check for job {JobId}. Continuing PDF generation.",
-                        model.JobId
-                    );
-                }
+               
 
                 // Step 2: Generate PDF only after marker map succeeds.
                 var path =
@@ -203,6 +174,7 @@ namespace Survery_Certification_App_Consume.Controllers
 
                 TempData["ErrorMessage"] = message;
             }
+          
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected IHM PDF error for job {JobId}.", model.JobId);

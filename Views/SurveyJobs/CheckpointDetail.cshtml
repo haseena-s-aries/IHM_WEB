@@ -431,6 +431,34 @@
             background: #ffffff;
         }
 
+        .layout-zoom-controls {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .layout-zoom-btn {
+            width: 38px;
+            height: 38px;
+            border: 1px solid #bdd0e5;
+            border-radius: 10px;
+            background: #ffffff;
+            color: #11243c;
+            display: inline-grid;
+            place-items: center;
+            box-shadow: 0 8px 20px rgba(20, 40, 70, .14);
+            cursor: pointer;
+        }
+
+            .layout-zoom-btn:hover {
+                background: #eef7ff;
+                border-color: #1e95ff;
+                color: #1e95ff;
+            }
         .layout-toolbar {
             position: absolute;
             top: 12px;
@@ -532,16 +560,16 @@
             color: #ff5252;
             --pin-color: #ff5252;
             text-align: center;
-            pointer-events: auto;
+            pointer-events: none;
         }
 
         .pin-content {
             position: absolute;
-            left: calc(-36px * var(--pin-scale, 1));
-            top: calc(-64px * var(--pin-scale, 1));
+            left: -36px;
+            top: -64px;
             width: 72px;
             height: 64px;
-            transform: scale(var(--pin-scale, 1));
+            transform: none;
             transform-origin: 50% 0;
             filter: drop-shadow(0 2px 3px rgba(0,0,0,.35));
             white-space: nowrap;
@@ -888,6 +916,18 @@
 
         <section id="areaPanel" class="tab-panel">
             <div class="layout-shell">
+                <div class="layout-zoom-controls">
+                    <button type="button" class="layout-zoom-btn" onclick="changeMapZoom(-0.2)" title="Zoom out">
+                        <i class="fa-solid fa-minus"></i>
+                    </button>
+                    <button type="button" class="layout-zoom-btn" onclick="resetMapView()" title="Reset zoom">
+                        <i class="fa-solid fa-expand"></i>
+                    </button>
+                    <button type="button" class="layout-zoom-btn" onclick="changeMapZoom(0.2)" title="Zoom in">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+
                 <button id="markerSaveBtn" class="layout-action" type="button" onclick="saveMarker()" disabled hidden>
                     <i class="fa-solid fa-floppy-disk"></i> Save Marker
                 </button>
@@ -967,8 +1007,8 @@
                 let manualMapMode = "new";
         let manualMapCheckpointId = checkpointContext.checkpointId;
         let manualMapSampleNo = checkpointContext.sampleNo;
-        const mapView = {
-            scale: 1,
+                const mapView = {
+            scale: 0.65,
             x: 0,
             y: 0
         };
@@ -1231,7 +1271,7 @@
 
                 const oldScale = mapView.scale;
                 const zoomFactor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
-                const nextScale = Math.max(1, Math.min(6, oldScale * zoomFactor));
+                const nextScale = Math.max(0.35, Math.min(6, oldScale * zoomFactor));
                 if (nextScale === oldScale) return;
 
                 const stageRect = stage.getBoundingClientRect();
@@ -1255,13 +1295,28 @@
             mapView.y = 0;
             applyMapTransform();
         }
+                function changeMapZoom(delta) {
+            const stage = document.querySelector(".layout-stage");
+            const oldScale = mapView.scale;
+            const nextScale = Math.max(0.35, Math.min(6, oldScale + delta));
+
+            if (nextScale === oldScale) return;
+
+            mapView.scale = nextScale;
+            applyMapTransform();
+
+            if (stage) {
+                stage.scrollLeft = stage.scrollLeft * (nextScale / oldScale);
+                stage.scrollTop = stage.scrollTop * (nextScale / oldScale);
+            }
+        }
 
                 function applyMapTransform() {
             const wrap = document.getElementById("imageWrap");
             if (!wrap) return;
                       wrap.style.zoom = "";
         wrap.style.transform = `scale(${mapView.scale})`;
-            wrap.style.setProperty("--pin-scale", 1 / mapView.scale);
+            
         }
 
         function setMarkerHint(message, icon = "fa-circle-info") {

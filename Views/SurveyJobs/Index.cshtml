@@ -184,6 +184,21 @@
                 cursor: wait;
             }
 
+        .pending-layout-row {
+            max-width: 100%;
+        }
+
+        .pending-file-name {
+            max-width: 100%;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            line-height: 1.25;
+        }
+
+        .pending-layout-row .btn {
+            flex: 0 0 auto;
+        }
+
         .page-loading-indicator {
             position: fixed;
             top: 18px;
@@ -1065,14 +1080,14 @@
             }
 
             const row = document.createElement("div");
-            row.className = "pending-layout-row border rounded p-2 d-flex align-items-center justify-content-between gap-2";
+            row.className = "pending-layout-row border rounded p-2 d-flex align-items-start justify-content-between gap-2 overflow-hidden";
             row.dataset.target = target;
 
             const text = document.createElement("div");
-            text.className = "min-w-0";
+            text.className = "min-w-0 flex-grow-1 overflow-hidden";
             text.innerHTML = `
                 <div class="fw-semibold text-truncate">${escapeHtml(targetLabel)}</div>
-                <div class="small text-muted text-truncate">${escapeHtml(file.name)}</div>
+                <div class="small text-muted pending-file-name">${escapeHtml(file.name)}</div>
             `;
 
             const removeBtn = document.createElement("button");

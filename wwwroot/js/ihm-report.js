@@ -1228,7 +1228,7 @@
         });
 
         if (notReady.length) {
-            alert("Layout images are still not ready. Check the Report layout image status bar at the top, then refresh and try again.");
+            alert("Marked images for Appendix 4 and Hazardous sections are not ready. Check the marked image status at the top, then refresh and try again.");
             return false;
         }
 
@@ -1288,6 +1288,10 @@
         event.preventDefault();
 
         if (!form || pdfGenerationStarted) return;
+        if (autosaveInProgress) {
+            alert("Report autosave is still running. Please wait a few seconds and generate again.");
+            return;
+        }
 
         const generateUrl =
             config.generatePdfUrl ||
@@ -1298,7 +1302,11 @@
             return;
         }
         const markedImagesReady = await ensureMarkedImagesReadyBeforePdf();
-        if (!markedImagesReady) return;
+        if (!markedImagesReady) {
+            pdfGenerationStarted = false;
+            return;
+        }
+
         let pdfWindow = window.open("about:blank", "_blank");
         if (pdfWindow) {
             pdfWindow.opener = null;
@@ -1402,6 +1410,7 @@
         const handlePdfError = (error) => {
             setProgress("PDF generation failed.", 100);
             unlockPageForPdfGeneration();
+            pdfGenerationStarted = false;
             if (pdfWindow && !pdfWindow.closed) pdfWindow.close();
             alert(error.message || "PDF generation failed.");
         };
@@ -1460,6 +1469,7 @@
                         window.open(pdfUrl, "_blank", "noopener,noreferrer");
                     }
                     unlockPageForPdfGeneration();
+                    pdfGenerationStarted = false;
                     return;
                 }
 
