@@ -1298,6 +1298,26 @@ namespace Survery_Certification_App_Consume.Controllers
 
             return RedirectToAction("Ihm", new { ihmCompletionFilter });
         }
+        [HttpPost]
+        public async Task<IActionResult> DeleteIhmLayoutAttachment(int jobId, string target)
+        {
+            if (jobId <= 0 || string.IsNullOrWhiteSpace(target))
+                return BadRequest("Invalid layout delete request.");
+
+            var client = CreateApiClient();
+
+            var response = await client.DeleteAsync(
+                $"ihm-survey/jobs/{jobId}/layouts?target={Uri.EscapeDataString(target)}");
+
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+                return StatusCode(
+                    (int)response.StatusCode,
+                    string.IsNullOrWhiteSpace(body) ? "Failed to delete layout attachment." : body);
+
+            return Content(body, "application/json");
+        }
         private async Task AssignSurveyorsInternal(HttpClient client, int jobId, int? primaryId, int? secondaryId)
         {
             var payload = new

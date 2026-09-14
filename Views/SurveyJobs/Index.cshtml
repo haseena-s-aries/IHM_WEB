@@ -815,6 +815,9 @@
                                             <i class="fa-regular fa-image text-primary"></i>
                                             <a class="attachment-link text-truncate" target="_blank"></a>
                                             <span class="badge bg-success">Saved</span>
+                                            <button type="button" class="btn btn-sm btn-outline-danger attachment-delete-layout" title="Delete layout">
+                                                <i class="fa-solid fa-xmark"></i>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -1148,6 +1151,7 @@
             const link = form.querySelector(".attachment-link");
             const badge = details.querySelector(".badge");
             if (!option) return;
+            const deleteButton = details.querySelector(".attachment-delete-layout");
             const fileName = option.dataset.fileName;
             const filePath = option.dataset.filePath;
 
@@ -1159,6 +1163,10 @@
                 link.textContent = fileName;
                 badge.textContent = "Saved";
                 badge.className = "badge bg-success";
+                        if (deleteButton) {
+            deleteButton.dataset.target = option.value;
+            deleteButton.onclick = () => deleteSavedLayoutAttachment(form, option.value);
+        }
             } else {
                 details.classList.add("d-none");
                 details.classList.remove("d-flex");
@@ -1277,7 +1285,49 @@
             option.dataset.filePath = filePath || "";
             return option;
         }
+                async function deleteSavedLayoutAttachment(form, target) {
+            if (!target) return;
 
+            if (!confirm("Delete this layout attachment?")) return;
+
+            const jobId = form.dataset.jobId;
+            const button = form.querySelector(".attachment-delete-layout");
+            const select = form.querySelector(".area-layout-select");
+            const option = select.options[select.selectedIndex];
+
+            if (button) button.disabled = true;
+
+            try {
+                const data = new FormData();
+                data.append("jobId", jobId);
+                data.append("target", target);
+
+                const response = await fetch("/SurveyJobs/DeleteIhmLayoutAttachment", {
+                    method: "POST",
+                    body: data
+                });
+
+                const responseText = await response.text();
+
+                if (!response.ok) {
+                    throw new Error(readLayoutError(responseText) || "Failed to delete layout attachment.");
+                }
+
+                if (option) {
+                    option.dataset.fileName = "";
+                    option.dataset.filePath = "";
+                }
+
+                updateAttachment(form, option);
+                await loadLayoutOptions(form);
+
+                alert("Layout attachment deleted.");
+            } catch (error) {
+                alert(error.message || "Failed to delete layout attachment.");
+            } finally {
+                if (button) button.disabled = false;
+            }
+        }
         function readLayoutError(responseText) {
             if (!responseText) return "";
             try {

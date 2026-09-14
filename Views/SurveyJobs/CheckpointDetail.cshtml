@@ -542,21 +542,16 @@
 
         #markerPins {
             position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
+            inset: 1px;
             pointer-events: none;
-            overflow: hidden;
-            contain: layout paint;
-            overflow: hidden;
-            contain: layout paint;
-            pointer-events: none;
+            overflow: visible;
         }
 
         .marker-pin {
             position: absolute;
             width: 0;
             height: 0;
+            transform: translate(-50%, -100%);
             color: #ff5252;
             --pin-color: #ff5252;
             text-align: center;
@@ -565,14 +560,11 @@
 
         .pin-content {
             position: absolute;
-            left: -36px;
-            top: -64px;
+            left: 0;
+            top: auto;
+            bottom: 0;
             width: 72px;
-            height: 64px;
-            transform: none;
-            transform-origin: 50% 0;
-            filter: drop-shadow(0 2px 3px rgba(0,0,0,.35));
-            white-space: nowrap;
+            height: auto;
         }
 
         .marker-pin.active {
@@ -1013,8 +1005,16 @@
             y: 0
         };
 
-        document.querySelectorAll(".tab").forEach(button => {
-            button.addEventListener("click", () => activateTab(button.dataset.tab));
+               document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll(".tab").forEach(function (button) {
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    const tabName = button.getAttribute("data-tab");
+                    activateTab(tabName);
+                });
+            });
         });
 
         function activateTab(name) {
@@ -1436,6 +1436,16 @@
             const response = await fetch(`/SurveyJobs/GetIhmMarkers?jobId=${checkpointContext.jobId}`);
             if (!response.ok) return;
             loadedMarkers = await response.json();
+            console.log("SAVED MARKER", loadedMarkers);
+            console.log("CURRENT CHECKPOINT COORDINATE", loadedMarkers
+                .filter(marker => Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId")) === Number(checkpointContext.checkpointId))
+                .map(marker => ({
+                    id: getMarkerId(marker),
+                    areaId: getValue(marker, "ihmAreaId", "IhmAreaId"),
+                    checkpointId: getValue(marker, "ihmCheckpointId", "IhmCheckpointId"),
+                    x: getValue(marker, "xPercent", "XPercent"),
+                    y: getValue(marker, "yPercent", "YPercent")
+                })));
             renderMarkers();
             refreshAutoMapLists();
         }
@@ -1445,14 +1455,14 @@
             if (!container) return;
             container.innerHTML = "";
 
-                    const hasUnsavedPoint = selectedPoint !== null;
+                    const showUnsavedPoint = selectedPoint !== null && !window.markerSaving;
         const visibleByCheckpoint = new Map();
 
             loadedMarkers
         .filter(marker => {
             const checkpointId = Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId"));
             return samePath(getValue(marker, "imagePath", "ImagePath"), normalizePathForSave(currentImagePath)) &&
-                !(hasUnsavedPoint && checkpointId === checkpointContext.checkpointId);
+                !(showUnsavedPoint && checkpointId === checkpointContext.checkpointId);
         })
         .forEach((marker, index) => {
             const checkpointId = Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId"));
@@ -1486,7 +1496,7 @@
         );
 
                 });
-               if (selectedPoint) {
+               if (selectedPoint && !window.markerSaving) {
             addPin(
                 selectedPoint.x * 100,
                 selectedPoint.y * 100,
@@ -1627,15 +1637,22 @@
                 return;
             }
 
-            layoutClickTimer = setTimeout(() => {
-                if (!validateMarkerSelection()) return;
+                    if (!validateMarkerSelection()) return;
 
-                selectedPoint = point;
-                document.getElementById("markerHint").innerHTML =
-                    '<i class="fa-solid fa-spinner fa-spin"></i>Saving marker...';
+        if (window.markerSaving) return;
+        window.markerSaving = true;
 
-                saveMarker();
-            }, 260);
+        selectedPoint = point;
+                console.log("CLICK POINT", {
+            x: point.x,
+            y: point.y,
+            imageRect: document.getElementById("layoutImage").getBoundingClientRect()
+        });
+
+        document.getElementById("markerHint").innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin"></i>Saving marker...';
+
+        saveMarker();
         }
 
             async function deleteMarker(markerId, askConfirm = true) {
@@ -1659,6 +1676,7 @@
 
         async function saveMarker() {
             if (!selectedPoint) return;
+            const pointToSave = { ...selectedPoint };
             const button = document.getElementById("markerSaveBtn");
             button.disabled = true;
             button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving';
@@ -1672,8 +1690,8 @@
         ihmAreaId: checkpointContext.areaId,
         ihmCheckpointId: manualMapCheckpointId,
         imagePath: normalizePathForSave(currentImagePath),
-        xPercent: selectedPoint.x,
-        yPercent: selectedPoint.y,
+        xPercent: pointToSave.x,
+        yPercent: pointToSave.y,
         notes: manualMapMode === "existing" ? "manual-for-existing-image" : null,
         source: manualMapMode === "existing" ? "existing-image" : "manual",
         isManualForExistingImage: manualMapMode === "existing",
@@ -1681,14 +1699,16 @@
                     })
                 });
                 if (!response.ok) throw new Error(await response.text() || "Failed to save marker.");
-                        selectedPoint = null;
-                        resetManualMapMode();
-                        document.getElementById("markerHint").innerHTML = '<i class="fa-solid fa-circle-check"></i>Marker saved.';
-                await loadMarkers();
+        await loadMarkers();
+        selectedPoint = null;
+        resetManualMapMode();
+        renderMarkers();
+        document.getElementById("markerHint").innerHTML = '<i class="fa-solid fa-circle-check"></i>Marker saved.';
             } catch (error) {
                 alert(error.message || "Failed to save marker.");
                 button.disabled = false;
             } finally {
+                window.markerSaving = false;
                 button.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Marker';
             }
         }
