@@ -746,7 +746,10 @@
                 {
                     var areas = Model.AreasByJob.GetValueOrDefault(job.Id) ?? new();
                     var attachments = Model.LayoutAttachmentsByJob.GetValueOrDefault(job.Id) ?? new();
-                    attachments.TryGetValue("common", out var commonAttachment);
+                    var commonAttachment = attachments.FirstOrDefault(x => string.Equals(x.Target, "common", StringComparison.OrdinalIgnoreCase));
+                    var machineryAttachments = attachments
+                        .Where(x => string.Equals(x.Target, "machinery", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
                     <div class="modal fade" id="layoutModal-@job.Id" tabindex="-1">
                         <div class="modal-dialog modal-dialog-centered">
                             <form class="modal-content area-layout-form" method="post" enctype="multipart/form-data" action="/SurveyJobs/UploadIhmAreaLayout" data-job-id="@job.Id" data-layout-loaded="false">
@@ -768,21 +771,26 @@
                                         <option value="common" selected
                                                 data-file-name="@commonAttachment?.OriginalFileName"
                                                 data-file-path="@commonAttachment?.FilePath">
-                                            Common Layout - fallback for every location
+                                            GA Layout
                                         </option>
-                                        @foreach (var area in areas)
-                                        {
-                                            attachments.TryGetValue(area.Id.ToString(), out var areaAttachment);
-                                            <option value="area:@area.Id"
-                                                    data-locations="@area.LocationSummary"
-                                                    data-file-name="@areaAttachment?.OriginalFileName"
-                                                    data-file-path="@areaAttachment?.FilePath">
-                                                @area.AreaName
-                                            </option>
-                                        }
+                                        <option value="machinery">Machinery Layout</option>
                                     </select>
                                     <div class="form-text area-location-hint">
                                         Common is shown only where no specific area layout is uploaded.
+                                    </div>
+
+                                    <div class="machinery-area-assignment mt-3" hidden>
+                                        <label class="form-label fw-bold">Show this Machinery file in areas</label>
+                                        <div class="border rounded p-2 d-grid gap-1" style="max-height:180px;overflow:auto">
+                                            @foreach (var area in areas)
+                                            {
+                                                <label class="form-check">
+                                                    <input class="form-check-input machinery-area-checkbox" type="checkbox" value="@area.Id" />
+                                                    <span class="form-check-label">@area.AreaName</span>
+                                                </label>
+                                            }
+                                        </div>
+                                        <div class="form-text">An area assigned to one Machinery file will not be assigned to another file.</div>
                                     </div>
 
                                     <div class="new-area-fields mt-3" hidden>
@@ -798,8 +806,8 @@
                                                 <i class="fa-solid fa-plus me-1"></i>Add to list
                                             </button>
                                         </div>
-                                        <div class="form-text">This file will appear only inside the selected survey area.</div>
-                                        <div class="form-text">Adding a new image or PDF replaces only the current attachment for that same Common/area selection.</div>
+                                        <div class="form-text">This file will appear in every survey area and checkpoint.</div>
+                                        <div class="form-text">Adding a new image or PDF replaces the current GA or Machinery layout.</div>
                                     </div>
 
                                     <div class="pending-layout-uploads mt-4">
@@ -808,16 +816,29 @@
                                         <div class="pending-list d-grid gap-2"></div>
                                     </div>
 
-                                    <div class="current-layout-attachment mt-3 p-3 border rounded">
-                                        <div class="small text-uppercase fw-bold text-secondary mb-1">Current attachment</div>
-                                        <div class="attachment-empty text-muted small">No Common Layout uploaded.</div>
-                                        <div class="attachment-details d-none align-items-center gap-2">
-                                            <i class="fa-regular fa-image text-primary"></i>
-                                            <a class="attachment-link text-truncate" target="_blank"></a>
-                                            <span class="badge bg-success">Saved</span>
-                                            <button type="button" class="btn btn-sm btn-outline-danger attachment-delete-layout" title="Delete layout">
-                                                <i class="fa-solid fa-xmark"></i>
-                                            </button>
+                                    <div>
+                                        <div class="ga-current-file @(commonAttachment == null ? "d-none" : "") mb-3">
+                                            <div class="small text-uppercase fw-bold text-secondary mb-2">Uploaded GA file</div>
+                                            @if (commonAttachment != null)
+                                            {
+                                                <div class="small border rounded p-2 d-flex align-items-center gap-2">
+                                                    <i class="fa-regular fa-image text-primary"></i>
+                                                    <span class="text-truncate">@commonAttachment.OriginalFileName</span>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger ms-auto delete-common-layout" data-job-id="@job.Id" title="Delete file"><i class="fa-solid fa-xmark"></i></button>
+                                                </div>
+                                            }
+                                        </div>
+                                        <div class="machinery-current-files @(machineryAttachments.Count == 0 ? "d-none" : "")">
+                                            <div class="small text-uppercase fw-bold text-secondary mb-2">Uploaded Machinery files</div>
+                                            @foreach (var machinery in machineryAttachments)
+                                            {
+                                                <div class="small border rounded p-2 mb-1 machinery-file-row d-flex align-items-center gap-2" data-layout-id="@machinery.Id" data-assigned-area-ids="@machinery.AssignedAreaIds">
+                                                    <button type="button" class="btn btn-link text-start text-truncate flex-grow-1 machinery-file-select p-0">
+                                                        <i class="fa-regular fa-image text-primary me-1"></i>@machinery.OriginalFileName
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger delete-machinery-file" data-layout-id="@machinery.Id" title="Delete file"><i class="fa-solid fa-xmark"></i></button>
+                                                </div>
+                                            }
                                         </div>
                                     </div>
                                 </div>
@@ -991,15 +1012,22 @@
             });
         });
 
-                document.querySelectorAll(".area-layout-form").forEach(form => {
+        document.querySelectorAll(".area-layout-form").forEach(form => {
             const modal = form.closest(".modal");
             if (!modal) return;
 
             modal.addEventListener("show.bs.modal", function () {
                 loadLayoutOptions(form);
             });
+            modal.addEventListener("hidden.bs.modal", function () {
+                form.querySelector(".pending-list").innerHTML = "";
+                form.querySelector(".pending-empty").classList.remove("d-none");
+                form.querySelectorAll(".machinery-area-checkbox").forEach(box => { box.checked = false; box.disabled = false; });
+                delete form.dataset.editLayoutId;
+                form.querySelector(".layout-add-to-list").innerHTML = '<i class="fa-solid fa-plus me-1"></i>Add to list';
+            });
 
-                    form.addEventListener("submit", function (event) {
+            form.addEventListener("submit", function (event) {
             if (!form.querySelector(".pending-layout-row")) {
                 event.preventDefault();
                 event.stopImmediatePropagation();
@@ -1031,6 +1059,14 @@
                         ? `Checkpoint locations: ${option.dataset.locations}`
                         : "These images will appear only inside this survey area.";
                 }
+
+                const assignment = form.querySelector(".machinery-area-assignment");
+                if (assignment) assignment.hidden = this.value !== "machinery";
+                const machineryFiles = form.querySelector(".machinery-current-files");
+                if (machineryFiles) machineryFiles.classList.toggle("d-none", this.value !== "machinery");
+                const gaFile = form.querySelector(".ga-current-file");
+                if (gaFile) gaFile.classList.toggle("d-none", this.value !== "common");
+                if (this.value === "machinery" && !form.dataset.editLayoutId) refreshMachineryAreaAvailability(form);
 
                 updateAttachment(form, option);
             });
@@ -1066,6 +1102,33 @@
                 return;
             }
 
+            const target = select.value;
+            const targetLabel = option.textContent.trim();
+            const newAreaName = select.value === "new" ? newNameInput.value.trim() : "";
+            const assignedAreaIds = select.value === "machinery"
+                ? [...form.querySelectorAll(".machinery-area-checkbox:checked")].map(x => x.value).join(",")
+                : "";
+
+            if (form.dataset.editLayoutId) {
+                const data = new URLSearchParams({ jobId: form.dataset.jobId, layoutId: form.dataset.editLayoutId, assignedAreaIds });
+                const editedRow = form.querySelector(`.machinery-file-row[data-layout-id="${CSS.escape(form.dataset.editLayoutId)}"]`);
+                const addButton = form.querySelector(".layout-add-to-list");
+                addButton.disabled = true;
+                fetch("/SurveyJobs/UpdateMachineryAssignment", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: data })
+                    .then(async response => {
+                        if (!response.ok) throw new Error(await response.text() || "Assignment update failed");
+                        if (editedRow) editedRow.dataset.assignedAreaIds = assignedAreaIds;
+                        delete form.dataset.editLayoutId;
+                        form.querySelectorAll(".machinery-area-checkbox").forEach(box => box.disabled = false);
+                        refreshMachineryAreaAvailability(form);
+                        addButton.innerHTML = '<i class="fa-solid fa-plus me-1"></i>Add to list';
+                        alert("Machinery area assignment updated successfully.");
+                    })
+                    .catch(error => alert(error.message || "Assignment update failed."))
+                    .finally(() => addButton.disabled = false);
+                return;
+            }
+
             if (!fileInput.files.length) {
                 alert("Please choose a layout file.");
                 fileInput.focus();
@@ -1073,14 +1136,16 @@
             }
 
             const file = fileInput.files[0];
-            const target = select.value;
-            const targetLabel = option.textContent.trim();
-            const newAreaName = select.value === "new" ? newNameInput.value.trim() : "";
 
-            const duplicate = pendingList.querySelector(`[data-target="${CSS.escape(target)}"]`);
-            if (duplicate) {
-                duplicate.remove();
+            if (select.value === "machinery" && !assignedAreaIds) {
+                alert("Select at least one survey area for this Machinery file.");
+                return;
             }
+
+            const duplicate = target !== "machinery"
+                ? pendingList.querySelector(`[data-target="${CSS.escape(target)}"]`)
+                : null;
+            if (duplicate) duplicate.remove();
 
             const row = document.createElement("div");
             row.className = "pending-layout-row border rounded p-2 d-flex align-items-start justify-content-between gap-2 overflow-hidden";
@@ -1113,6 +1178,11 @@
             newAreaInput.name = "newAreaNames";
             newAreaInput.value = newAreaName;
 
+            const assignedAreaInput = document.createElement("input");
+            assignedAreaInput.type = "hidden";
+            assignedAreaInput.name = "assignedAreaIds";
+            assignedAreaInput.value = assignedAreaIds;
+
             fileInput.name = "files";
             fileInput.required = false;
             fileInput.classList.add("d-none");
@@ -1121,13 +1191,29 @@
             row.appendChild(removeBtn);
             row.appendChild(targetInput);
             row.appendChild(newAreaInput);
+            row.appendChild(assignedAreaInput);
             row.appendChild(fileInput);
             pendingList.appendChild(row);
+
+            if (target === "machinery") {
+                const assigned = new Set(assignedAreaIds.split(",").filter(Boolean));
+                form.querySelectorAll(".machinery-area-checkbox").forEach(box => {
+                    if (assigned.has(box.value)) {
+                        box.checked = false;
+                        box.disabled = true;
+                    }
+                });
+                refreshMachineryAreaAvailability(form);
+            }
 
             const replacement = document.createElement("input");
             replacement.className = "form-control layout-file-input";
             replacement.type = "file";
             replacement.accept = ".jpg,.jpeg,.png,.webp,.pdf";
+            replacement.addEventListener("change", function () {
+                delete form.dataset.editLayoutId;
+                form.querySelector(".layout-add-to-list").innerHTML = '<i class="fa-solid fa-plus me-1"></i>Add to list';
+            });
 
             const addButton = form.querySelector(".layout-add-to-list");
             addButton.parentElement.insertBefore(replacement, addButton);
@@ -1145,9 +1231,20 @@
                 .replaceAll('"', "&quot;")
                 .replaceAll("'", "&#039;");
         }
+
+        function refreshMachineryAreaAvailability(form) {
+            const used = new Set();
+            form.querySelectorAll(".machinery-file-row").forEach(row => {
+                if (String(row.dataset.layoutId) === String(form.dataset.editLayoutId || "")) return;
+                String(row.dataset.assignedAreaIds || "").split(",").filter(Boolean).forEach(id => used.add(id.trim()));
+            });
+            form.querySelectorAll(".pending-layout-row").forEach(row => row.querySelector("input[name='assignedAreaIds']")?.value.split(",").filter(Boolean).forEach(id => used.add(id.trim())));
+            form.querySelectorAll(".machinery-area-checkbox").forEach(box => { if (!box.checked) box.disabled = used.has(box.value); });
+        }
         function updateAttachment(form, option) {
             const details = form.querySelector(".attachment-details");
             const empty = form.querySelector(".attachment-empty");
+            if (!details || !empty) return;
             const link = form.querySelector(".attachment-link");
             const badge = details.querySelector(".badge");
             if (!option) return;
@@ -1212,37 +1309,18 @@
                 }
 
                 const data = responseText ? JSON.parse(responseText) : {};
-                const areas = data.areas || data.Areas || [];
-                const attachments = data.attachments || data.Attachments || [];
-                const attachmentMap = new Map();
-
-                attachments.forEach(item => {
-                    const target = String(item.target || item.Target || "");
-                    if (target) attachmentMap.set(target, item);
-                });
-
-                const commonLayout = data.commonLayout || data.CommonLayout || {};
-                const commonAttachment = attachmentMap.get("common") || commonLayout || {};
+                const layouts = data.layouts || data.Layouts || [];
                 select.innerHTML = "";
-                select.appendChild(createLayoutOption(
-                    commonLayout.value || commonLayout.Value || "common",
-                    commonLayout.label || commonLayout.Label || "Common Layout - fallback for every location",
-                    "",
-                    commonAttachment.originalFileName || commonAttachment.OriginalFileName,
-                    commonAttachment.filePath || commonAttachment.FilePath
-                ));
-
-                areas.forEach(area => {
-                    const areaId = String(area.id || area.Id || "").trim();
-                    const areaValue = area.value || area.Value || (areaId ? `area:${areaId}` : "");
-                    if (!areaValue) return;
-                    const attachment = attachmentMap.get(areaId) || area || {};
+                layouts.forEach(layout => {
+                    const target = layout.target || layout.Target || "";
+                    const type = layout.layoutType || layout.LayoutType || "";
+                    if (!target || !type) return;
                     select.appendChild(createLayoutOption(
-                        areaValue,
-                        area.label || area.Label || area.areaName || area.AreaName || "Survey area",
-                        area.locationSummary || area.LocationSummary || "",
-                        attachment.originalFileName || attachment.OriginalFileName,
-                        attachment.filePath || attachment.FilePath
+                        target,
+                        layout.label || layout.Label || `${type} Layout`,
+                        "",
+                        layout.originalFileName || layout.OriginalFileName,
+                        layout.filePath || layout.FilePath
                     ));
                 });
 
@@ -1252,8 +1330,8 @@
 
                 form.dataset.layoutLoaded = "true";
                 select.dispatchEvent(new Event("change"));
-                if (!areas.length) {
-                    hint.textContent = "No survey areas found. Upload the checklist Excel first.";
+                if (!layouts.length) {
+                    hint.textContent = "No GA or Machinery Layout uploaded.";
                 }
             } catch (error) {
                 form.dataset.layoutLoaded = "false";
@@ -1437,6 +1515,37 @@
                     submitButton.disabled = true;
                 }
             });
+
+            form.querySelectorAll(".save-machinery-assignment").forEach(button => button.addEventListener("click", async function () {
+                const row = this.closest(".machinery-file-row");
+                const ids = [...row.querySelectorAll(".existing-machinery-area:checked")].map(x => x.value).join(",");
+                const data = new URLSearchParams({ jobId: form.dataset.jobId, layoutId: row.dataset.layoutId, assignedAreaIds: ids });
+                const response = await fetch("/SurveyJobs/UpdateMachineryAssignment", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: data });
+                if (response.ok) alert("Machinery area assignment updated.");
+            }));
+            form.querySelectorAll(".delete-machinery-file").forEach(button => button.addEventListener("click", async function () {
+                if (!confirm("Delete this Machinery file?")) return;
+                const data = new URLSearchParams({ jobId: form.dataset.jobId, layoutId: this.dataset.layoutId });
+                const response = await fetch("/SurveyJobs/DeleteMachineryFile", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: data });
+                if (!response.ok) { alert(await response.text() || "Machinery file delete failed."); return; }
+                const row = this.closest(".machinery-file-row");
+                row?.remove();
+                const files = form.querySelector(".machinery-current-files");
+                if (files && !files.querySelector(".machinery-file-row")) files.classList.add("d-none");
+                alert("Machinery file deleted successfully.");
+            }));
+            form.querySelectorAll(".machinery-file-select").forEach(button => button.addEventListener("click", function () {
+                const row = this.closest(".machinery-file-row");
+                const select = form.querySelector(".area-layout-select");
+                select.value = "machinery";
+                select.dispatchEvent(new Event("change", { bubbles: true }));
+                form.dataset.editLayoutId = row.dataset.layoutId;
+                form.querySelectorAll(".machinery-area-checkbox").forEach(box => {
+                    box.checked = String(row.dataset.assignedAreaIds || "").split(",").map(x => x.trim()).includes(box.value);
+                    box.disabled = false;
+                });
+                form.querySelector(".layout-add-to-list").innerHTML = '<i class="fa-solid fa-check me-1"></i>Update areas';
+            }));
         });
           
         

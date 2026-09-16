@@ -55,6 +55,32 @@ namespace Survery_Certification_App_Consume.Controllers
 
                 model.Jobs = await GetAsync<List<SurveyJobDto>>(client, jobsUrl) ?? new();
 
+                if (surveyType == "IHM Survey" && model.Jobs.Count > 0)
+                {
+                    var jobData = await Task.WhenAll(model.Jobs.Select(async job =>
+                    {
+                        var areasTask = GetAsync<List<IhmAreaOptionDto>>(
+                            client,
+                            $"ihm-survey/jobs/{job.Id}/areas-with-checkpoints");
+                        var attachmentsTask = GetAsync<List<IhmLayoutAttachmentDto>>(
+                            client,
+                            $"ihm-survey/jobs/{job.Id}/layout-attachments");
+
+                        await Task.WhenAll(areasTask, attachmentsTask);
+                        return (
+                            job.Id,
+                            Areas: areasTask.Result ?? new List<IhmAreaOptionDto>(),
+                            Attachments: attachmentsTask.Result ?? new List<IhmLayoutAttachmentDto>()
+                        );
+                    }));
+
+                    foreach (var item in jobData)
+                    {
+                        model.AreasByJob[item.Id] = item.Areas;
+                        model.LayoutAttachmentsByJob[item.Id] = item.Attachments;
+                    }
+                }
+
                 if (model.IsAdmin)
                 {
                     model.Vessels = await GetAsync<List<VesselDto>>(client, "vessels") ?? new();
@@ -295,6 +321,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 var areaLayouts = attachments
                     .Where(x =>
                         string.Equals(x.Target, "common", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(x.Target, "machinery", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(x.Target, areaId.ToString(), StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(x.Target, area.AreaName, StringComparison.OrdinalIgnoreCase))
                     .ToList();
@@ -516,11 +543,10 @@ namespace Survery_Certification_App_Consume.Controllers
                     $"ihm-survey/jobs/{jobId}/layout-attachments"
                 ) ?? new List<IhmLayoutAttachmentDto>();
 
-                var areaLayout = attachments.FirstOrDefault(x =>
-                    string.Equals(x.Target, areaId.ToString(), StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(x.Target, area.AreaName, StringComparison.OrdinalIgnoreCase));
+                var gaLayout = attachments.FirstOrDefault(x =>
+                    string.Equals(x.Target, "common", StringComparison.OrdinalIgnoreCase));
 
-                area.LayoutFilePath = areaLayout?.FilePath;
+                area.LayoutFilePath = gaLayout?.FilePath;
                 var checkpoint = area.Checkpoints.FirstOrDefault(x => x.Id == checkpointId);
                 if (checkpoint == null)
                 {
@@ -551,8 +577,7 @@ namespace Survery_Certification_App_Consume.Controllers
                 ViewBag.Layouts = attachments
                     .Where(x =>
                         string.Equals(x.Target, "common", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(x.Target, areaId.ToString(), StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(x.Target, area.AreaName, StringComparison.OrdinalIgnoreCase))
+                        string.Equals(x.Target, "machinery", StringComparison.OrdinalIgnoreCase))
                     .ToList();
 
                 return View(checkpoint);
@@ -1197,6 +1222,7 @@ namespace Survery_Certification_App_Consume.Controllers
     int jobId,
     List<string> layoutTargets,
     List<string> newAreaNames,
+    List<string> assignedAreaIds,
     List<IFormFile> files,
     string? ihmCompletionFilter = null)
         {
@@ -1224,43 +1250,12 @@ namespace Survery_Certification_App_Consume.Controllers
                         continue;
 
                     var layoutTarget = layoutTargets[i];
-                    var newAreaName = newAreaNames != null && i < newAreaNames.Count
-                        ? newAreaNames[i]
-                        : null;
+                    var normalizedTarget = (layoutTarget ?? "")
+                        .Trim()
+                        .ToLowerInvariant();
 
-                    int? areaId = null;
-
-                    if (layoutTarget == "new")
-                    {
-                        if (string.IsNullOrWhiteSpace(newAreaName))
-                            throw new InvalidOperationException($"Enter the new area name for {file.FileName}.");
-
-                        var response = await client.PostAsync(
-                            $"ihm-survey/jobs/{jobId}/areas",
-                            new StringContent(JsonConvert.SerializeObject(new
-                            {
-                                areaName = newAreaName.Trim(),
-                                description = "Created while uploading layouts",
-                                sortOrder = 999
-                            }), Encoding.UTF8, "application/json"));
-
-                        var body = await response.Content.ReadAsStringAsync();
-                        if (!response.IsSuccessStatusCode)
-                            throw new InvalidOperationException(ExtractApiErrorMessage(body));
-
-                        areaId = JsonConvert.DeserializeObject<IhmAreaOptionDto>(body)?.Id;
-                    }
-                    else if (layoutTarget != "common")
-                    {
-                        var normalizedTarget = (layoutTarget ?? "").Trim();
-                        if (normalizedTarget.StartsWith("area:", StringComparison.OrdinalIgnoreCase))
-                            normalizedTarget = normalizedTarget["area:".Length..];
-
-                        if (!int.TryParse(normalizedTarget, out var parsedAreaId) || parsedAreaId <= 0)
-                            throw new InvalidOperationException($"Select a valid survey area for {file.FileName}.");
-
-                        areaId = parsedAreaId;
-                    }
+                    if (normalizedTarget != "common" && normalizedTarget != "machinery")
+                        throw new InvalidOperationException($"Select GA Layout or Machinery Layout for {file.FileName}.");
 
                     var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
                     if (extension is not (".jpg" or ".jpeg" or ".png" or ".webp" or ".pdf"))
@@ -1268,12 +1263,14 @@ namespace Survery_Certification_App_Consume.Controllers
 
                     using var content = new MultipartFormDataContent();
                     content.Add(new StringContent((HttpContext.Session.GetInt32("UserId") ?? 0).ToString()), "uploadedByUserId");
+                    if (normalizedTarget == "machinery" && assignedAreaIds != null && i < assignedAreaIds.Count)
+                        content.Add(new StringContent(assignedAreaIds[i] ?? ""), "assignedAreaIds");
 
                     await using var stream = file.OpenReadStream();
                     content.Add(new StreamContent(stream), "file", file.FileName);
 
-                    var endpoint = areaId.HasValue
-                        ? $"ihm-survey/jobs/{jobId}/areas/{areaId}/layout"
+                    var endpoint = normalizedTarget == "machinery"
+                        ? $"ihm-survey/jobs/{jobId}/machinery-layout"
                         : $"ihm-survey/jobs/{jobId}/ga-layout";
 
                     var uploadResponse = await client.PostAsync(endpoint, content);
@@ -1318,6 +1315,32 @@ namespace Survery_Certification_App_Consume.Controllers
 
             return Content(body, "application/json");
         }
+        [HttpPost]
+        public async Task<IActionResult> UpdateMachineryAssignment(int jobId, int layoutId, string assignedAreaIds)
+        {
+            var client = CreateApiClient();
+            using var content = new MultipartFormDataContent();
+            content.Add(new StringContent(assignedAreaIds ?? ""), "assignedAreaIds");
+            var response = await client.PutAsync($"ihm-survey/jobs/{jobId}/machinery-layouts/{layoutId}/assignment", content);
+            var body = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode)
+                return StatusCode((int)response.StatusCode,
+                    string.IsNullOrWhiteSpace(body) ? "Failed to update Machinery area assignment." : body);
+            return Content(body, "application/json");
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteMachineryFile(int jobId, int layoutId)
+        {
+            var client = CreateApiClient();
+            var response = await client.DeleteAsync($"ihm-survey/jobs/{jobId}/machinery-layouts/{layoutId}");
+            var body = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode)
+                return StatusCode((int)response.StatusCode,
+                    string.IsNullOrWhiteSpace(body) ? "Failed to delete Machinery file." : body);
+            return Content(body, "application/json");
+        }
+
         private async Task AssignSurveyorsInternal(HttpClient client, int jobId, int? primaryId, int? secondaryId)
         {
             var payload = new

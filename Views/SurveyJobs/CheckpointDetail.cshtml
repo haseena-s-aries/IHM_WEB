@@ -12,7 +12,9 @@
         target = layout.Target,
         originalFileName = layout.OriginalFileName,
         filePath = layout.FilePath,
-        isCommon = string.Equals(layout.Target, "common", StringComparison.OrdinalIgnoreCase)
+        assignedAreaIds = layout.AssignedAreaIds,
+        isCommon = string.Equals(layout.Target, "common", StringComparison.OrdinalIgnoreCase),
+        layoutType = string.Equals(layout.Target, "common", StringComparison.OrdinalIgnoreCase) ? "GA" : "Machinery"
     }));
     var checkpointLabels = ViewBag.CheckpointLabels as Dictionary<int, string>
         ?? new Dictionary<int, string>();
@@ -35,9 +37,7 @@
     var sampleLabel = Val(Model.SampleNo ?? Model.Location);
     var auditStatus = NormalizeAuditStatus(Model.AuditStatus);
     var layoutPath = layouts.FirstOrDefault(x =>
-        string.Equals(x.Target, areaId.ToString(), StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(x.Target, areaName, StringComparison.OrdinalIgnoreCase))?.FilePath
-        ?? layouts.FirstOrDefault(x => string.Equals(x.Target, "common", StringComparison.OrdinalIgnoreCase))?.FilePath
+        string.Equals(x.Target, "common", StringComparison.OrdinalIgnoreCase))?.FilePath
         ?? "";
 }
 
@@ -431,6 +431,49 @@
             background: #ffffff;
         }
 
+        .layout-type-tabs {
+            position: sticky;
+            top: 84px;
+            z-index: 1000;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 12px;
+            background: rgba(255, 255, 255, .96);
+            border-bottom: 1px solid #d8e3ee;
+            backdrop-filter: blur(8px);
+        }
+
+        .layout-type-btn {
+            flex: 1 1 180px;
+            min-height: 42px;
+            border: 1px solid #d8e3ee;
+            background: #ffffff;
+            color: #607d9a;
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: .2s ease;
+        }
+
+        .layout-type-btn:hover {
+            border-color: #00b894;
+            color: #008f78;
+        }
+
+        .layout-type-btn.active {
+            background: #00d4aa;
+            border-color: #00d4aa;
+            color: #102033;
+        }
+
+        @@media (max-width: 600px) {
+            .layout-type-tabs { top: 64px; padding: 8px; }
+            .layout-type-btn { flex-basis: 100%; }
+        }
+
         .layout-zoom-controls {
             position: absolute;
             top: 12px;
@@ -585,15 +628,16 @@
 
         .pin-label {
             display: block;
-            min-width: 34px;
-            max-width: 74px;
+            min-width: 42px;
+            max-width: 110px;
             margin: 0 auto -3px;
-            padding: 4px 7px;
+            padding: 5px 9px;
             border: 2px solid #fff;
             border-radius: 999px;
             background: var(--pin-color);
             color: #fff;
-            font-size: 11px;
+            font-size: 14px;
+            line-height: 1.2;
             font-weight: 900;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -601,8 +645,8 @@
         }
 
         .marker-pin i {
-            font-size: 32px;
-            line-height: 32px;
+            font-size: 38px;
+            line-height: 38px;
         }
 
         .layout-hint {
@@ -983,6 +1027,23 @@
             initialLayoutPath: @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(layoutPath))
         };
         const layoutOptions = @Html.Raw(layoutOptionsJson);
+        const gaLayout = layoutOptions.find(x => x.layoutType === "GA");
+        const machineryLayoutsForArea = layoutOptions.filter(x => x.layoutType === "Machinery").filter(file => {
+            const ids = String(file.assignedAreaIds || "")
+                .split(",")
+                .map(x => Number(x.trim()))
+                .filter(Number.isFinite);
+            return ids.includes(Number(checkpointContext.areaId));
+        });
+        const machineryLayout = machineryLayoutsForArea[0] || null;
+        const selectedAreaLayout = machineryLayout || gaLayout;
+        let selectedLayoutType = machineryLayout ? "Machinery" : "GA";
+        // Declare this before selecting the area-specific layout. Otherwise the
+        // assignment below throws a temporal-dead-zone error and stops all tab handlers.
+        let currentImagePath = checkpointContext.initialLayoutPath || (layoutOptions[0]?.filePath ?? "");
+        if (selectedAreaLayout?.filePath) {
+            currentImagePath = selectedAreaLayout.filePath;
+        }
 
         const checkpointLabels = @Html.Raw(checkpointLabelsJson);
              const expectedSamples = Object.entries(checkpointLabels || {})
@@ -993,7 +1054,6 @@
         .filter(x => x.checkpointId > 0 && x.label && x.label !== "-")
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: "base" }));
         const apiRoot = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(apiRoot));
-        let currentImagePath = checkpointContext.initialLayoutPath || (layoutOptions[0]?.filePath ?? "");
         let loadedMarkers = [];
         let selectedPoint = null;
                 let manualMapMode = "new";
@@ -1023,6 +1083,14 @@
             if (name === "area") initializeAreaTab();
             if (name === "images") loadPhotos();
         }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll(".tab").forEach(button => {
+                button.style.pointerEvents = "auto";
+                button.style.position = "relative";
+                button.style.zIndex = "20";
+            });
+        });
 
         function normalizeUrl(path) {
             if (!path) return "";
@@ -1271,7 +1339,7 @@
 
                 const oldScale = mapView.scale;
                 const zoomFactor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
-                const nextScale = Math.max(0.35, Math.min(6, oldScale * zoomFactor));
+                const nextScale = Math.max(0.20, Math.min(8, oldScale * zoomFactor));
                 if (nextScale === oldScale) return;
 
                 const stageRect = stage.getBoundingClientRect();
@@ -1298,7 +1366,7 @@
                 function changeMapZoom(delta) {
             const stage = document.querySelector(".layout-stage");
             const oldScale = mapView.scale;
-            const nextScale = Math.max(0.35, Math.min(6, oldScale + delta));
+            const nextScale = Math.max(0.20, Math.min(8, oldScale + delta));
 
             if (nextScale === oldScale) return;
 
@@ -1456,7 +1524,7 @@
             container.innerHTML = "";
 
                     const showUnsavedPoint = selectedPoint !== null && !window.markerSaving;
-        const visibleByCheckpoint = new Map();
+        const visibleMarkers = [];
 
             loadedMarkers
         .filter(marker => {
@@ -1467,17 +1535,10 @@
         .forEach((marker, index) => {
             const checkpointId = Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId"));
             const markerId = Number(getValue(marker, "id", "Id") || getValue(marker, "markerId", "MarkerId") || getValue(marker, "localId", "LocalId") || 0);
-            const sortId = markerId > 0 ? markerId : index;
-            const existing = visibleByCheckpoint.get(checkpointId);
-
-            if (!existing || sortId > existing.sortId) {
-                visibleByCheckpoint.set(checkpointId, { marker, markerId, sortId });
-            }
+            visibleMarkers.push({ marker, markerId, checkpointId });
         });
 
-        [...visibleByCheckpoint.values()]
-                .forEach(({ marker, markerId }) => {
-                    const checkpointId = Number(getValue(marker, "ihmCheckpointId", "IhmCheckpointId"));
+        visibleMarkers.forEach(({ marker, markerId, checkpointId }) => {
                             const x = getMarkerCoordinate(marker, "x");
         const y = getMarkerCoordinate(marker, "y");
 
@@ -1495,7 +1556,7 @@
             isExistingImageMarker(marker)
         );
 
-                });
+        });
                if (selectedPoint && !window.markerSaving) {
             addPin(
                 selectedPoint.x * 100,
@@ -1618,7 +1679,26 @@
             if (!point) return;
 
             const now = Date.now();
-            const isDoubleTap = now - lastLayoutTapTime < 320;
+            const currentMarker = getCurrentCheckpointMarker();
+            const currentMarkerXPercent = currentMarker
+                ? getMarkerCoordinate(currentMarker, "x")
+                : null;
+            const currentMarkerYPercent = currentMarker
+                ? getMarkerCoordinate(currentMarker, "y")
+                : null;
+            const currentMarkerX = currentMarkerXPercent === null
+                ? null
+                : currentMarkerXPercent / 100;
+            const currentMarkerY = currentMarkerYPercent === null
+                ? null
+                : currentMarkerYPercent / 100;
+            const clickIsNearCurrentMarker =
+                currentMarkerX !== null &&
+                currentMarkerY !== null &&
+                Math.hypot(point.x - currentMarkerX, point.y - currentMarkerY) <= 0.025;
+            const isDoubleTap =
+                now - lastLayoutTapTime < 320 &&
+                clickIsNearCurrentMarker;
             lastLayoutTapTime = now;
 
             clearTimeout(layoutClickTimer);

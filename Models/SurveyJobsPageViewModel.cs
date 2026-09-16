@@ -10,7 +10,7 @@
         public List<SurveyorOptionDto> Surveyors { get; set; } = new();
         public List<SurveyorOptionDto> Managers { get; set; } = new();
         public Dictionary<int, List<IhmAreaOptionDto>> AreasByJob { get; set; } = new();
-        public Dictionary<int, Dictionary<string, IhmLayoutAttachmentDto>> LayoutAttachmentsByJob { get; set; } = new();
+        public Dictionary<int, List<IhmLayoutAttachmentDto>> LayoutAttachmentsByJob { get; set; } = new();
         public string? ErrorMessage { get; set; }
     }
     public class IhmImageMarkerDto
@@ -44,9 +44,11 @@
     }
     public class IhmLayoutAttachmentDto
     {
+        public int? Id { get; set; }
         public string Target { get; set; } = "";
         public string OriginalFileName { get; set; } = "";
         public string FilePath { get; set; } = "";
+        public string? AssignedAreaIds { get; set; }
     }
 
     public class IhmAreaOptionDto
