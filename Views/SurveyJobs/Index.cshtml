@@ -823,7 +823,13 @@
                                             {
                                                 <div class="small border rounded p-2 d-flex align-items-center gap-2">
                                                     <i class="fa-regular fa-image text-primary"></i>
-                                                    <span class="text-truncate">@commonAttachment.OriginalFileName</span>
+                                                    <a class="btn btn-link text-start text-truncate flex-grow-1 p-0"
+                                                       href="@commonAttachment.FilePath"
+                                                       target="_blank"
+                                                       rel="noopener"
+                                                       title="View GA layout">
+                                                        @commonAttachment.OriginalFileName
+                                                    </a>
                                                     <button type="button" class="btn btn-sm btn-outline-danger ms-auto delete-common-layout" data-job-id="@job.Id" title="Delete file"><i class="fa-solid fa-xmark"></i></button>
                                                 </div>
                                             }
@@ -833,9 +839,10 @@
                                             @foreach (var machinery in machineryAttachments)
                                             {
                                                 <div class="small border rounded p-2 mb-1 machinery-file-row d-flex align-items-center gap-2" data-layout-id="@machinery.Id" data-assigned-area-ids="@machinery.AssignedAreaIds">
-                                                    <button type="button" class="btn btn-link text-start text-truncate flex-grow-1 machinery-file-select p-0">
+                                                    <a class="btn btn-link text-start text-truncate flex-grow-1 machinery-file-view p-0" href="@machinery.FilePath" target="_blank" rel="noopener">
                                                         <i class="fa-regular fa-image text-primary me-1"></i>@machinery.OriginalFileName
-                                                    </button>
+                                                    </a>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary machinery-file-edit" data-layout-id="@machinery.Id" title="Replace / edit areas"><i class="fa-solid fa-pen"></i></button>
                                                     <button type="button" class="btn btn-sm btn-outline-danger delete-machinery-file" data-layout-id="@machinery.Id" title="Delete file"><i class="fa-solid fa-xmark"></i></button>
                                                 </div>
                                             }
@@ -1017,6 +1024,8 @@
             if (!modal) return;
 
             modal.addEventListener("show.bs.modal", function () {
+                const select = form.querySelector(".area-layout-select");
+                select.value = "common";
                 loadLayoutOptions(form);
             });
             modal.addEventListener("hidden.bs.modal", function () {
@@ -1025,16 +1034,64 @@
                 form.querySelectorAll(".machinery-area-checkbox").forEach(box => { box.checked = false; box.disabled = false; });
                 delete form.dataset.editLayoutId;
                 form.querySelector(".layout-add-to-list").innerHTML = '<i class="fa-solid fa-plus me-1"></i>Add to list';
+                // Reload after closing so newly added/edited/deleted layout rows
+                // are reflected immediately when the modal is opened again.
+                if (form.dataset.layoutChanged === "true") {
+                    delete form.dataset.layoutChanged;
+                    window.location.reload();
+                }
             });
 
-            form.addEventListener("submit", function (event) {
+            form.addEventListener("submit", async function (event) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+
             if (!form.querySelector(".pending-layout-row")) {
-                event.preventDefault();
-                event.stopImmediatePropagation();
                 alert("Please add at least one layout file to the pending list.");
                 updateLayoutUploadSubmitState(form);
                 return false;
             }
+
+            const submitButton = form.querySelector(".layout-upload-submit");
+            const originalText = submitButton?.innerHTML;
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Uploading...';
+            }
+
+            try {
+                const response = await fetch(form.action, {
+                    method: "POST",
+                    body: new FormData(form),
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest",
+                        "Accept": "application/json"
+                    }
+                });
+                const text = await response.text();
+                if (!response.ok) throw new Error(readLayoutError(text) || "Layout upload failed.");
+
+                form.querySelector(".pending-list").innerHTML = "";
+                form.querySelector(".pending-empty").classList.remove("d-none");
+                form.querySelectorAll(".layout-file-input").forEach(input => input.value = "");
+                delete form.dataset.editLayoutId;
+                form.dataset.layoutChanged = "true";
+                await loadLayoutOptions(form);
+                updateLayoutUploadSubmitState(form);
+                // The upload endpoint updates the database, but the current modal
+                // contains server-rendered attachment rows. Reload once so both GA
+                // and Machinery rows show the latest file name, link and id.
+                sessionStorage.setItem("ihm-layout-upload-success", "1");
+                window.location.reload();
+            } catch (error) {
+                alert(error.message || "Layout upload failed.");
+            } finally {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalText;
+                }
+            }
+            return false;
         });
         });
 
@@ -1086,7 +1143,8 @@
                 function addLayoutUploadToList(form) {
             const select = form.querySelector(".area-layout-select");
             const option = select.options[select.selectedIndex];
-            const fileInput = form.querySelector(".layout-file-input");
+            const fileInput = [...form.querySelectorAll(".layout-file-input")]
+                .find(input => input.files && input.files.length > 0);
             const newNameInput = form.querySelector(".new-area-fields input");
             const pendingList = form.querySelector(".pending-list");
             const pendingEmpty = form.querySelector(".pending-empty");
@@ -1109,7 +1167,21 @@
                 ? [...form.querySelectorAll(".machinery-area-checkbox:checked")].map(x => x.value).join(",")
                 : "";
 
-            if (form.dataset.editLayoutId) {
+            if (target === "common" && option.dataset.filePath && fileInput) {
+                if (!confirm("Replace the existing GA Layout file?")) {
+                    fileInput.value = "";
+                    return;
+                }
+            }
+
+            if (form.dataset.editLayoutId && fileInput) {
+                if (!confirm("Replace this Machinery layout file?")) {
+                    fileInput.value = "";
+                    return;
+                }
+            }
+
+            if (form.dataset.editLayoutId && !fileInput) {
                 const data = new URLSearchParams({ jobId: form.dataset.jobId, layoutId: form.dataset.editLayoutId, assignedAreaIds });
                 const editedRow = form.querySelector(`.machinery-file-row[data-layout-id="${CSS.escape(form.dataset.editLayoutId)}"]`);
                 const addButton = form.querySelector(".layout-add-to-list");
@@ -1119,9 +1191,13 @@
                         if (!response.ok) throw new Error(await response.text() || "Assignment update failed");
                         if (editedRow) editedRow.dataset.assignedAreaIds = assignedAreaIds;
                         delete form.dataset.editLayoutId;
-                        form.querySelectorAll(".machinery-area-checkbox").forEach(box => box.disabled = false);
+                        form.querySelectorAll(".machinery-area-checkbox").forEach(box => {
+                            box.checked = false;
+                            box.disabled = false;
+                        });
                         refreshMachineryAreaAvailability(form);
                         addButton.innerHTML = '<i class="fa-solid fa-plus me-1"></i>Add to list';
+                        form.dataset.layoutChanged = "true";
                         alert("Machinery area assignment updated successfully.");
                     })
                     .catch(error => alert(error.message || "Assignment update failed."))
@@ -1129,9 +1205,9 @@
                 return;
             }
 
-            if (!fileInput.files.length) {
+            if (!fileInput || !fileInput.files.length) {
                 alert("Please choose a layout file.");
-                fileInput.focus();
+                form.querySelector(".layout-file-input:not(.d-none)")?.focus();
                 return;
             }
 
@@ -1183,6 +1259,11 @@
             assignedAreaInput.name = "assignedAreaIds";
             assignedAreaInput.value = assignedAreaIds;
 
+            const replaceLayoutInput = document.createElement("input");
+            replaceLayoutInput.type = "hidden";
+            replaceLayoutInput.name = "replaceLayoutIds";
+            replaceLayoutInput.value = select.value === "machinery" ? (form.dataset.editLayoutId || "") : "";
+
             fileInput.name = "files";
             fileInput.required = false;
             fileInput.classList.add("d-none");
@@ -1192,6 +1273,7 @@
             row.appendChild(targetInput);
             row.appendChild(newAreaInput);
             row.appendChild(assignedAreaInput);
+            row.appendChild(replaceLayoutInput);
             row.appendChild(fileInput);
             pendingList.appendChild(row);
 
@@ -1210,10 +1292,9 @@
             replacement.className = "form-control layout-file-input";
             replacement.type = "file";
             replacement.accept = ".jpg,.jpeg,.png,.webp,.pdf";
-            replacement.addEventListener("change", function () {
-                delete form.dataset.editLayoutId;
-                form.querySelector(".layout-add-to-list").innerHTML = '<i class="fa-solid fa-plus me-1"></i>Add to list';
-            });
+            // Keep edit mode while choosing a file. The selected uploaded row must
+            // be updated, not converted into a second Machinery upload.
+            replacement.addEventListener("change", function () { });
 
             const addButton = form.querySelector(".layout-add-to-list");
             addButton.parentElement.insertBefore(replacement, addButton);
@@ -1532,9 +1613,50 @@
                 row?.remove();
                 const files = form.querySelector(".machinery-current-files");
                 if (files && !files.querySelector(".machinery-file-row")) files.classList.add("d-none");
+                form.dataset.layoutChanged = "true";
                 alert("Machinery file deleted successfully.");
             }));
-            form.querySelectorAll(".machinery-file-select").forEach(button => button.addEventListener("click", function () {
+            form.querySelectorAll(".delete-common-layout").forEach(button => button.addEventListener("click", async function () {
+                if (!confirm("Delete this GA Layout file?")) return;
+
+                const data = new FormData();
+                data.append("jobId", form.dataset.jobId);
+                data.append("target", "common");
+                this.disabled = true;
+
+                try {
+                    const response = await fetch("/SurveyJobs/DeleteIhmLayoutAttachment", {
+                        method: "POST",
+                        body: data,
+                        headers: { "X-Requested-With": "XMLHttpRequest", "Accept": "application/json" }
+                    });
+                    const text = await response.text();
+                    if (!response.ok) throw new Error(readLayoutError(text) || "GA Layout delete failed.");
+
+                    const gaSection = form.querySelector(".ga-current-file");
+                    if (gaSection) {
+                        gaSection.classList.add("d-none");
+                        const link = gaSection.querySelector("a");
+                        if (link) {
+                            link.removeAttribute("href");
+                            link.textContent = "";
+                        }
+                    }
+                    const gaOption = [...form.querySelector(".area-layout-select").options]
+                        .find(x => x.value === "common");
+                    if (gaOption) {
+                        gaOption.dataset.fileName = "";
+                        gaOption.dataset.filePath = "";
+                    }
+                    form.dataset.layoutChanged = "true";
+                    await loadLayoutOptions(form);
+                    alert("GA Layout deleted successfully.");
+                } catch (error) {
+                    alert(error.message || "GA Layout delete failed.");
+                    this.disabled = false;
+                }
+            }));
+            form.querySelectorAll(".machinery-file-edit").forEach(button => button.addEventListener("click", function () {
                 const row = this.closest(".machinery-file-row");
                 const select = form.querySelector(".area-layout-select");
                 select.value = "machinery";

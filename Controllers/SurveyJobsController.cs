@@ -333,7 +333,29 @@ namespace Survery_Certification_App_Consume.Controllers
                 var commonLayout = areaLayouts.FirstOrDefault(x =>
                     string.Equals(x.Target, "common", StringComparison.OrdinalIgnoreCase));
 
-                area.LayoutFilePath = areaLayout?.FilePath ?? commonLayout?.FilePath;
+                var machineryLayout = areaLayouts.FirstOrDefault(x =>
+                    string.Equals(x.Target, "machinery", StringComparison.OrdinalIgnoreCase) &&
+                    (x.AssignedAreaIds ?? string.Empty)
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                        .Any(id => string.Equals(id, areaId.ToString(), StringComparison.OrdinalIgnoreCase)));
+
+                // Priority: explicit area layout, assigned Machinery layout,
+                // then the common GA layout. Machinery must still work when GA
+                // has never been uploaded.
+                area.LayoutFilePath = areaLayout?.FilePath
+                    ?? machineryLayout?.FilePath
+                    ?? commonLayout?.FilePath;
+
+                // Keep the area page consistent with the API's final fallback
+                // resolver. This also covers older attachment rows whose target
+                // metadata may not have been returned by layout-attachments.
+                if (string.IsNullOrWhiteSpace(area.LayoutFilePath))
+                {
+                    var applicable = await GetAsync<List<IhmLayoutAttachmentDto>>(
+                        client,
+                        $"ihm-survey/jobs/{jobId}/areas/{areaId}/layouts") ?? new List<IhmLayoutAttachmentDto>();
+                    area.LayoutFilePath = applicable.FirstOrDefault()?.FilePath;
+                }
 
                 ViewBag.Job = job;
                 ViewBag.JobId = jobId;
@@ -545,8 +567,15 @@ namespace Survery_Certification_App_Consume.Controllers
 
                 var gaLayout = attachments.FirstOrDefault(x =>
                     string.Equals(x.Target, "common", StringComparison.OrdinalIgnoreCase));
+                var machineryLayout = attachments.FirstOrDefault(x =>
+                    string.Equals(x.Target, "machinery", StringComparison.OrdinalIgnoreCase) &&
+                    (x.AssignedAreaIds ?? string.Empty)
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                        .Any(id => string.Equals(id, areaId.ToString(), StringComparison.OrdinalIgnoreCase)));
 
-                area.LayoutFilePath = gaLayout?.FilePath;
+                // Checkpoint detail must use the assigned Machinery layout when
+                // GA is unavailable. GA remains the final fallback.
+                area.LayoutFilePath = machineryLayout?.FilePath ?? gaLayout?.FilePath;
                 var checkpoint = area.Checkpoints.FirstOrDefault(x => x.Id == checkpointId);
                 if (checkpoint == null)
                 {
@@ -1223,17 +1252,24 @@ namespace Survery_Certification_App_Consume.Controllers
     List<string> layoutTargets,
     List<string> newAreaNames,
     List<string> assignedAreaIds,
+    List<string>? replaceLayoutIds,
     List<IFormFile> files,
     string? ihmCompletionFilter = null)
         {
+            var isAjax = Request.Headers["X-Requested-With"] == "XMLHttpRequest"
+                || Request.Headers.Accept.Any(x => x.Contains("application/json", StringComparison.OrdinalIgnoreCase));
+            var uploadedCount = 0;
+
             if (files == null || files.Count == 0 || files.All(x => x.Length == 0))
             {
+                if (isAjax) return BadRequest(new { message = "Please add at least one layout file." });
                 TempData["ErrorMessage"] = "Please add at least one layout file.";
                 return RedirectToAction("Ihm", new { ihmCompletionFilter });
             }
 
             if (layoutTargets == null || layoutTargets.Count != files.Count)
             {
+                if (isAjax) return BadRequest(new { message = "Layout upload list is invalid. Please add the files again." });
                 TempData["ErrorMessage"] = "Layout upload list is invalid. Please add the files again.";
                 return RedirectToAction("Ihm", new { ihmCompletionFilter });
             }
@@ -1241,7 +1277,6 @@ namespace Survery_Certification_App_Consume.Controllers
             try
             {
                 var client = CreateApiClient();
-                var uploadedCount = 0;
 
                 for (var i = 0; i < files.Count; i++)
                 {
@@ -1265,6 +1300,8 @@ namespace Survery_Certification_App_Consume.Controllers
                     content.Add(new StringContent((HttpContext.Session.GetInt32("UserId") ?? 0).ToString()), "uploadedByUserId");
                     if (normalizedTarget == "machinery" && assignedAreaIds != null && i < assignedAreaIds.Count)
                         content.Add(new StringContent(assignedAreaIds[i] ?? ""), "assignedAreaIds");
+                    if (normalizedTarget == "machinery" && replaceLayoutIds != null && i < replaceLayoutIds.Count && !string.IsNullOrWhiteSpace(replaceLayoutIds[i]))
+                        content.Add(new StringContent(replaceLayoutIds[i]), "replaceLayoutId");
 
                     await using var stream = file.OpenReadStream();
                     content.Add(new StreamContent(stream), "file", file.FileName);
@@ -1290,8 +1327,12 @@ namespace Survery_Certification_App_Consume.Controllers
             }
             catch (Exception ex)
             {
+                if (isAjax) return BadRequest(new { message = "Failed to upload layouts: " + ex.Message });
                 TempData["ErrorMessage"] = "Failed to upload layouts: " + ex.Message;
             }
+
+            if (isAjax)
+                return Json(new { success = true, uploadedCount });
 
             return RedirectToAction("Ihm", new { ihmCompletionFilter });
         }

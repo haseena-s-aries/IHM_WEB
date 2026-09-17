@@ -36,8 +36,14 @@
 
     var sampleLabel = Val(Model.SampleNo ?? Model.Location);
     var auditStatus = NormalizeAuditStatus(Model.AuditStatus);
-    var layoutPath = layouts.FirstOrDefault(x =>
-        string.Equals(x.Target, "common", StringComparison.OrdinalIgnoreCase))?.FilePath
+    var assignedMachineryLayout = layouts.FirstOrDefault(x =>
+        string.Equals(x.Target, "machinery", StringComparison.OrdinalIgnoreCase) &&
+        (x.AssignedAreaIds ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(id => string.Equals(id, areaId.ToString(), StringComparison.OrdinalIgnoreCase)));
+    var layoutPath = assignedMachineryLayout?.FilePath
+        ?? layouts.FirstOrDefault(x =>
+            string.Equals(x.Target, "common", StringComparison.OrdinalIgnoreCase))?.FilePath
         ?? "";
 }
 
@@ -561,8 +567,8 @@
             display: inline-block;
             border-radius: 12px;
             overflow: visible;
-            border: 1px solid #d8e3ee;
-            background: #f4f7fb;
+            border: 0;
+            background: transparent;
             transform-origin: 0 0;
             will-change: transform;
         }
@@ -585,7 +591,7 @@
 
         #markerPins {
             position: absolute;
-            inset: 1px;
+            inset: 0;
             pointer-events: none;
             overflow: visible;
         }
@@ -594,7 +600,9 @@
             position: absolute;
             width: 0;
             height: 0;
-            transform: translate(-50%, -100%);
+            /* The bottom tip of the pin is the saved click coordinate. */
+            transform: translate(-50%, -100%) scale(.72);
+            transform-origin: 50% 100%;
             color: #ff5252;
             --pin-color: #ff5252;
             text-align: center;
@@ -603,11 +611,12 @@
 
         .pin-content {
             position: absolute;
-            left: 0;
+            left: 50%;
             top: auto;
             bottom: 0;
-            width: 72px;
+            width: 58px;
             height: auto;
+            transform: translateX(-50%);
         }
 
         .marker-pin.active {
@@ -628,15 +637,15 @@
 
         .pin-label {
             display: block;
-            min-width: 42px;
-            max-width: 110px;
+            min-width: 34px;
+            max-width: 88px;
             margin: 0 auto -3px;
-            padding: 5px 9px;
+            padding: 3px 6px;
             border: 2px solid #fff;
             border-radius: 999px;
             background: var(--pin-color);
             color: #fff;
-            font-size: 14px;
+            font-size: 11px;
             line-height: 1.2;
             font-weight: 900;
             overflow: hidden;
