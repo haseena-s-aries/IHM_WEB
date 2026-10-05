@@ -766,21 +766,15 @@
                                     {
                                         <input type="hidden" name="ihmCompletionFilter" value="@Model.IhmCompletionFilter" />
                                     }
-                                    <label class="form-label fw-bold">Layout visibility *</label>
-                                    <select class="form-select area-layout-select" name="layoutTarget" required>
-                                        <option value="common" selected
-                                                data-file-name="@commonAttachment?.OriginalFileName"
-                                                data-file-path="@commonAttachment?.FilePath">
-                                            GA Layout
-                                        </option>
-                                        <option value="machinery">Machinery Layout</option>
+                                    <select class="form-select area-layout-select d-none" name="layoutTarget" aria-hidden="true">
+                                        <option value="machinery" selected>Area Layout</option>
                                     </select>
                                     <div class="form-text area-location-hint">
-                                        Common is shown only where no specific area layout is uploaded.
+                                        Select the survey areas where this layout file should appear.
                                     </div>
 
-                                    <div class="machinery-area-assignment mt-3" hidden>
-                                        <label class="form-label fw-bold">Show this Machinery file in areas</label>
+                                    <div class="machinery-area-assignment mt-3">
+                                        <label class="form-label fw-bold">Show this layout file in areas</label>
                                         <div class="border rounded p-2 d-grid gap-1" style="max-height:180px;overflow:auto">
                                             @foreach (var area in areas)
                                             {
@@ -790,7 +784,7 @@
                                                 </label>
                                             }
                                         </div>
-                                        <div class="form-text">An area assigned to one Machinery file will not be assigned to another file.</div>
+                                        <div class="form-text">An area assigned to one file will not be assigned to another file.</div>
                                     </div>
 
                                     <div class="new-area-fields mt-3" hidden>
@@ -806,8 +800,8 @@
                                                 <i class="fa-solid fa-plus me-1"></i>Add to list
                                             </button>
                                         </div>
-                                        <div class="form-text">This file will appear in every survey area and checkpoint.</div>
-                                        <div class="form-text">Adding a new image or PDF replaces the current GA or Machinery layout.</div>
+                                        <div class="form-text">This file will appear only in the selected survey areas.</div>
+                                        <div class="form-text">Adding a file with the same selected area replaces that area assignment.</div>
                                     </div>
 
                                     <div class="pending-layout-uploads mt-4">
@@ -1054,6 +1048,7 @@
 
             const submitButton = form.querySelector(".layout-upload-submit");
             const originalText = submitButton?.innerHTML;
+            let uploadSucceeded = false;
             if (submitButton) {
                 submitButton.disabled = true;
                 submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Uploading...';
@@ -1071,6 +1066,14 @@
                 const text = await response.text();
                 if (!response.ok) throw new Error(readLayoutError(text) || "Layout upload failed.");
 
+                // Keep the modal locked until the server confirms success. The
+                // user must see the success message before another action or
+                // reload is allowed.
+                form.querySelectorAll("button, input, select, textarea").forEach(control => {
+                    control.disabled = true;
+                });
+                uploadSucceeded = true;
+
                 form.querySelector(".pending-list").innerHTML = "";
                 form.querySelector(".pending-empty").classList.remove("d-none");
                 form.querySelectorAll(".layout-file-input").forEach(input => input.value = "");
@@ -1085,9 +1088,12 @@
                 window.location.reload();
             } catch (error) {
                 alert(error.message || "Layout upload failed.");
+                form.querySelectorAll("button, input, select, textarea").forEach(control => {
+                    control.disabled = false;
+                });
             } finally {
                 if (submitButton) {
-                    submitButton.disabled = false;
+                    submitButton.disabled = uploadSucceeded;
                     submitButton.innerHTML = originalText;
                 }
             }
@@ -1107,23 +1113,19 @@
                 newFields.hidden = !isNew;
                 newName.required = isNew;
 
-                if (this.value === "common") {
-                    hint.textContent = "Common is shown only where no specific area layout is uploaded.";
-                } else if (isNew) {
+                if (isNew) {
                     hint.textContent = "The images will be mapped only to the new area.";
                 } else {
-                    hint.textContent = option.dataset.locations
-                        ? `Checkpoint locations: ${option.dataset.locations}`
-                        : "These images will appear only inside this survey area.";
+                    hint.textContent = "This layout will appear only inside the selected survey areas.";
                 }
 
                 const assignment = form.querySelector(".machinery-area-assignment");
-                if (assignment) assignment.hidden = this.value !== "machinery";
+                if (assignment) assignment.hidden = false;
                 const machineryFiles = form.querySelector(".machinery-current-files");
                 if (machineryFiles) machineryFiles.classList.toggle("d-none", this.value !== "machinery");
                 const gaFile = form.querySelector(".ga-current-file");
                 if (gaFile) gaFile.classList.toggle("d-none", this.value !== "common");
-                if (this.value === "machinery" && !form.dataset.editLayoutId) refreshMachineryAreaAvailability(form);
+                if (!form.dataset.editLayoutId) refreshMachineryAreaAvailability(form);
 
                 updateAttachment(form, option);
             });
@@ -1163,9 +1165,9 @@
             const target = select.value;
             const targetLabel = option.textContent.trim();
             const newAreaName = select.value === "new" ? newNameInput.value.trim() : "";
-            const assignedAreaIds = select.value === "machinery"
-                ? [...form.querySelectorAll(".machinery-area-checkbox:checked")].map(x => x.value).join(",")
-                : "";
+            const assignedAreaIds = [...form.querySelectorAll(".machinery-area-checkbox:checked")]
+                .map(x => x.value)
+                .join(",");
 
             if (target === "common" && option.dataset.filePath && fileInput) {
                 if (!confirm("Replace the existing GA Layout file?")) {
@@ -1213,8 +1215,8 @@
 
             const file = fileInput.files[0];
 
-            if (select.value === "machinery" && !assignedAreaIds) {
-                alert("Select at least one survey area for this Machinery file.");
+            if (!assignedAreaIds) {
+                alert("Select at least one survey area for this layout file.");
                 return;
             }
 
@@ -1364,7 +1366,7 @@
             const select = form.querySelector(".area-layout-select");
             const fileInput = form.querySelector(".layout-file-input");
             const hint = form.querySelector(".area-location-hint");
-            const previousValue = select.value || "common";
+            const previousValue = "machinery";
             const requestUrl = `/SurveyJobs/IhmLayoutOptions?jobId=${encodeURIComponent(jobId)}`;
 
             form.dataset.layoutLoading = "true";
@@ -1392,7 +1394,10 @@
                 const data = responseText ? JSON.parse(responseText) : {};
                 const layouts = data.layouts || data.Layouts || [];
                 select.innerHTML = "";
-                layouts.forEach(layout => {
+                layouts.filter(layout => {
+                    const target = layout.target || layout.Target || "";
+                    return target.toLowerCase() === "machinery";
+                }).forEach(layout => {
                     const target = layout.target || layout.Target || "";
                     const type = layout.layoutType || layout.LayoutType || "";
                     if (!target || !type) return;
@@ -1405,14 +1410,12 @@
                     ));
                 });
 
-                select.value = Array.from(select.options).some(option => option.value === previousValue)
-                    ? previousValue
-                    : "common";
+                select.value = "machinery";
 
                 form.dataset.layoutLoaded = "true";
                 select.dispatchEvent(new Event("change"));
                 if (!layouts.length) {
-                    hint.textContent = "No GA or Machinery Layout uploaded.";
+                    hint.textContent = "No area layout files uploaded.";
                 }
             } catch (error) {
                 form.dataset.layoutLoaded = "false";
