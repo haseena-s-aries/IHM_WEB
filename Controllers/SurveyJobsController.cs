@@ -360,6 +360,10 @@ namespace Survery_Certification_App_Consume.Controllers
                 ViewBag.Job = job;
                 ViewBag.JobId = jobId;
                 ViewBag.Layouts = areaLayouts;
+                ViewBag.ApiRoot = (client.BaseAddress?.ToString() ?? "")
+                    .Replace("/api/", "/")
+                    .Replace("/api", "")
+                    .TrimEnd('/');
                 ViewBag.IhmCompletionFilter = ihmCompletionFilter;
                 ViewBag.ReturnUrl = SafeSurveyAreasReturnUrl(returnUrl, jobId, ihmCompletionFilter);
                 return View(area);
