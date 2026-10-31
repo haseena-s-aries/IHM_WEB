@@ -1,0 +1,113 @@
+@model Survery_Certification_App_Consume.Models.CreateUserDto
+@{
+    ViewData["Title"] = "Register";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Register | AURAS</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <style>
+        body { min-height:100vh; margin:0; background:linear-gradient(120deg,#5b2be2 0%,#2e63ef 100%); font-family:Arial,Helvetica,sans-serif; color:#111; }
+        .register-card { width:400px; border:0; border-radius:5px; }
+        .register-card h2 { font-size:32px; font-weight:400; color:#111; }
+        .form-label { font-size:16px; font-weight:400; }
+        .form-control, .form-select { min-height:45px; padding:9px 12px; border:1px solid #c7d0df; border-radius:10px; font-size:14px; background:#e8f0fd; }
+        .form-control:focus, .form-select:focus { background:#e8f0fd; border-color:#86a9df; box-shadow:0 0 0 .2rem rgba(13,110,253,.12); }
+        .btn-primary { min-height:45px; border:0; border-radius:10px; background:#1677f3; font-size:16px; font-weight:700; }
+        .btn-primary:hover { background:#0d68dc; }
+        .btn-otp-secondary { min-height:45px; border:0; border-radius:10px; background:#6f42c1; color:#fff; font-size:16px; font-weight:700; }
+        .btn-otp-secondary:hover { background:#5d35a5; color:#fff; }
+        .register-card a { font-size:16px; }
+        .register-card .text-center.mt-3 { margin-top:20px !important; }
+        .step-hidden { display:none; }
+        .status { min-height:20px; font-size:13px; text-align:center; margin-top:12px; }
+    </style>
+</head>
+<body>
+    <div class="d-flex justify-content-center align-items-center vh-100">
+    <main class="register-card card shadow-lg p-4">
+        <h2 class="text-center mb-4">Register</h2>
+        <form id="registerForm">
+            <div class="mb-3"><label class="form-label">Full name</label><input id="FullName" class="form-control" required /></div>
+            <div class="mb-3"><label class="form-label">Email</label><input id="Email" type="email" class="form-control" required /></div>
+            <button id="sendOtpBtn" type="button" class="btn btn-primary w-100">Send OTP</button>
+            <div id="otpSection" class="step-hidden mt-3">
+                <label class="form-label">OTP</label><input id="OtpCode" class="form-control" />
+                <button id="verifyOtpBtn" type="button" class="btn btn-primary w-100 mt-2">Verify OTP</button>
+                <button id="resendOtpBtn" type="button" class="btn btn-otp-secondary w-100 mt-2">Resend OTP</button>
+            </div>
+            <div id="accountSection" class="step-hidden mt-3">
+                <div class="mb-3"><label class="form-label">Password</label><input id="Password" type="password" class="form-control" /></div>
+                <div class="mb-3"><label class="form-label">Confirm password</label><input id="ConfirmPassword" type="password" class="form-control" /></div>
+                <div class="mb-3"><label class="form-label">Project</label><select id="ProjectId" class="form-select"><option value="">Select project</option></select></div>
+                <div class="mb-3"><label class="form-label">Role</label><select id="RoleId" class="form-select" disabled><option value="">Select role</option></select></div>
+                <button id="registerBtn" type="button" class="btn btn-primary w-100">Register</button>
+            </div>
+            <div id="status" class="status"></div>
+        </form>
+            <div class="text-center mt-3">Already have an account? <a href="@Url.Action("Login", "Auth")">Login</a></div>
+    </main>
+    </div>
+    <script>
+        const $ = id => document.getElementById(id);
+        const status = message => { $('status').textContent = ''; };
+        const showAlert = message => window.alert(message);
+        function errorMessage(data, fallback) {
+            if (data?.errors) {
+                const messages = Object.entries(data.errors).flatMap(([field, errors]) =>
+                    (Array.isArray(errors) ? errors : [errors]).map(error => `${field}: ${error}`));
+                if (messages.length) return messages.join('\n');
+            }
+            return data?.message || fallback;
+        }
+        async function jsonPost(url, body) {
+            const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+            let data = {};
+            try { data = await r.json(); } catch (_) { data = {}; }
+            return { ok:r.ok, data };
+        }
+        async function loadProjects() { const r=await fetch('/Home/RegisterProjects'); const items=await r.json(); items.forEach(x=>$('ProjectId').insertAdjacentHTML('beforeend', `<option value="${x.id}">${x.name}</option>`)); }
+        $('ProjectId').addEventListener('change', async e => { $('RoleId').innerHTML='<option value="">Select role</option>'; $('RoleId').disabled=true; if(!e.target.value)return; const r=await fetch(`/Home/RegisterRoles?projectId=${e.target.value}`); (await r.json()).forEach(x=>$('RoleId').insertAdjacentHTML('beforeend', `<option value="${x.id}">${x.roleName}</option>`)); $('RoleId').disabled=false; });
+        async function sendOtp() {
+            if (!$('FullName').value.trim() || !$('Email').value.trim()) { showAlert('Please enter your full name and email address.'); return; }
+            $('sendOtpBtn').disabled = true;
+            try {
+                const r = await jsonPost('/Home/SendOtp', { Email:$('Email').value.trim().toLowerCase() });
+                if (!r.ok) throw Error(errorMessage(r.data, 'Unable to send OTP.'));
+                $('otpSection').classList.remove('step-hidden');
+                showAlert('OTP sent successfully.');
+            } catch (e) { $('sendOtpBtn').disabled = false; showAlert(e.message); }
+        }
+        $('sendOtpBtn').onclick = sendOtp;
+        $('resendOtpBtn').onclick = sendOtp;
+        $('verifyOtpBtn').onclick=async()=>{
+            if (!$('OtpCode').value.trim()) { showAlert('Please enter the OTP.'); return; }
+            try {
+                const r=await jsonPost('/Home/VerifyOtp',{Email:$('Email').value.trim().toLowerCase(),Otp:$('OtpCode').value.trim()});
+                if(!r.ok) throw Error(errorMessage(r.data,'OTP verification failed.'));
+                $('accountSection').classList.remove('step-hidden'); $('verifyOtpBtn').disabled=true; $('OtpCode').readOnly=true;
+                showAlert('OTP verified successfully. Complete your account details.');
+                $('accountSection').scrollIntoView({ behavior:'smooth', block:'center' });
+            } catch(e){ showAlert(e.message); }
+        };
+        $('registerBtn').onclick=async()=>{
+            const body={fullName:$('FullName').value.trim(),email:$('Email').value.trim().toLowerCase(),password:$('Password').value,confirmPassword:$('ConfirmPassword').value,projectId:Number($('ProjectId').value),roleId:Number($('RoleId').value),role:$('RoleId').selectedOptions[0]?.textContent||''};
+            if (body.password.length < 6) { showAlert('Password must be at least 6 characters.'); $('Password').focus(); return; }
+            if (body.password !== body.confirmPassword) { showAlert('Password and Confirm Password do not match.'); $('ConfirmPassword').focus(); return; }
+            if (!body.projectId) { showAlert('Please select a project.'); $('ProjectId').focus(); return; }
+            if (!body.roleId) { showAlert('Please select a role.'); $('RoleId').focus(); return; }
+            try {
+                const r=await jsonPost('/Home/Register',body);
+                if(!r.ok) throw Error(errorMessage(r.data,'Registration failed.'));
+                showAlert('Registration successful. Please wait for admin approval.');
+                window.location.href=r.data.redirectUrl||'/Auth/Login';
+            }
+            catch(e){ showAlert(e.message); }
+        };
+        loadProjects();
+    </script>
+</body>
+</html>
