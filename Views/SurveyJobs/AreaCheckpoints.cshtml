@@ -577,11 +577,9 @@
         <h2 class="section-title">Checkpoints</h2>
 
         <div class="grid">
-            @foreach (var checkpoint in (Model.Checkpoints ?? new List<Survery_Certification_App_Consume.Models.IhmCheckpointOptionDto>())
-                        .OrderBy(x => x.IsSample ? 0 : x.IsVisual ? 1 : 2)
-                        .ThenBy(x => SampleOrder(x.SampleNo))
-                        .ThenBy(x => x.SampleNo)
-                        .ThenBy(x => x.Location))
+            @* Keep the order from the API, which is the uploaded Excel row order.
+               Do not group Sample above Visual, and do not sort by number. *@
+            @foreach (var checkpoint in (Model.Checkpoints ?? new List<Survery_Certification_App_Consume.Models.IhmCheckpointOptionDto>()))
             {
                 var isVisual = checkpoint.IsVisual;
                 var isSample = checkpoint.IsSample;
