@@ -276,6 +276,74 @@
             cursor: wait;
         }
 
+        .undecided {
+            background: #eef1f5;
+            color: #6b7c8f;
+        }
+
+        /* Compact [S | V] choice for checkpoints left blank in the Excel */
+        .procedure-choice {
+            display: inline-flex;
+            border-radius: 8px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .procedure-choice button {
+            width: 32px;
+            height: 26px;
+            border: 1px solid;
+            font-size: 12px;
+            font-weight: 900;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .procedure-choice button + button {
+            border-left: 0;
+        }
+
+        .procedure-choice .choice-s {
+            background: #fff0f1;
+            color: #ff5d65;
+            border-color: #ff9aa0;
+            border-radius: 8px 0 0 8px;
+        }
+
+        .procedure-choice .choice-v {
+            background: #eef7ff;
+            color: #1e95ff;
+            border-color: #8cc8ff;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .procedure-choice button:hover {
+            filter: brightness(.96);
+        }
+
+        .procedure-choice button:disabled {
+            opacity: .6;
+            cursor: wait;
+        }
+
+        /* Sample / Visual / Not decided counts */
+        .type-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: -4px 0 14px;
+        }
+
+        .type-summary span {
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
         .procedure-toggle {
             border: 1px solid #0b7285;
             background: #fff;
@@ -659,6 +727,20 @@
 
     <main class="page">
         <h2 class="section-title">Checkpoints</h2>
+        @{
+            var allCheckpoints = Model.Checkpoints ?? new List<Survery_Certification_App_Consume.Models.IhmCheckpointOptionDto>();
+            var sampleCount = allCheckpoints.Count(x => x.IsSample && !x.IsVisual);
+            var visualCount = allCheckpoints.Count(x => x.IsVisual);
+            var undecidedCount = allCheckpoints.Count(x => !x.IsSample && !x.IsVisual);
+        }
+        <div class="type-summary">
+            <span class="sample"><i class="fa-solid fa-flask"></i>Sample @sampleCount</span>
+            <span class="visual"><i class="fa-solid fa-eye"></i>Visual @visualCount</span>
+            @if (undecidedCount > 0)
+            {
+                <span class="undecided"><i class="fa-solid fa-circle-question"></i>Not decided @undecidedCount</span>
+            }
+        </div>
 
         <div class="grid">
             @* Keep the order from the API, which is the uploaded Excel row order.
@@ -668,9 +750,10 @@
                 var isVisual = checkpoint.IsVisual;
                 var isSample = checkpoint.IsSample;
 
-                var typeClass = isVisual ? "visual" : isSample ? "sample" : "normal";
-                var typeText = isVisual ? "Visual" : isSample ? "Sample" : "Checkpoint";
-                var icon = isVisual ? "fa-eye" : isSample ? "fa-flask" : "fa-location-dot";
+                var isUndecided = !isVisual && !isSample;
+                var typeClass = isVisual ? "visual" : isSample ? "sample" : "undecided";
+                var typeText = isVisual ? "Visual" : isSample ? "Sample" : "Not decided";
+                var icon = isVisual ? "fa-eye" : isSample ? "fa-flask" : "fa-circle-question";
 
                 var code = Val(checkpoint.SampleNo ?? checkpoint.Location);
                 var surveyStatus = checkpoint.IsAudited ? "Surveyed" : "Not surveyed yet";
@@ -694,8 +777,9 @@
                                     data-checkpoint-id="@checkpoint.Id"
                                     data-sample-no="@sampleNo"
                                     data-prefix="@numberPrefix"
+                                    data-undecided="@(isUndecided ? "1" : "0")"
                                     onclick="openSampleNoModal(event, this)">
-                                <h2 class="cp-title @(hasNumber ? "" : "empty")">@(hasNumber ? sampleNo.ToUpperInvariant() : $"{(string.IsNullOrEmpty(numberPrefix) ? code : numberPrefix)} · Enter no.")</h2>
+                                <h2 class="cp-title @(hasNumber ? "" : "empty")">@(hasNumber ? sampleNo.ToUpperInvariant() : (isUndecided ? "Enter no." : $"{numberPrefix} · Enter no."))</h2>
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </button>
                             @if (isVisual || isSample)
@@ -707,6 +791,17 @@
                                         onclick="toggleCheckpointProcedure(event, this)">
                                     Change to @(isVisual ? "S" : "V")
                                 </button>
+                            }
+                            else
+                            {
+                                <span class="procedure-choice" onclick="event.stopPropagation()">
+                                    <button type="button" class="choice-s" title="Set as Sample"
+                                            data-checkpoint-id="@checkpoint.Id"
+                                            onclick="setCheckpointProcedure(event, this, 'sample')">S</button>
+                                    <button type="button" class="choice-v" title="Set as Visual"
+                                            data-checkpoint-id="@checkpoint.Id"
+                                            onclick="setCheckpointProcedure(event, this, 'visual')">V</button>
+                                </span>
                             }
                         </div>
 
@@ -1291,6 +1386,13 @@
                     throw new Error(message || `HTTP ${response.status}`);
                 }
 
+                // Not decided: the letter typed set Sample / Visual, so refresh
+                // the card badge. Cards keep the Excel order, so it stays put.
+                if (button.dataset.undecided === "1") {
+                    window.location.reload();
+                    return;
+                }
+
                 // Update the card in place so it keeps its position.
                 button.dataset.sampleNo = value;
                 const title = button.querySelector(".cp-title");
@@ -1301,6 +1403,35 @@
                 console.error("Failed to save sample number", error);
                 errorBox.innerText = error?.message || "Unable to save the number. Please try again.";
                 saveBtn.disabled = false;
+            }
+        }
+
+        // Sets Sample / Visual on a checkpoint left blank in the Excel.
+        async function setCheckpointProcedure(event, button, procedureType) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const checkpointId = Number(button.dataset.checkpointId || 0);
+            if (!checkpointId) return;
+
+            const group = button.closest(".procedure-choice");
+            group?.querySelectorAll("button").forEach(b => b.disabled = true);
+
+            try {
+                const response = await fetch(`${apiRoot}/api/ihm-survey/checkpoints/${checkpointId}/procedure`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+                    body: JSON.stringify({ procedureType })
+                });
+                if (!response.ok) {
+                    throw new Error(await response.text() || `HTTP ${response.status}`);
+                }
+                // Cards keep the Excel order, so a reload does not move the card.
+                window.location.reload();
+            } catch (error) {
+                console.error("Failed to set checkpoint procedure", error);
+                group?.querySelectorAll("button").forEach(b => b.disabled = false);
+                alert("Unable to update this checkpoint. Please try again.");
             }
         }
 

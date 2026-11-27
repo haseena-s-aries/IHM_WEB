@@ -661,9 +661,25 @@ namespace Survery_Certification_App_Consume.Controllers
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(body)
+                    var errorMessage = body;
+                    try
+                    {
+                        // API errors come back as { "message": "..." }.
+                        var parsed = Newtonsoft.Json.Linq.JToken.Parse(body);
+                        var apiMessage = parsed.Type == Newtonsoft.Json.Linq.JTokenType.Object
+                            ? (string?)(parsed["message"] ?? parsed["Message"])
+                            : null;
+                        if (!string.IsNullOrWhiteSpace(apiMessage))
+                            errorMessage = apiMessage;
+                    }
+                    catch
+                    {
+                        // Plain-text error: show as is.
+                    }
+
+                    TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(errorMessage)
                         ? "Unable to save checkpoint."
-                        : body;
+                        : errorMessage;
                     return RedirectToAction("CheckpointDetail", new
                     {
                         jobId = request.JobId,
