@@ -192,6 +192,90 @@
             white-space: nowrap;
         }
 
+        /* Sample / visual number entered manually (S01, V01, ...) */
+        .sample-no-btn {
+            border: 1px dashed transparent;
+            background: transparent;
+            border-radius: 8px;
+            padding: 3px 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+            cursor: pointer;
+            color: inherit;
+            font: inherit;
+        }
+
+        .sample-no-btn:hover {
+            border-color: #9fb3c8;
+            background: #f5f8fd;
+        }
+
+        .sample-no-btn .cp-title.empty {
+            color: #8aa0b6;
+            font-weight: 700;
+        }
+
+        .sample-no-btn i {
+            color: #607d9a;
+            font-size: 12px;
+        }
+
+        .sample-no-panel {
+            width: min(100%, 380px);
+        }
+
+        .sample-no-input {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #c5d3e0;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .sample-no-error {
+            color: #d6336c;
+            font-size: 12px;
+            margin-top: 8px;
+            min-height: 16px;
+        }
+
+        .sample-no-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 12px 16px;
+            border-top: 1px solid #d8e3ee;
+        }
+
+        .sample-no-actions button {
+            border-radius: 10px;
+            padding: 8px 14px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .sample-no-cancel {
+            border: 1px solid #c5d3e0;
+            background: #fff;
+            color: #374e64;
+        }
+
+        .sample-no-save {
+            border: 0;
+            background: #0b7285;
+            color: #fff;
+        }
+
+        .sample-no-save:disabled {
+            opacity: .6;
+            cursor: wait;
+        }
+
         .procedure-toggle {
             border: 1px solid #0b7285;
             background: #fff;
@@ -599,7 +683,21 @@
                                 <i class="fa-solid @icon"></i>
                                 @typeText
                             </span>
-                            <h2 class="cp-title">@code</h2>
+                            @{
+                                var sampleNo = (checkpoint.SampleNo ?? string.Empty).Trim();
+                                var hasNumber = System.Text.RegularExpressions.Regex.IsMatch(sampleNo, "^[SsVv]\\d+$");
+                                var numberPrefix = isVisual ? "V" : isSample ? "S" : "";
+                            }
+                            <button type="button"
+                                    class="sample-no-btn"
+                                    title="Enter sample / visual number"
+                                    data-checkpoint-id="@checkpoint.Id"
+                                    data-sample-no="@sampleNo"
+                                    data-prefix="@numberPrefix"
+                                    onclick="openSampleNoModal(event, this)">
+                                <h2 class="cp-title @(hasNumber ? "" : "empty")">@(hasNumber ? sampleNo.ToUpperInvariant() : $"{(string.IsNullOrEmpty(numberPrefix) ? code : numberPrefix)} · Enter no.")</h2>
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
                             @if (isVisual || isSample)
                             {
                                 <button type="button"
@@ -693,6 +791,24 @@
             }
         </div>
     </main>
+    <div id="sampleNoModal" class="marker-modal" onclick="if (event.target === this) closeSampleNoModal()">
+        <div class="marker-panel sample-no-panel">
+            <div class="marker-head">
+                <h3 id="sampleNoTitle" class="marker-title">Sample / Visual Number</h3>
+                <button type="button" class="marker-close" onclick="closeSampleNoModal()">×</button>
+            </div>
+            <div class="marker-body">
+                <input id="sampleNoInput" class="sample-no-input" type="text" maxlength="20" autocomplete="off"
+                       placeholder="S01"
+                       onkeydown="if (event.key === 'Enter') saveSampleNo(); if (event.key === 'Escape') closeSampleNoModal();" />
+                <div id="sampleNoError" class="sample-no-error"></div>
+            </div>
+            <div class="sample-no-actions">
+                <button type="button" class="sample-no-cancel" onclick="closeSampleNoModal()">Cancel</button>
+                <button id="sampleNoSaveBtn" type="button" class="sample-no-save" onclick="saveSampleNo()">Save</button>
+            </div>
+        </div>
+    </div>
     <div id="markerModal" class="marker-modal">
         <div class="marker-panel">
             <div class="marker-head">
@@ -1094,6 +1210,98 @@
             const div = document.createElement("div");
             div.textContent = value ?? "";
             return div.innerHTML;
+        }
+
+        // ---- Sample / visual number entered manually (S01, V01, ...) ----
+        let sampleNoButton = null;
+
+        function openSampleNoModal(event, button) {
+            event.preventDefault();
+            event.stopPropagation();
+            sampleNoButton = button;
+
+            const prefix = String(button.dataset.prefix || "").toUpperCase();
+            const current = String(button.dataset.sampleNo || "").trim().toUpperCase();
+            const hasNumber = /^[SV]\d+$/.test(current);
+
+            document.getElementById("sampleNoTitle").innerText =
+                prefix === "V" ? "Visual Number" : prefix === "S" ? "Sample Number" : "Sample / Visual Number";
+            const input = document.getElementById("sampleNoInput");
+            input.value = hasNumber ? current : prefix;
+            input.placeholder = `${prefix || "S"}01`;
+            document.getElementById("sampleNoError").innerText = "";
+            document.getElementById("sampleNoSaveBtn").disabled = false;
+            document.getElementById("sampleNoModal").style.display = "flex";
+            setTimeout(() => {
+                input.focus();
+                input.setSelectionRange(input.value.length, input.value.length);
+            }, 0);
+        }
+
+        function closeSampleNoModal() {
+            document.getElementById("sampleNoModal").style.display = "none";
+            sampleNoButton = null;
+        }
+
+        async function saveSampleNo(allowDuplicate = false) {
+            if (!sampleNoButton) return;
+            const button = sampleNoButton;
+            const checkpointId = Number(button.dataset.checkpointId || 0);
+            const prefix = String(button.dataset.prefix || "").toUpperCase();
+            const errorBox = document.getElementById("sampleNoError");
+            const saveBtn = document.getElementById("sampleNoSaveBtn");
+            const value = document.getElementById("sampleNoInput").value.trim().toUpperCase();
+
+            if (!/^[SV]\d+$/.test(value)) {
+                errorBox.innerText = `Enter S or V followed by a number, e.g. ${prefix || "S"}01`;
+                return;
+            }
+            if (prefix && !value.startsWith(prefix)) {
+                errorBox.innerText = prefix === "S"
+                    ? 'This is a Sample checkpoint, so the number must start with S. Use "Change to V" first to make it Visual.'
+                    : 'This is a Visual checkpoint, so the number must start with V. Use "Change to S" first to make it Sample.';
+                return;
+            }
+
+            errorBox.innerText = "";
+            saveBtn.disabled = true;
+            try {
+                const response = await fetch(`${apiRoot}/api/ihm-survey/checkpoints/${checkpointId}/sample-no`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+                    body: JSON.stringify({ sampleNo: value, allowDuplicate })
+                });
+
+                if (response.status === 409) {
+                    saveBtn.disabled = false;
+                    if (confirm(`${value} is already used by another checkpoint in this job. Save it anyway?`)) {
+                        await saveSampleNo(true);
+                    }
+                    return;
+                }
+
+                if (!response.ok) {
+                    let message = "";
+                    try {
+                        const data = await response.json();
+                        message = data?.message || data?.Message || "";
+                    } catch {
+                        message = await response.text().catch(() => "");
+                    }
+                    throw new Error(message || `HTTP ${response.status}`);
+                }
+
+                // Update the card in place so it keeps its position.
+                button.dataset.sampleNo = value;
+                const title = button.querySelector(".cp-title");
+                title.innerText = value;
+                title.classList.remove("empty");
+                closeSampleNoModal();
+            } catch (error) {
+                console.error("Failed to save sample number", error);
+                errorBox.innerText = error?.message || "Unable to save the number. Please try again.";
+                saveBtn.disabled = false;
+            }
         }
 
         async function toggleCheckpointProcedure(event, button) {
